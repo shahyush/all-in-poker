@@ -1,0 +1,33 @@
+name: Publish server bundle
+# Rebuilds the edge API bundle and uploads it to the Supabase asset store (public.app_assets 'edge/server.js').
+# The `api` function pins the bundle by sha256; after a successful upload, redeploy `api` with the new BUNDLE_SHA.
+# Triggered by hand with a one-time upload token: store sha256(token) in app_settings.upload_token_sha first and
+# clear it afterwards. The repository is private, so this is the only path from CI into the project without secrets.
+on:
+  workflow_dispatch:
+    inputs:
+      upload_token:
+        description: One-time upload token
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: publish-bundle
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "::add-mask::${{ inputs.upload_token }}"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test -w engine
+      - run: npm run bundle:function
+      - run: sha256sum supabase/functions/api/bundle/server.js
+      - run: node scripts/publish-assets.mjs supabase/functions/api/bundle edge
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://vlnkslhmmbkkvbpvzuiw.supabase.co' }}
+          ALLIN_UPLOAD_TOKEN: ${{ inputs.upload_token }}
