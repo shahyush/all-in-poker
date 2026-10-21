@@ -1,0 +1,1 @@
+{ "extends": "../tsconfig.base.json", "compilerOptions": { "types": ["node"], "paths": { "@allin/engine": ["../engine/src/index.ts"] } }, "include": ["src", "test"] }

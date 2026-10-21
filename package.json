@@ -1,0 +1,22 @@
+{
+  "name": "all-in-poker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["engine", "server", "web"],
+  "scripts": {
+    "test": "npm run test -w engine && npm run test -w server",
+    "test:e2e": "npm run test:e2e -w web",
+    "build": "npm run build -w web",
+    "bundle:function": "node scripts/bundle-function.mjs",
+    "dev:server": "npm run dev -w server",
+    "dev:web": "npm run dev -w web"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vitest": "5.0.5",
+    "tsx": "4.23.15",
+    "esbuild": "0.28.2",
+    "@types/node": "26.6.5"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@allin/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p .",
+    "dev": "tsx src/node/dev-server.ts"
+  },
+  "dependencies": {
+    "postgres": "3.4.9",
+    "@supabase/supabase-js": "2.118.0"
+  }
+}
