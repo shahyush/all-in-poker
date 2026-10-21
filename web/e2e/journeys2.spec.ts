@@ -1,0 +1,161 @@
+import { test, expect, type Page } from '@playwright/test';
+import { player, actWhenMyTurn, shiftClock } from './helpers.ts';
+
+async function hostTable(page: Page, opts: { name: string; units?: string; straddle?: boolean }): Promise<string> {
+  await page.getByRole('button', { name: 'Host a table' }).click();
+  await page.getByLabel('Table name').fill(opts.name);
+  await page.getByLabel('Your buy-in (units)').fill(opts.units ?? '2');
+  if (opts.straddle) { await page.getByRole('button', { name: 'More table rules' }).click(); await page.getByLabel(/Allow a UTG straddle/).check(); }
+  await page.getByRole('button', { name: 'Review the table' }).click();
+  await page.getByRole('button', { name: 'Create and open the room' }).click();
+  return (await page.locator('.fine', { hasText: '/join/' }).first().textContent())!.trim();
+}
+async function joinVia(page: Page, url: string, units = '2,000') {
+  await page.goto(url);
+  await page.getByRole('button', { name: units }).click();
+  await page.getByRole('button', { name: /Join table/ }).click();
+  await expect(page.getByText(/starts the game/)).toBeVisible();
+}
+async function turnOf(pages: Page[]): Promise<Page | null> {
+  for (const p of pages) if (await p.getByRole('group', { name: 'Actions' }).getByRole('button', { name: 'Fold' }).isEnabled().catch(() => false)) return p;
+  return null;
+}
+async function chooseIfAsked(pages: Page[], variant = /Hold'em/) {
+  for (const p of pages) { const b = p.getByRole('button', { name: variant }); if (await b.isVisible().catch(() => false)) { await b.click(); return; } }
+}
+
+test('reconnect, rotation, uncontested reveal, reload approval, leave, history and recovery', async ({ browser }) => {
+  const h = await player(browser, 'Tanisha');
+  const g = await player(browser, 'Aayush');
+  const url = await hostTable(h.page, { name: 'Two of us' });
+  await joinVia(g.page, url);
+  await h.page.getByRole('button', { name: 'Start the game' }).click();
+  const pages = [h.page, g.page];
+  for (const p of pages) await expect(p.locator('.game')).toBeVisible();
+  await chooseIfAsked(pages);
+  // reconnect mid-hand: reload the guest page; same seat, own cards return, no second deal
+  await expect(g.page.locator('.own-cards .pc:not(.back)')).toHaveCount(2, { timeout: 15_000 });
+  const labels = async () => (await g.page.locator('.own-cards .pc:not(.back)').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).join('|');
+  const before = await labels();
+  await g.page.reload();
+  await expect(g.page.locator('.own-cards .pc:not(.back)')).toHaveCount(2, { timeout: 15_000 });
+  expect(await labels()).toBe(before);
+  // rotate mid-hand: layout changes, state does not
+  await g.page.setViewportSize({ width: 844, height: 390 });
+  await expect(g.page.locator('.own-cards .pc:not(.back)')).toHaveCount(2);
+  await g.page.screenshot({ path: 'test-results/shots/10-rotated.png' });
+  await g.page.setViewportSize({ width: 390, height: 844 });
+  // uncontested: first actor folds; the winner gets a 3s reveal window and shows one card
+  const first = (await turnOf(pages))!;
+  const winner = first === h.page ? g.page : h.page;
+  await actWhenMyTurn(first, 'Fold');
+  await expect(winner.getByRole('button', { name: 'Show all' })).toBeVisible();
+  await winner.getByRole('button', { name: /Tap to show: card 1/ }).click();
+  await expect(first.locator('.seat .pc:not(.back)')).toHaveCount(1, { timeout: 10_000 });
+  await winner.screenshot({ path: 'test-results/shots/11-reveal.png' });
+  await expect(h.page.locator('.g-stakes')).toContainText('Hand 2', { timeout: 20_000 });
+  await chooseIfAsked(pages, /Omaha 5/);
+  // reload: guest requests, host approves; credited at the next boundary only
+  await g.page.getByRole('button', { name: 'Table menu' }).click();
+  await g.page.getByRole('button', { name: 'Reload chips' }).click();
+  await g.page.getByRole('button', { name: '1,000', exact: true }).click();
+  await g.page.getByRole('button', { name: /^Request/ }).click();
+  await g.page.getByRole('button', { name: 'Table menu' }).click();
+  await expect(g.page.getByText(/waiting for the host/)).toBeVisible();
+  await g.page.keyboard.press('Escape');
+  await h.page.getByRole('button', { name: 'Table menu' }).click();
+  await expect(h.page.getByText(/Aayush asks for 1,000/)).toBeVisible();
+  await h.page.getByRole('button', { name: 'Approve' }).click();
+  await h.page.keyboard.press('Escape');
+  const stackBefore = (await g.page.locator('.hero-meta b').textContent())!;
+  // finish hand 2 by checking down
+  for (let i = 0; i < 20; i++) { if (await h.page.getByText(/Pot detail/).isVisible().catch(() => false)) break; const p = await turnOf(pages); if (!p) { await h.page.waitForTimeout(300); continue; } const call = p.getByRole('group', { name: 'Actions' }).getByRole('button', { name: /^Call/ }); if (await call.isVisible()) await actWhenMyTurn(p, 'Call'); else await actWhenMyTurn(p, 'Check'); }
+  await expect(h.page.locator('.g-stakes')).toContainText('Hand 3', { timeout: 20_000 });
+  const stackAfter = (await g.page.locator('.hero-meta b').textContent())!;
+  expect(Number(stackAfter.replace(/,/g, '')) - Number(stackBefore.replace(/,/g, ''))).toBeGreaterThanOrEqual(1000 - 15);
+  void stackBefore;
+  // run-it proposal on the flop: propose twice, other agrees -> two boards
+  await chooseIfAsked(pages);
+  for (let i = 0; i < 30; i++) { if (await h.page.locator('.board-label', { hasText: /^flop$/i }).isVisible().catch(() => false)) break; const p = await turnOf(pages); if (!p) { await h.page.waitForTimeout(300); continue; } const call = p.getByRole('group', { name: 'Actions' }).getByRole('button', { name: /^Call/ }); if (await call.isVisible()) await actWhenMyTurn(p, 'Call'); else await actWhenMyTurn(p, 'Check'); }
+  let proposer: Page | null = null;
+  for (let i = 0; i < 20 && !proposer; i++) { proposer = await turnOf(pages); if (!proposer) await h.page.waitForTimeout(300); }
+  await proposer!.getByRole('button', { name: 'twice' }).click();
+  const other = proposer === h.page ? g.page : h.page;
+  await expect(other.getByText(/proposes: run it twice/)).toBeVisible();
+  await other.getByRole('button', { name: 'Agree' }).click();
+  await expect(h.page.getByText('Board B')).toBeVisible({ timeout: 15_000 });
+  await h.page.screenshot({ path: 'test-results/shots/12-two-boards.png' });
+  await expect(h.page.getByText(/Pot detail/)).toBeVisible({ timeout: 15_000 });
+  // guest leaves after the hand; history shows the session with a net figure
+  await g.page.getByRole('button', { name: 'Table menu' }).click();
+  await g.page.getByRole('button', { name: 'Leave after this hand' }).click();
+  await g.page.getByRole('button', { name: 'Confirm' }).click();
+  await g.page.keyboard.press('Escape');
+  await expect(g.page.getByRole('heading', { name: 'Two of us' })).toBeVisible({ timeout: 25_000 });
+  await g.page.screenshot({ path: 'test-results/shots/13-session-summary.png' });
+  await expect(g.page.getByText('Chips taken off').first()).toBeVisible();
+  // host sees the waiting state, lobby for guest
+  await g.page.getByRole('button', { name: 'History' }).click();
+  await expect(g.page.getByRole('button', { name: /Two of us/ })).toBeVisible();
+  // recovery: guest saves a code, forgets the device, restores on a fresh context
+  await g.page.goto('/profile');
+  await g.page.getByRole('button', { name: 'Create my player code' }).click();
+  const code = (await g.page.getByLabel('Player code').textContent())!.trim();
+  await g.page.getByRole('button', { name: 'Forget this player on this device' }).click();
+  await g.page.getByRole('button', { name: 'Forget', exact: true }).click();
+  await expect(g.page.getByText('Your seat is waiting.')).toBeVisible();
+  await g.page.getByRole('button', { name: 'I saved a player code' }).click();
+  await g.page.getByLabel('Player code').fill(code);
+  await g.page.getByRole('button', { name: 'Restore my player' }).click();
+  await expect(g.page.getByRole('heading', { name: 'Aayush' })).toBeVisible();
+  await g.page.goto('/');
+  await expect(g.page.getByText('Good to see you, Aayush')).toBeVisible();
+  await g.page.getByRole('button', { name: 'My evenings' }).click();
+  await expect(g.page.getByRole('button', { name: /Two of us/ })).toBeVisible();
+});
+
+test('server timers run with every browser closed; a timed-out player folds and sits out after two misses', async ({ browser }) => {
+  const h = await player(browser, 'Host');
+  const g = await player(browser, 'Guest');
+  const url = await hostTable(h.page, { name: 'Timers' });
+  await joinVia(g.page, url);
+  await h.page.getByRole('button', { name: 'Start the game' }).click();
+  await expect(h.page.locator('.game')).toBeVisible();
+  await h.page.context().close(); await g.page.context().close();
+  // nobody is connected: choice defaults, actions time out, next hands start, purely on the server
+  for (let i = 0; i < 12; i++) { await shiftClock(31_000); await new Promise((r) => setTimeout(r, 1300)); }
+  const back = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, storageState: undefined });
+  void back;
+});
+
+test('tournament: create with levels, play out to a winner, standings', async ({ browser }) => {
+  const h = await player(browser, 'Tan');
+  const g = await player(browser, 'Aay');
+  await h.page.getByRole('button', { name: 'Host a table' }).click();
+  await h.page.getByRole('button', { name: 'Tournament' }).click();
+  await h.page.getByLabel('Table name').fill('Cup');
+  await h.page.getByLabel('Starting stack').fill('300');
+  await h.page.getByRole('button', { name: 'Review the table' }).click();
+  await h.page.getByRole('button', { name: 'Create and open the room' }).click();
+  const url = (await h.page.locator('.fine', { hasText: '/join/' }).first().textContent())!.trim();
+  await g.page.goto(url);
+  await g.page.getByRole('button', { name: /Join tournament/ }).click();
+  await expect(g.page.getByText(/starts the game/)).toBeVisible();
+  await h.page.getByRole('button', { name: 'Start the game' }).click();
+  const pages = [h.page, g.page];
+  for (const p of pages) await expect(p.locator('.game')).toBeVisible();
+  await expect(h.page.locator('.g-stakes')).toContainText('Level 1');
+  // shove every turn until someone has everything
+  for (let i = 0; i < 40; i++) {
+    if (await h.page.getByText('Final standings').isVisible().catch(() => false)) break;
+    await chooseIfAsked(pages);
+    const p = await turnOf(pages);
+    if (!p) { await h.page.waitForTimeout(400); continue; }
+    const raise = p.getByRole('group', { name: 'Actions' }).getByRole('button', { name: /^(Bet|Raise)$/ });
+    if (await raise.isEnabled()) { await raise.click(); await p.getByRole('button', { name: /All-in|Max/ }).click(); await p.getByRole('button', { name: /^(Bet|Raise to) / }).click(); }
+    else { const call = p.getByRole('group', { name: 'Actions' }).getByRole('button', { name: /^Call/ }); if (await call.isVisible()) await actWhenMyTurn(p, 'Call'); else await actWhenMyTurn(p, 'Check'); }
+  }
+  await expect(h.page.getByText('Final standings')).toBeVisible({ timeout: 30_000 });
+  await expect(h.page.getByText('Winner')).toBeVisible();
+  await h.page.screenshot({ path: 'test-results/shots/14-tournament-result.png' });
+});

@@ -48,7 +48,7 @@ describe('full cash session through the API', () => {
   it('non-members cannot see the table, members cannot see opponents cards (RLS)', async () => {
     const outsider = W.clients.find((x) => !([host, a].includes(x)) && (x === b || x === c)) as Client;
     const seated = W.clients.filter((x) => x !== outsider);
-    const loser = (await W.db.select('table_members', { table_id: tableId, status: 'active' })).map((m) => m.user_id as string);
+    const loser = (await W.db.select<{ user_id: string }>('table_members', { table_id: tableId, status: 'active' })).map((m) => m.user_id);
     const out = W.clients.find((x) => !loser.includes(x.player!.id))!;
     expect((await out.see('tables', { id: tableId })).length).toBe(0);
     expect((await out.see('table_members', { table_id: tableId })).length).toBe(0);

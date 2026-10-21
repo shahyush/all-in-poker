@@ -55,9 +55,9 @@ describe('admission and identity', () => {
     expect((await other.raw('recover', { code: code2 })).status).toBe(409);
   });
   it('owner can rotate the group password; nickname/password never select an existing identity', async () => {
-    const owner = W.clients[0] ?? (await W.db.select<{ auth_user_id: string; id: string }>('profiles', { is_owner: true }))[0];
+    const owner = (await W.db.select<{ auth_user_id: string; id: string }>('profiles', { is_owner: true }))[0];
     const { Client } = await import('./harness.ts');
-    const o = new Client(W.app, W.db); o.authUid = (owner as { auth_user_id: string }).auth_user_id; o.player = { id: (owner as { id: string }).id, name: 'Tanisha' };
+    const o = new Client(W.app, W.db); o.authUid = owner.auth_user_id; o.player = { id: owner.id, name: 'Tanisha' };
     await o.cmd('rotate_password', { current: GROUP_PASSWORD, next: 'new-secret-9' });
     const n = new Client(W.app, W.db); await n.signIn();
     expect((await n.raw('admit', { nickname: 'Tanisha', password: GROUP_PASSWORD })).status).toBe(403);

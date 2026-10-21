@@ -44,9 +44,19 @@ export class App {
     }
   }
 
+  private jobKeyCache: { value: string; at: number } | null = null;
+  private async jobKey(): Promise<string> {
+    if (this.env.jobKey) return this.env.jobKey;
+    if (this.jobKeyCache && Date.now() - this.jobKeyCache.at < 60_000) return this.jobKeyCache.value;
+    const rows = await this.db.select<{ value: string }>('app_settings', { key: 'job_key' }, { limit: 1 });
+    const value = rows[0]?.value ?? '';
+    this.jobKeyCache = { value, at: Date.now() };
+    return value;
+  }
+
   private async jobs(req: ApiRequest): Promise<unknown> {
     const key = req.headers['x-allin-job'] ?? '';
-    const expected = this.env.jobKey ?? '';
+    const expected = await this.jobKey();
     if (!expected || !constantTimeEqual(new TextEncoder().encode(key), new TextEncoder().encode(expected))) throw new ApiError(403, 'forbidden', 'Not allowed');
     const body = (req.body ?? {}) as { tableIds?: string[]; limit?: number };
     const ids: string[] = Array.isArray(body.tableIds) && body.tableIds.every(isUuid) ? body.tableIds : await this.db.rpc<string[]>('allin_claim_due', { limit: body.limit ?? 10 });

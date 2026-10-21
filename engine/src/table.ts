@@ -948,6 +948,8 @@ function historyRecord(t: TableState, h: HandState): unknown {
 }
 
 export interface PublicHand extends Omit<HandState, 'deck' | 'cursor' | 'hole' | 'vote' | 'runoutQueue'> {
+  actorLegal: LegalActions | null;
+  canRunTwice: boolean;
   vote: null | { kind: Vote['kind']; runs: 1 | 2; proposer: number | null; electorate: number[]; answered: number[]; deadline: number; remainingMs: number };
   revealedCards: Record<number, { index: number; card: Card }[]>;
   stagesPending: number;
@@ -961,6 +963,8 @@ export function publicView(t: TableState): PublicTable {
     vote: h.vote ? { kind: h.vote.kind, runs: h.vote.runs, proposer: h.vote.proposer, electorate: h.vote.electorate, answered: Object.keys(h.vote.votes).map(Number), deadline: h.vote.deadline, remainingMs: h.vote.remainingMs } : null,
     revealedCards: Object.fromEntries(h.players.filter((p) => p.revealed.length).map((p) => [p.seat, p.revealed.map((i) => ({ index: i, card: h.hole[p.seat][i] }))])),
     stagesPending: h.runoutQueue.length,
+    actorLegal: h.phase === 'betting' && h.actor !== null ? legalActions(t, h.actor, h.actionReadyAt ?? 0) : null,
+    canRunTwice: canRunTwice(h),
   };
   if (ph) ph.result = ph.result && { ...ph.result, shows: h!.result!.shows };
   return { ...t, hand: ph };

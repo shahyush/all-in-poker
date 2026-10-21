@@ -217,3 +217,6 @@ begin
 end $$;
 revoke all on function public.allin_claim_due(jsonb) from public;
 grant execute on function public.allin_claim_due(jsonb) to service_role;
+
+-- clients may read the server clock for display offsets
+grant execute on function public.allin_now() to authenticated, anon;

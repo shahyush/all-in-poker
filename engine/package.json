@@ -5,5 +5,12 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit -p ." }
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./public": "./src/public.ts"
+  }
 }

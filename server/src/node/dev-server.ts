@@ -61,6 +61,13 @@ const server = http.createServer(async (req, res) => {
       return send(200, { ok: true });
     }
     if (url.pathname === '/dev/now') return send(200, { now: Number(await db.rpc('allin_now', {})) });
+    if (url.pathname === '/dev/shift' && req.method === 'POST') {
+      // test-only: make stored deadlines look older so the job runner resolves them now
+      const body = (await readJson(req)) as { ms: number };
+      await db.sql.unsafe(`update public.table_secrets set secret = public.allin_shift_time(secret, $1::bigint)`, [-body.ms as never]);
+      await db.sql.unsafe(`update public.tables set due_at = due_at - make_interval(secs => $1::double precision / 1000.0) where due_at is not null`, [body.ms as never]);
+      return send(200, { ok: true });
+    }
     const body = await readJson(req);
     const r = await app.handle({ method: req.method ?? 'GET', path: url.pathname, headers, body });
     return send(r.status, r.body, r.headers);
