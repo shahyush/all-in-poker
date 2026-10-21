@@ -4,7 +4,7 @@ A phone-first progressive web app for a closed group: one shared group password 
 identity per device, dealer's-choice cash games and tournaments, a server-authoritative engine, and saved history.
 No real money, no email, no phone numbers.
 
-* **App URL:** Cloudflare Worker static site (free plan, private repo) — https://all-in-poker.shahyush.workers.dev/ (hosted; the live multiplayer check is still open, see `docs/RELEASE.md`)
+* **App URL:** Cloudflare Worker static site (free plan, private repo) — https://all-in-poker.aayush9shah.workers.dev/ (hosted; the live multiplayer check is still open, see `docs/RELEASE.md`)
 * **Backend:** Supabase project `vlnkslhmmbkkvbpvzuiw` (free plan) — Postgres + RLS, anonymous auth, Realtime, Edge Functions, pg_cron
 * **Status and evidence:** `docs/RELEASE.md` · **How to host / play / install:** `docs/GUIDE.md`
 
@@ -35,7 +35,7 @@ npm run test:e2e -w web          # Playwright journeys against the two dev serve
 * **PWA:** Cloudflare Workers Builds runs `npm run build -w web` then `npx wrangler deploy` on every push to `main`;
   `wrangler.toml` declares an assets-only Worker serving `web/dist` with single-page-application fallback. Public build
   values live in `web/.env.production`; cache and security headers in `web/public/_headers`. The API allowlist accepts
-  `https://all-in-poker.shahyush.workers.dev` and its version-preview origins.
+  `https://all-in-poker.aayush9shah.workers.dev` and its version-preview origins.
 * **Database:** apply `supabase/migrations/*.sql` in order (`supabase db push`, or the SQL editor). All four are recorded in
   `supabase_migrations.schema_migrations` on the live project.
 * **API:** `npm run bundle:function` → `supabase/functions/api/bundle/server.js`. The deployed `api` function loads that exact

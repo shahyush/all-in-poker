@@ -1,0 +1,84 @@
+name: Deploy PWA to Cloudflare Worker
+# Builds web/ and publishes it to the assets-only Worker `all-in-poker` (wrangler.toml), then verifies the live site with
+# real HTTP checks: entry page, every referenced asset, service worker, manifest, SPA fallback. Free plan, private repo.
+# Needs two repository secrets: CLOUDFLARE_API_TOKEN (token template "Edit Cloudflare Workers") and CLOUDFLARE_ACCOUNT_ID.
+# Optional: with E2E_GROUP_PASSWORD set and the "run_hosted_e2e" input = yes, runs the separate-identity Playwright journeys
+# against the live site (only after the owner has entered first, so test players never become the group owner).
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', 'engine/src/**', 'wrangler.toml', 'package.json', 'package-lock.json', '.github/workflows/deploy-worker.yml']
+  workflow_dispatch:
+    inputs:
+      run_hosted_e2e:
+        description: Run the hosted multiplayer journeys after deploying (type yes; the owner must already have entered)
+        required: false
+        default: 'no'
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+env:
+  SITE: https://all-in-poker.aayush9shah.workers.dev
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for Cloudflare credentials
+        id: creds
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"; echo "::warning::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets are not set; build only, no deploy"
+          else echo "present=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck -w web && npm run build -w web
+        env: { VITE_BUILD_ID: '${{ github.sha }}' }
+      - run: ls -R web/dist && test -f web/dist/index.html && test -f web/dist/sw.js && test -f web/dist/_headers
+      - name: Deploy to Cloudflare (wrangler)
+        if: steps.creds.outputs.present == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+      - name: Verify the live site
+        if: steps.creds.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          sleep 10
+          html=$(curl -fsS "$SITE/")
+          echo "$html" | grep -q '<title>All In</title>' || { echo "::error::entry page missing"; echo "$html" | head -20; exit 1; }
+          echo "$html" | grep -q 'id="root"' || { echo "::error::root element missing"; exit 1; }
+          for a in $(echo "$html" | grep -o '\(src\|href\)="/[^"]*"' | sed 's/.*="\(.*\)"/\1/' | sort -u); do
+            ct=$(curl -fsS -o /dev/null -w '%{content_type}' "$SITE$a") || { echo "::error::asset $a failed"; exit 1; }
+            echo "ok $a ($ct)"
+          done
+          curl -fsS -o /dev/null -w 'sw.js %{http_code} %{content_type}\n' "$SITE/sw.js" | tee /dev/stderr | grep -q 'javascript'
+          curl -fsS -o /dev/null -w 'manifest %{http_code} %{content_type}\n' "$SITE/manifest.webmanifest" | tee /dev/stderr | grep -q 'manifest'
+          curl -fsS "$SITE/t/anything" | grep -q '<title>All In</title>' && echo "spa fallback ok"
+          curl -fsS -o /dev/null -w 'icon %{http_code} %{content_type}\n' "$SITE/icons/icon-192.png" | grep -q 'image/png'
+          echo "live site verified: $SITE"
+  hosted-e2e:
+    needs: deploy
+    if: github.event.inputs.run_hosted_e2e == 'yes'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: test -n "${{ secrets.E2E_GROUP_PASSWORD }}" || { echo "::error::E2E_GROUP_PASSWORD secret not set"; exit 1; }
+      - run: npm run test:e2e:hosted -w web
+        env:
+          E2E_BASE: ${{ env.SITE }}
+          E2E_GROUP_PASSWORD: ${{ secrets.E2E_GROUP_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: hosted-e2e-results, path: web/test-results, retention-days: 7 }
