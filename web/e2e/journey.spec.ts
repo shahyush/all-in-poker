@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // every test opens several phone contexts; close them so later tests do not inherit their polling load
 test.afterEach(async ({ browser }) => { for (const c of browser.contexts()) await c.close().catch(() => undefined); });
-import { player, actWhenMyTurn, PASSWORD } from './helpers.ts';
+import { player, actWhenMyTurn, PASSWORD, attachDiagnostics, expectVisibleOrDump } from './helpers.ts';
 
 test('three friends: invite → entry → buy-in → start → dealer choice → a full hand → next hand', async ({ browser }) => {
   const host = await player(browser, 'Tanisha');
@@ -23,13 +23,13 @@ test('three friends: invite → entry → buy-in → start → dealer choice →
   for (const [i, name] of ['Aayush', 'Sam'].entries()) {
     const ctx = await browser.newContext({ viewport: i === 1 ? { width: 844, height: 390 } : { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: i === 1 ? 'reduce' : 'no-preference' });
     const page = await ctx.newPage();
-    page.on('pageerror', (e) => console.log(`[${name}] pageerror`, e.message));
+    attachDiagnostics(page, name);
     await page.goto(inviteUrl);
     await expect(page.getByText("You are invited")).toBeVisible();
     await page.getByLabel('Your nickname').fill(name);
     await page.getByLabel('Group password').fill(PASSWORD);
     await page.getByRole('button', { name: 'Continue' }).click();
-    await expect(page.getByRole('heading', { name: 'Friday at ours' })).toBeVisible();
+    await expectVisibleOrDump(page, page.getByRole('heading', { name: 'Friday at ours' }), 'invite-preview');
     await page.getByRole('button', { name: '2,000' }).click();
     await page.getByRole('button', { name: /Join table/ }).click();
     await expect(page.getByText(/starts the game/)).toBeVisible();
