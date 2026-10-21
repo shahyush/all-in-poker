@@ -21,8 +21,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const refresh = useCallback(async () => {
     try {
-      const uid = await transport.ensureSession();
-      const me = await transport.cmd<{ player: Player | null }>('me');
+      let uid = await transport.ensureSession();
+      let me: { player: Player | null };
+      try { me = await transport.cmd<{ player: Player | null }>('me'); }
+      catch (e) {
+        if (!(e instanceof TransportError) || e.status !== 401) throw e;
+        uid = await transport.ensureSession(); // session vanished between the two calls: start over once
+        me = await transport.cmd<{ player: Player | null }>('me');
+      }
       setState({ ready: true, player: me.player, authUid: uid, error: null });
     } catch (e) {
       setState({ ready: true, player: null, authUid: null, error: e instanceof TransportError ? e.message : 'Could not reach the server' });

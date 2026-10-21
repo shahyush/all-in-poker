@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p .",
     "test:e2e": "playwright test",
-    "test:e2e:hosted": "E2E_HOSTED=1 E2E_BASE=${E2E_BASE:-https://all-in-poker.aayush9shah.workers.dev} playwright test"
+    "test:e2e:hosted": "E2E_HOSTED=1 E2E_BASE=${E2E_BASE:-https://all-in-poker.aayush9shah.workers.dev} playwright test",
+    "test:e2e:live": "E2E_LIVE=1 E2E_BASE=${E2E_BASE:-https://all-in-poker.aayush9shah.workers.dev} playwright test"
   },
   "dependencies": {
     "react": "19.3.1",

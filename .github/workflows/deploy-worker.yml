@@ -63,6 +63,22 @@ jobs:
           curl -fsS "$SITE/t/anything" | grep -q '<title>All In</title>' && echo "spa fallback ok"
           curl -fsS -o /dev/null -w 'icon %{http_code} %{content_type}\n' "$SITE/icons/icon-192.png" | grep -q 'image/png'
           echo "live site verified: $SITE"
+  live-smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium webkit
+        working-directory: web
+      - name: Session, token validation and admission on the live site (WebKit + Chromium, no password)
+        run: npm run test:e2e:live -w web
+        env: { E2E_BASE: '${{ env.SITE }}' }
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: live-smoke-results, path: web/test-results, retention-days: 7 }
   hosted-e2e:
     needs: deploy
     if: github.event.inputs.run_hosted_e2e == 'yes'
