@@ -43,6 +43,7 @@ test('reconnect, rotation, uncontested reveal, reload approval, leave, history a
   const g = await player(browser, 'Aayush');
   const url = await hostTable(h.page, { name: 'Two of us' });
   await joinVia(g.page, url);
+  await h.page.waitForTimeout(4000); // let realtime warm before the first deal (natural in real use)
   await h.page.getByRole('button', { name: 'Start the game' }).click();
   const pages = [h.page, g.page];
   for (const p of pages) await expect(p.locator('.game')).toBeVisible();
