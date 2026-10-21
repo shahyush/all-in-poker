@@ -40,11 +40,12 @@ test('three friends: invite → entry → buy-in → start → dealer choice →
 
   // dealer's choice: whoever is chooser picks Omaha 4 (3 players), others see "is choosing"
   const pages = [host.page, guests[0].page, guests[1].page];
-  let chooser = null as import('@playwright/test').Page | null;
-  for (const p of pages) { await expect(p.locator('.game')).toBeVisible(); if (await p.getByRole('button', { name: /Omaha 4/ }).isVisible().catch(() => false)) chooser = p; }
-  expect(chooser).not.toBeNull();
+  for (const p of pages) await expect(p.locator('.game')).toBeVisible();
+  // the chooser is whoever's button renders first; race all pages and click the instant it appears (the window is 4 s)
+  const chooser = await Promise.any(pages.map(async (p) => { await p.getByRole('button', { name: /Omaha 4/ }).waitFor({ state: 'visible', timeout: 12_000 }); return p; })).catch(() => null);
+  expect(chooser, 'a player is offered the dealer\'s choice').not.toBeNull();
   await chooser!.getByRole('button', { name: /Omaha 4/ }).click();
-  await expect(pages[0].locator('.g-stakes')).toContainText('Omaha 4');
+  await expect(pages[0].locator('.g-stakes')).toContainText('Omaha 4', { timeout: 15_000 });
   // every player sees their own four cards and nobody else's faces
   for (const p of pages) {
     await expect(p.locator('.own-cards .pc:not(.back)')).toHaveCount(4, { timeout: 15_000 });

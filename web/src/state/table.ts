@@ -39,6 +39,7 @@ export function useTable(tableId: string): TableView {
   const [loaded, setLoaded] = useState(false);
   const [connected, setConnected] = useState(true);
   const versionRef = useRef(-1);
+  const stateRef = useRef<PublicTable | null>(null);
 
   const loadTable = useCallback(async () => {
     try {
@@ -48,6 +49,7 @@ export function useTable(tableId: string): TableView {
       // never regress to an older version (out-of-order delivery)
       if (r.version < versionRef.current) return;
       versionRef.current = r.version;
+      stateRef.current = r.state;
       setRow(r); setLoaded(true); setConnected(true);
     } catch { setConnected(false); }
   }, [t, tableId]);
@@ -75,13 +77,35 @@ export function useTable(tableId: string): TableView {
       t.subscribe('reload_requests', tableId, loadReloads),
       t.subscribe('table_members', tableId, loadMembers),
     ];
+    // Adaptive poll: realtime postgres_changes are not guaranteed on every network/host, and the game has windows
+    // shorter than any safe fixed poll (4 s dealer's choice, 3 s reveal). Poll fast while a short window or the local
+    // player's turn is live, slow when idle. Realtime (above) still delivers instantly when it works; this is the floor.
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    const pollInterval = (): number => {
+      const st = stateRef.current;
+      if (!st) return 2000;
+      if (st.status !== 'running' && st.status !== 'waiting') return 6000;
+      if (st.status === 'waiting') return 1500;
+      const h = st.hand;
+      if (!h) return 2500;
+      if (h.phase === 'choice' || h.phase === 'vote' || h.phase === 'offer' || h.phase === 'runout' || h.phase === 'result') return 800;
+      if (h.phase === 'betting') {
+        const mySeat = st.seats.findIndex((x) => x && x.playerId === s.player!.id);
+        return h.actor === mySeat ? 800 : 1500;
+      }
+      return 2000;
+    };
+    const pollLoop = () => {
+      pollTimer = setTimeout(async () => { await Promise.all([loadTable(), loadOwn()]); pollLoop(); }, pollInterval());
+    };
+    pollLoop();
     const hb = setInterval(() => { void t.heartbeat(tableId); }, 10_000);
     void t.heartbeat(tableId);
     const vis = () => { if (document.visibilityState === 'visible') { void reload(); void t.heartbeat(tableId); } };
     document.addEventListener('visibilitychange', vis);
     window.addEventListener('online', vis);
     window.addEventListener('focus', vis);
-    return () => { subs.forEach((u) => u()); clearInterval(hb); document.removeEventListener('visibilitychange', vis); window.removeEventListener('online', vis); window.removeEventListener('focus', vis); };
+    return () => { subs.forEach((u) => u()); if (pollTimer) clearTimeout(pollTimer); clearInterval(hb); document.removeEventListener('visibilitychange', vis); window.removeEventListener('online', vis); window.removeEventListener('focus', vis); };
   }, [t, tableId, reload, loadTable, loadOwn, loadChat, loadReloads, loadMembers, loadLedger]);
 
   return { row, members, chat, reloads, ledger, participants, own, error, loaded, reload, connected };
