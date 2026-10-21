@@ -4,7 +4,7 @@ A phone-first progressive web app for a closed group: one shared group password 
 identity per device, dealer's-choice cash games and tournaments, a server-authoritative engine, and saved history.
 No real money, no email, no phone numbers.
 
-* **App URL:** Cloudflare Worker static site (free plan, private repo) — https://all-in-poker.aayush9shah.workers.dev/ (hosted; the live multiplayer check is still open, see `docs/RELEASE.md`)
+* **App URL:** Cloudflare Worker static site (free plan, private repo) — https://all-in-poker.aayush9shah.workers.dev/ (live, deployed from GitHub Actions; the hosted multiplayer check is still open, see `docs/RELEASE.md`)
 * **Backend:** Supabase project `vlnkslhmmbkkvbpvzuiw` (free plan) — Postgres + RLS, anonymous auth, Realtime, Edge Functions, pg_cron
 * **Status and evidence:** `docs/RELEASE.md` · **How to host / play / install:** `docs/GUIDE.md`
 

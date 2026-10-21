@@ -1,7 +1,7 @@
 # Release status — All In V1 (2026-10-21)
 
-**Not share-ready yet.** Everything that can be done without the project owner is built, tested and deployed. Three owner
-actions remain (section 1). Until they are done the app URL does not resolve and nobody can enter.
+**Not share-ready yet.** Backend and frontend are deployed and the entry page is verified live; the hosted multiplayer game
+has not been played yet (section 3, live rows).
 
 ## 1. Owner actions (in this order)
 
@@ -23,7 +23,7 @@ code, create a table, and play a hand with two phones. Then section 3's "live" r
 | Edge function `api` v4 (`verify_jwt=false`, own auth) | live; loads bundle sha `548045ad…ec9a` (current sources) from `code`, verifies the hash before use; allowed origins from `app_settings.app_origins` | v3 smoke: `POST /jobs` wrong key → 403; `POST /cmd` no token → 401; right key → ok. v4 boot NOT YET EXERCISED (no request can reach it from here; first hosted request will show in function logs) |
 | Edge function `code` v2 | live; serves `edge/server.js` byte-identical to `supabase/functions/api/bundle/server.js` (57,083 bytes, same sha256); one-time-token upload endpoint | pg_net GET returned 200, 57,083 bytes, matching sha |
 | Edge function `app` v6 | 302 redirect to https://all-in-poker.aayush9shah.workers.dev/ (prototype host retired) | |
-| PWA | Cloudflare Worker `all-in-poker` serving `web/dist`; URL reported by the owner. NOT YET LOADED from this environment (network policy denies `*.workers.dev`); hosted game NOT YET PLAYED | |
+| PWA | LIVE at https://all-in-poker.aayush9shah.workers.dev/ — deployed by GitHub Actions run 39642606243 (wrangler, commit 4d2b1bb); the run's verification fetched the entry page (`<title>All In</title>`, root element), all four hashed assets with correct content types, both icons, the manifest, `sw.js` as JavaScript, and the deep-link fallback. Hosted multiplayer game NOT YET PLAYED. | Actions log of run 39642606243 |
 
 ## 3. Gates (from RELEASE_CHECKLIST.csv) — status
 
