@@ -155,6 +155,16 @@ create table if not exists public.app_settings (
 );
 alter table public.app_settings enable row level security;
 
+-- asset store: the API bundle served to the `api` function and the hosted PWA files (service role only)
+create table if not exists public.app_assets (
+  path text primary key,
+  body text not null,
+  encoding text not null default 'utf8' check (encoding in ('utf8','base64')),
+  updated_at timestamptz not null default now()
+);
+alter table public.app_assets add column if not exists encoding text not null default 'utf8';
+alter table public.app_assets enable row level security;
+
 create table if not exists public.diagnostics (
   id bigint generated always as identity primary key,
   table_id uuid,

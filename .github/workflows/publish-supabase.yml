@@ -1,0 +1,35 @@
+name: Publish PWA to Supabase host
+# Builds the PWA for https://<project>.supabase.co/functions/v1/app/ and uploads it to the asset store.
+# Triggered by hand with a one-time upload token (its hash lives in app_settings.upload_token_sha and is cleared after use).
+on:
+  workflow_dispatch:
+    inputs:
+      upload_token:
+        description: One-time upload token
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: publish-supabase
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "::add-mask::${{ inputs.upload_token }}"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test -w engine
+      - run: npm run build -w web
+        env:
+          VITE_BASE: /functions/v1/app/
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://vlnkslhmmbkkvbpvzuiw.supabase.co' }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_6BV7f_xPQjKkayenn8q0Kw_XvcrIxLo' }}
+          VITE_BUILD_ID: ${{ github.sha }}
+      - run: node scripts/publish-assets.mjs web/dist web --prune
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://vlnkslhmmbkkvbpvzuiw.supabase.co' }}
+          ALLIN_UPLOAD_TOKEN: ${{ inputs.upload_token }}

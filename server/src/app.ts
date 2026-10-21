@@ -17,9 +17,11 @@ export class App {
     this.handlers = new Handlers(db, env);
   }
 
-  cors(): Record<string, string> {
+  cors(origin?: string): Record<string, string> {
+    const allowed = (this.env.corsOrigin ?? '*').split(',').map((s) => s.trim()).filter(Boolean);
+    const pick = allowed.includes('*') ? '*' : origin && allowed.includes(origin) ? origin : allowed[0] ?? '*';
     return {
-      'Access-Control-Allow-Origin': this.env.corsOrigin ?? '*',
+      'Access-Control-Allow-Origin': pick,
       'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-allin-job',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Vary': 'Origin',
@@ -27,7 +29,7 @@ export class App {
   }
 
   async handle(req: ApiRequest): Promise<ApiResponse> {
-    const h = this.cors();
+    const h = this.cors(req.headers['origin']);
     if (req.method === 'OPTIONS') return { status: 204, body: null, headers: h };
     if (req.method !== 'POST') return { status: 405, body: { ok: false, error: { code: 'method', message: 'POST only' } }, headers: h };
     const path = req.path.replace(/\/+$/, '');

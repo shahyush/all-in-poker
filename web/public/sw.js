@@ -13,8 +13,9 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;               // never touch Supabase or other origins
-  if (url.pathname.includes('/functions/') || url.pathname.includes('/rest/') || url.pathname.includes('/auth/')) return;
+  if (url.origin !== self.location.origin) return;               // never touch other origins
+  const scope = new URL(self.registration.scope).pathname;
+  if (!url.pathname.startsWith(scope)) return;                     // only the app shell: never the API, auth, REST or realtime
   const isNav = req.mode === 'navigate';
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
