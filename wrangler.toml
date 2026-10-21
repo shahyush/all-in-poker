@@ -2,7 +2,7 @@
 #   build command  : npm run build -w web
 #   deploy command : npx wrangler deploy          (default)
 # This Worker has no code of its own; it serves the built PWA from web/dist as static assets at
-# https://all-in-poker.<account>.workers.dev (enable the workers.dev route in Settings → Domains & Routes).
+# https://all-in-poker.shahyush.workers.dev (enable the workers.dev route in Settings → Domains & Routes).
 # `_headers` and `_redirects` inside web/dist are honoured; unknown paths fall back to index.html for the in-app router.
 name = "all-in-poker"
 compatibility_date = "2026-10-01"

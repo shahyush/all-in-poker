@@ -42,8 +42,9 @@ Branch `main` on github.com/shahyush/all-in-poker (private). Read `CLAUDE.md` fo
   publish workflow (run 39635955822) with the one-time token, hash verified in the asset store, token cleared.
 
 ## Remaining tasks
-1. Frontend hosting on Cloudflare Pages (free plan, private repo) — needs the owner to connect the repo once (settings in
-   `docs/RELEASE.md`). `app_settings.app_origins` is pre-set for `all-in-poker.pages.dev` and its preview origins.
+1. Frontend: Cloudflare Worker `all-in-poker` (assets-only, free plan) at https://all-in-poker.shahyush.workers.dev/ —
+   connected and built by the owner; `app_settings.app_origins` pinned to that origin (+ version previews). Not yet loaded
+   from this environment (network policy); hosted multiplayer test still pending.
 2. Owner: allow anonymous sign-ins; set `GROUP_PASSWORD` edge secret.
 3. Standard CLI deploy route (`deploy-functions.yml`) stays dormant until `SUPABASE_ACCESS_TOKEN` exists as a GitHub secret.
 4. Play a full hosted game on real phones with separate identities (all streets, awards, next hand, reload, reconnect,

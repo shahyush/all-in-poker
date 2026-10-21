@@ -7,7 +7,7 @@ actions remain (section 1). Until they are done the app URL does not resolve and
 
 | # | Action | Where | Why |
 | --- | --- | --- | --- |
-| 1 | Connect the private repo to **Cloudflare Pages** (free plan): dash.cloudflare.com → *Workers & Pages* → *Create* → *Pages* → *Connect to Git* → authorise GitHub for `shahyush/all-in-poker` → project name `all-in-poker`, production branch `main`, framework preset *None*, build command `npm run build -w web`, build output directory `web/dist` → *Save and Deploy*. | dash.cloudflare.com | GitHub Pages is free only for public repos (private needs GitHub Pro, paid); the Pages run failed with *Resource not accessible by integration*. Edge functions on `*.supabase.co` serve HTML as `text/plain`, so Supabase cannot host the PWA. Cloudflare Pages' free plan builds private GitHub repos with no card. The API already allows `https://all-in-poker.pages.dev` and its preview origins; if you pick another project name, tell me and I update the allowlist. |
+| 1 | ~~Connect the repo to Cloudflare~~ DONE: Worker `all-in-poker` built from `main`, URL https://all-in-poker.shahyush.workers.dev/ (workers.dev route enabled by the owner). | dash.cloudflare.com | Free plan, private repo, assets-only Worker (`wrangler.toml`). The API allowlist is pinned to this origin plus version previews. |
 | 2 | **Allow anonymous sign-ins** | Supabase Dashboard → Authentication → Sign In / Providers → *Allow anonymous sign-ins* → Save | Players get a private session without email/phone. The server never trusts the anonymous session alone: admission needs the group password, and RLS keys everything to `profiles.auth_user_id`. |
 | 3 | Set the bootstrap **GROUP_PASSWORD** secret | Supabase Dashboard → Edge Functions → Secrets → add `GROUP_PASSWORD` (the MCP prompt from this session does the same) | Used only until the first player is admitted; from then on the PBKDF2 hash in `group_settings` is authoritative and the owner rotates it in-app. |
 
@@ -22,8 +22,8 @@ code, create a table, and play a hand with two phones. Then section 3's "live" r
 | pg_cron `allin-dispatch-due` (every second) → pg_net → `/functions/v1/api/jobs` | running: 590 successful runs / 0 failures in the 10 minutes before this note; dispatches only when a table is due | `cron.job_run_details` |
 | Edge function `api` v4 (`verify_jwt=false`, own auth) | live; loads bundle sha `548045ad…ec9a` (current sources) from `code`, verifies the hash before use; allowed origins from `app_settings.app_origins` | v3 smoke: `POST /jobs` wrong key → 403; `POST /cmd` no token → 401; right key → ok. v4 boot NOT YET EXERCISED (no request can reach it from here; first hosted request will show in function logs) |
 | Edge function `code` v2 | live; serves `edge/server.js` byte-identical to `supabase/functions/api/bundle/server.js` (57,083 bytes, same sha256); one-time-token upload endpoint | pg_net GET returned 200, 57,083 bytes, matching sha |
-| Edge function `app` v4 | 302 redirect to https://all-in-poker.pages.dev/ (prototype host retired) | |
-| PWA | production build verified locally for the site root (`/assets/...`, `_redirects`, `_headers`, stamped `sw.js`); deploy blocked on owner action 1 | |
+| Edge function `app` v6 | 302 redirect to https://all-in-poker.shahyush.workers.dev/ (prototype host retired) | |
+| PWA | Cloudflare Worker `all-in-poker` serving `web/dist`; URL reported by the owner. NOT YET LOADED from this environment (network policy denies `*.workers.dev`); hosted game NOT YET PLAYED | |
 
 ## 3. Gates (from RELEASE_CHECKLIST.csv) — status
 
