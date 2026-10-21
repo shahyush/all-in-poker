@@ -72,7 +72,7 @@ export async function actCurrentTurn(pages: Page[], opts: { fold?: boolean } = {
     if (!(await btn.isEnabled({ timeout: 2000 }).catch(() => false))) { await actor.waitForTimeout(200); continue; }
     await btn.click().catch(() => undefined);
     // confirm it registered: the cue clears (turn advanced) within a few seconds
-    await actor.getByText(/^Your turn/).waitFor({ state: 'hidden', timeout: 8000 }).catch(() => undefined);
+    await actor.getByText(/^Your turn/).waitFor({ state: 'hidden', timeout: 4000 }).catch(() => undefined);
     return true;
   }
   return false;

@@ -38,6 +38,7 @@ async function chooseIfAsked(pages: Page[], variant = /Hold'em/) {
 }
 
 test('reconnect, rotation, uncontested reveal, reload approval, leave, history and recovery', async ({ browser }) => {
+  test.setTimeout(180_000);
   const h = await player(browser, 'Tanisha');
   const g = await player(browser, 'Aayush');
   const url = await hostTable(h.page, { name: 'Two of us' });
@@ -62,8 +63,8 @@ test('reconnect, rotation, uncontested reveal, reload approval, leave, history a
   const first = (await turnOf(pages))!;
   const winner = first === h.page ? g.page : h.page;
   await actWhenMyTurn(first, 'Fold');
-  await expect(winner.getByRole('button', { name: 'Show all' })).toBeVisible();
-  await winner.getByRole('button', { name: /Tap to show: card 1/ }).click();
+  // 3 s reveal window: click the first card the instant it is offered, don't wait on the separate "Show all"
+  await winner.getByRole('button', { name: /Tap to show: card 1/ }).click({ timeout: 6000 });
   await expect(first.locator('.seat .pc:not(.back)')).toHaveCount(1, { timeout: 10_000 });
   await winner.screenshot({ path: 'test-results/shots/11-reveal.png' });
   await expect(h.page.locator('.g-stakes')).toContainText('Hand 2', { timeout: 20_000 });

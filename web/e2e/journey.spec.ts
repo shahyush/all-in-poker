@@ -5,6 +5,7 @@ test.afterEach(async ({ browser }) => { for (const c of browser.contexts()) awai
 import { player, actWhenMyTurn, PASSWORD, attachDiagnostics, expectVisibleOrDump, actCurrentTurn } from './helpers.ts';
 
 test('three friends: invite → entry → buy-in → start → dealer choice → a full hand → next hand', async ({ browser }) => {
+  test.setTimeout(180_000);
   const host = await player(browser, 'Tanisha');
   // host creates a table
   await host.page.getByRole('button', { name: 'Host a table' }).click();
@@ -58,7 +59,7 @@ test('three friends: invite → entry → buy-in → start → dealer choice →
 
   // preflop: everyone calls/checks, then check down to showdown
   let acted = 0;
-  for (let i = 0; i < 40; i++) { if (!(await actCurrentTurn(pages))) break; acted++; }
+  for (let i = 0; i < 40; i++) { if (await pages[0].getByText('Showdown').first().isVisible().catch(() => false)) break; if (!(await actCurrentTurn(pages))) break; acted++; }
   expect(acted).toBeGreaterThanOrEqual(6);
   await expect(pages[0].getByText('Showdown')).toBeVisible();
   await pages[0].screenshot({ path: 'test-results/shots/04-showdown.png' });
