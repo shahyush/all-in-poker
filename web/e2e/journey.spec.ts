@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // every test opens several phone contexts; close them so later tests do not inherit their polling load
 test.afterEach(async ({ browser }) => { for (const c of browser.contexts()) await c.close().catch(() => undefined); });
-import { player, actWhenMyTurn, PASSWORD, attachDiagnostics, expectVisibleOrDump } from './helpers.ts';
+import { player, actWhenMyTurn, PASSWORD, attachDiagnostics, expectVisibleOrDump, actCurrentTurn } from './helpers.ts';
 
 test('three friends: invite → entry → buy-in → start → dealer choice → a full hand → next hand', async ({ browser }) => {
   const host = await player(browser, 'Tanisha');
@@ -57,20 +57,8 @@ test('three friends: invite → entry → buy-in → start → dealer choice →
   await pages[2].screenshot({ path: 'test-results/shots/03-dealt-landscape.png' });
 
   // preflop: everyone calls/checks, then check down to showdown
-  async function whoseTurn(): Promise<import('@playwright/test').Page | null> {
-    for (const p of pages) { const fold = p.getByRole('group', { name: 'Actions' }).getByRole('button', { name: 'Fold' }); if (await fold.count() === 0) continue; if (await fold.isEnabled({ timeout: 1000 }).catch(() => false)) return p; }
-    return null;
-  }
   let acted = 0;
-  for (let i = 0; i < 40; i++) {
-    const resultVisible = await pages[0].getByText('Pot detail').isVisible().catch(() => false);
-    if (resultVisible) break;
-    const p = await whoseTurn();
-    if (!p) { await pages[0].waitForTimeout(300); continue; }
-    const call = p.getByRole('group', { name: 'Actions' }).getByRole('button', { name: /^Call/ });
-    if (await call.isVisible()) await actWhenMyTurn(p, 'Call'); else await actWhenMyTurn(p, 'Check');
-    acted++;
-  }
+  for (let i = 0; i < 40; i++) { if (!(await actCurrentTurn(pages))) break; acted++; }
   expect(acted).toBeGreaterThanOrEqual(6);
   await expect(pages[0].getByText('Showdown')).toBeVisible();
   await pages[0].screenshot({ path: 'test-results/shots/04-showdown.png' });

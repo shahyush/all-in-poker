@@ -52,3 +52,28 @@ export async function actWhenMyTurn(page: Page, action: 'Fold' | 'Check' | 'Call
     await page.getByRole('button', { name: /^(Bet|Raise to) / }).click();
   }
 }
+
+/** Robustly drive one betting action on whichever page's turn it is. Waits for the "Your turn" cue (not just an enabled
+ *  button, which can briefly show on a stale view), acts, then waits for the cue to clear so we never double-act or act on
+ *  a turn that already moved. Returns true if it acted, false if the hand has reached a result/showdown. */
+export async function actCurrentTurn(pages: Page[], opts: { fold?: boolean } = {}): Promise<boolean> {
+  const deadline = Date.now() + 40_000;
+  while (Date.now() < deadline) {
+    for (const p of pages) {
+      if (await p.getByText('Pot detail').isVisible().catch(() => false)) return false;
+      if (await p.getByText('Showdown').first().isVisible().catch(() => false)) return false;
+    }
+    let actor: Page | null = null;
+    for (const p of pages) { if (await p.getByText(/^Your turn/).isVisible().catch(() => false)) { actor = p; break; } }
+    if (!actor) { await pages[0].waitForTimeout(250); continue; }
+    const dock = actor.getByRole('group', { name: 'Actions' });
+    const call = dock.getByRole('button', { name: /^Call/ });
+    const btn = opts.fold ? dock.getByRole('button', { name: 'Fold' }) : (await call.isEnabled({ timeout: 500 }).catch(() => false)) ? call : dock.getByRole('button', { name: 'Check' });
+    if (!(await btn.isEnabled({ timeout: 2000 }).catch(() => false))) { await actor.waitForTimeout(200); continue; }
+    await btn.click().catch(() => undefined);
+    // confirm it registered: the cue clears (turn advanced) within a few seconds
+    await actor.getByText(/^Your turn/).waitFor({ state: 'hidden', timeout: 8000 }).catch(() => undefined);
+    return true;
+  }
+  return false;
+}

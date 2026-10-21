@@ -20,7 +20,7 @@ export function Hero(p: HeroProps) {
   const myTurn = !!legal && legal.canAct;
   const deadline = myTurn ? hand?.deadline ?? null : null;
   const secs = timeLeft(deadline, now);
-  const ready = hand?.actionReadyAt ? now >= hand.actionReadyAt : true;
+  const ready = hand?.actionReadyAt ? now >= hand.actionReadyAt + 250 : true;
   const frac = deadline ? Math.max(0, Math.min(1, (deadline - now) / 30000)) : 0;
   useEffect(() => { if (!myTurn) setComposer(false); }, [myTurn]);
   const showCards = p.dealt && own && hand && p.ownHandId === hand.id && myHp && !myHp.folded;

@@ -88,10 +88,10 @@ export function useTable(tableId: string): TableView {
       if (st.status === 'waiting') return 1500;
       const h = st.hand;
       if (!h) return 2500;
-      if (h.phase === 'choice' || h.phase === 'vote' || h.phase === 'offer' || h.phase === 'runout' || h.phase === 'result') return 800;
+      if (h.phase === 'choice' || h.phase === 'vote' || h.phase === 'offer' || h.phase === 'runout' || h.phase === 'result') return 700;
       if (h.phase === 'betting') {
         const mySeat = st.seats.findIndex((x) => x && x.playerId === s.player!.id);
-        return h.actor === mySeat ? 800 : 1500;
+        return h.actor === mySeat ? 600 : 1000;
       }
       return 2000;
     };
