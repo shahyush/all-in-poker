@@ -1,0 +1,13 @@
+# Supabase CLI configuration (used by the standard `supabase functions deploy` route in .github/workflows/deploy-functions.yml).
+project_id = "vlnkslhmmbkkvbpvzuiw"
+
+[functions.api]
+verify_jwt = false
+# the static entry imports ./bundle/server.js directly; the MCP-deployed index.ts loads the same bundle from the asset store
+entrypoint = "./functions/api/static.ts"
+
+[functions.code]
+verify_jwt = false
+
+[functions.app]
+verify_jwt = false

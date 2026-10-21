@@ -1,3 +1,6 @@
+-- Migration 3/4: admission and identity RPCs (APPLIED 2026-10-21). allin_admit, allin_set_group_password,
+--   allin_update_profile, allin_recovery_create, allin_recover, allin_unbind.
+-- Existing data: untouched. Rollback: drop these six functions; group_settings/recovery_codes rows can be truncated safely.
 -- Identity, admission and recovery functions (service only).
 
 create or replace function public.allin_admit(p jsonb)

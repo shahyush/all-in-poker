@@ -1,24 +1,32 @@
-// All In — game API. Deno Edge Function entry. The server itself is runtime-agnostic (see server/src) and is bundled by
-// `npm run bundle:function` into ./bundle/server.js. The deployed function imports the same bundle (hash-pinned) from the
-// `code` function, which serves it out of public.app_assets because the repository is private.
-// Local/CI deploys may instead import './bundle/server.js' directly; both files carry the same sha256.
-import { App, RestDb, SupabaseAuthenticator } from 'https://vlnkslhmmbkkvbpvzuiw.supabase.co/functions/v1/code/server.js?sha=4598de2ed203bf3b7053bf4ec537884da0401d1b559bb08dd4f8f873cc6a7457';
+// All In — game API, asset-store entry. The server is runtime-agnostic (server/src) and bundled by `npm run bundle:function`
+// into ./bundle/server.js. This entry fetches that exact bundle (sha256-pinned) from the `code` function, which serves it
+// out of public.app_assets, because the deploy path available in this environment cannot ship the bundle file itself.
+// static.ts is the standard entry (direct import) used by `supabase functions deploy`.
+import '@supabase/supabase-js';
+import { serve } from './serve.ts';
 
 const url = Deno.env.get('SUPABASE_URL')!;
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const db = new RestDb(url, serviceKey);
-const auth = new SupabaseAuthenticator(url, serviceKey);
-const app = new App(db, auth, {
-  groupPassword: Deno.env.get('GROUP_PASSWORD') ?? undefined,
-  corsOrigin: Deno.env.get('ALLIN_APP_ORIGIN') ?? `${new URL(url).origin},https://shahyush.github.io`,
-});
+const BUNDLE_SHA = 'f2d9b05dcd3defc813f5e69cda33db73e2b48258449d86d8b7cb96c2486a8b8c';
+const BUNDLE_URL = `${url}/functions/v1/code/server.js?sha=${BUNDLE_SHA}`;
 
-Deno.serve(async (req: Request) => {
-  const u = new URL(req.url);
-  const headers: Record<string, string> = {};
-  req.headers.forEach((v, k) => { headers[k.toLowerCase()] = v; });
-  let body: unknown = null;
-  if (req.method === 'POST') { try { body = await req.json(); } catch { body = {}; } }
-  const r = await app.handle({ method: req.method, path: u.pathname, headers, body });
-  return new Response(r.body === null ? null : JSON.stringify(r.body), { status: r.status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...(r.headers ?? {}) } });
-});
+async function sha256(text: string) {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+serve((async () => {
+  const res = await fetch(BUNDLE_URL);
+  if (!res.ok) throw new Error(`bundle fetch failed: ${res.status}`);
+  const text = await res.text();
+  const sha = await sha256(text);
+  if (sha !== BUNDLE_SHA) throw new Error(`bundle sha mismatch: ${sha}`);
+  const src = text.replaceAll('"@supabase/supabase-js"', '"npm:@supabase/supabase-js@2.118.0"');
+  const mod = await import(`data:text/javascript;base64,${btoa(unescape(encodeURIComponent(src)))}`);
+  const db = new mod.RestDb(url, serviceKey);
+  const fromDb = (await db.select('app_settings', { key: 'app_origins' }, { limit: 1 }).catch(() => []))[0]?.value as string | undefined;
+  return new mod.App(db, new mod.SupabaseAuthenticator(url, serviceKey), {
+    groupPassword: Deno.env.get('GROUP_PASSWORD') ?? undefined,
+    corsOrigin: Deno.env.get('ALLIN_APP_ORIGIN') ?? fromDb ?? new URL(url).origin,
+  });
+})());

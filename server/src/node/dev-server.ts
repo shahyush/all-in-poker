@@ -5,7 +5,7 @@ import { App } from '../app.ts';
 import { PgDb } from '../db-postgres.ts';
 import { DevAuthenticator } from '../auth.ts';
 
-const DB_URL = process.env.ALLIN_DB_URL ?? 'postgres://postgres@127.0.0.1:54329/allin_test';
+const DB_URL = process.env.ALLIN_DB_URL ?? 'postgres://postgres@127.0.0.1:54329/allin_dev';
 const PORT = Number(process.env.ALLIN_PORT ?? 8787);
 const JOB_KEY = process.env.ALLIN_JOB_KEY ?? 'dev-job-key';
 const db = new PgDb(DB_URL);

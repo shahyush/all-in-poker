@@ -163,6 +163,7 @@ export interface TableState {
   tournament: TournamentState | null;
   waitingReason: string | null;
   dueAt: number | null;
+  idleCheckAt: number | null;          // while running without a hand: when the scheduler should re-check presence/abandonment
   events: PublicEvent[];             // recent public events (bounded)
   error: string | null;              // invariant failure halts the table
   lastActivityAt: number;

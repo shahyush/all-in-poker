@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+
+// every test opens several phone contexts; close them so later tests do not inherit their polling load
+test.afterEach(async ({ browser }) => { for (const c of browser.contexts()) await c.close().catch(() => undefined); });
 import { player, actWhenMyTurn } from './helpers.ts';
 
 test('three friends: invite → entry → buy-in → start → dealer choice → a full hand → next hand', async ({ browser }) => {
@@ -54,7 +57,7 @@ test('three friends: invite → entry → buy-in → start → dealer choice →
 
   // preflop: everyone calls/checks, then check down to showdown
   async function whoseTurn(): Promise<import('@playwright/test').Page | null> {
-    for (const p of pages) { const dock = p.getByRole('group', { name: 'Actions' }); if (await dock.getByRole('button', { name: 'Fold' }).isEnabled().catch(() => false)) return p; }
+    for (const p of pages) { const fold = p.getByRole('group', { name: 'Actions' }).getByRole('button', { name: 'Fold' }); if (await fold.count() === 0) continue; if (await fold.isEnabled({ timeout: 1000 }).catch(() => false)) return p; }
     return null;
   }
   let acted = 0;

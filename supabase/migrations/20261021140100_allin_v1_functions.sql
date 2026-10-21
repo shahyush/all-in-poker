@@ -1,3 +1,6 @@
+-- Migration 2/4: server RPCs (APPLIED 2026-10-21). allin_now, allin_load, allin_purge_live, allin_commit (CAS commit of a
+--   table + secrets + hole cards + ledger + history + receipts), allin_receipt, allin_attempt (rate limits), allin_claim_due.
+-- Existing data: untouched (functions only). Rollback: drop function public.allin_* (uuid/jsonb signatures as declared).
 -- Service-only transactional functions used by the API. Clients never call these.
 
 create or replace function public.allin_now()

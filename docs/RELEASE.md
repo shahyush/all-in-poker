@@ -7,7 +7,7 @@ actions remain (section 1). Until they are done the app URL does not resolve and
 
 | # | Action | Where | Why |
 | --- | --- | --- | --- |
-| 1 | Make the repository **public** (or add GitHub Pro) and re-run the *Deploy PWA to GitHub Pages* workflow | GitHub → Settings → General → Danger zone → Change visibility; then Actions → *Deploy PWA to GitHub Pages* → Run workflow | GitHub Pages is the only free HTTPS host reachable from this setup; on a private free-plan repo `configure-pages` fails with *Resource not accessible by integration* (run 39628036053). The Supabase host was tried and rejected: edge functions on `*.supabase.co` serve HTML as `text/plain`. The workflow auto-enables Pages and publishes to https://shahyush.github.io/all-in-poker/ |
+| 1 | Connect the private repo to **Netlify** (free): sign in at app.netlify.com with GitHub → *Add new site* → *Import an existing project* → GitHub → `shahyush/all-in-poker` → *Deploy*. Build settings come from `netlify.toml`. | app.netlify.com | GitHub Pages is free only for public repos (private needs GitHub Pro, paid); the Pages run failed with *Resource not accessible by integration*. Edge functions on `*.supabase.co` serve HTML as `text/plain`, so Supabase cannot host the PWA. Netlify's free tier builds private GitHub repos with no card. The site URL will be `https://<site-name>.netlify.app/`; tell me the name and I set the API's allowed origin. |
 | 2 | **Allow anonymous sign-ins** | Supabase Dashboard → Authentication → Sign In / Providers → *Allow anonymous sign-ins* → Save | Players get a private session without email/phone. The server never trusts the anonymous session alone: admission needs the group password, and RLS keys everything to `profiles.auth_user_id`. |
 | 3 | Set the bootstrap **GROUP_PASSWORD** secret | Supabase Dashboard → Edge Functions → Secrets → add `GROUP_PASSWORD` (the MCP prompt from this session does the same) | Used only until the first player is admitted; from then on the PBKDF2 hash in `group_settings` is authoritative and the owner rotates it in-app. |
 
@@ -62,9 +62,9 @@ Legend: ✅ verified by automated test or production check · 🟡 implemented, 
 
 | Suite | Result |
 | --- | --- |
-| `npm run test -w engine` | 50 passed |
+| `npm run test -w engine` | 53 passed (incl. 4 new tournament cases: forced short-stack all-in + elimination after settlement, timeout-only progression, simulated-shove completion, all-absent hold/abandon) |
 | `npm run test -w server` (real Postgres 16, RLS as `authenticated`) | 15 passed |
-| `npm run test:e2e -w web` (Playwright, iPhone 13 emulation, 3–4 independent browser contexts) | 4 passed in 1.2 min — `docs/evidence/e2e-results.json`, screenshots `docs/evidence/*.png` |
+| `npm run test:e2e -w web` (Playwright, iPhone 13 emulation, 3–4 independent browser contexts, local dev API) | 4 passed in 1.3 min — `docs/evidence/e2e-results.json`, screenshots `docs/evidence/*.png` |
 | Supplied reproductions (handoff `tests/`) | candidate audit A01–A24 pass; 28/13/15 supplied checks pass; `reproduce-live.mjs` confirmed BUG01–05 on the old engine, all five fixed |
 | Production smoke (pg_net) | `code` bundle sha matches; `api` 403/401/200 as expected; cron 590/0 |
 

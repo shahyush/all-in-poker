@@ -1,0 +1,80 @@
+{
+  "revision": "R4",
+  "date": "2026-10-21",
+  "status": "Recommended implementation defaults; not historical user approvals",
+  "precedence": [
+    "Latest explicit user instructions",
+    "HANDOFF.md explicit resolutions",
+    "Original undisputed wireframe requirements"
+  ],
+  "product": {
+    "phonesOnly": true,
+    "orientations": [
+      "portrait",
+      "landscape"
+    ],
+    "playChipsOnly": true,
+    "contactSignup": false,
+    "paidServicesWithoutApproval": false
+  },
+  "rules": {
+    "burnCards": false,
+    "variants": {
+      "holdem": {
+        "holeCards": 2,
+        "limit": "NL",
+        "maxDealt": 9
+      },
+      "omaha4": {
+        "holeCards": 4,
+        "limit": "PL",
+        "maxDealt": 9
+      },
+      "omaha5": {
+        "holeCards": 5,
+        "limit": "PL",
+        "maxDealt": 9
+      },
+      "omaha6": {
+        "holeCards": 6,
+        "limit": "PL",
+        "maxDealt": 7
+      }
+    },
+    "omahaSelection": "exactly2hole+3board",
+    "initialButton": "serverCSPRNG",
+    "cashButton": "moving physical seats",
+    "tournamentButton": "dead button with correct heads-up transition",
+    "ante": "per-player, before blinds",
+    "straddle": "cash UTG only,2BB,full amount,choice cutoff",
+    "earlyRunoutVote": "all live pot claimants; one proposal per street; unanimity",
+    "preflopAllin": "one shared flop then optional two tails",
+    "twoBoardOddChip": "Board A",
+    "tieOddChip": "clockwise after button among tied winners",
+    "showdown": "all nonfolded contestants expose full hand",
+    "cashNet": "available+committed+takenOff-totalAdded",
+    "tournamentRebuys": "Off in V1; optional enabled mode is a separately specified expansion",
+    "tournamentTieRank": "hand-start stack; equal stacks share competition rank"
+  },
+  "timersSeconds": {
+    "choiceMax": 4,
+    "betting": 30,
+    "voluntaryRunoutVote": 8,
+    "forcedAllinOffer": 5,
+    "optionalReveal": 3,
+    "awardToNextChoice": 3,
+    "hostGrace": 30,
+    "abandonment": 1800
+  },
+  "straddleTimer": "No extra serial timer; closes when choice locks or expires",
+  "tournamentLevels": "cumulative server wall time; immutable current hand; final level held",
+  "workingDesign": "After Hours, not a separately approved final brand",
+  "stillRequiresEvidence": [
+    "production migrations/security",
+    "autonomous timers",
+    "multi-client/recovery",
+    "integrated animations",
+    "actual phone/PWA tests",
+    "hosted final release"
+  ]
+}

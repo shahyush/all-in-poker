@@ -135,7 +135,7 @@ export function createTable(id: string, rules: TableRules, hostPlayerId: string,
     id, rules: r, status: 'waiting', version: 0, seq: 0,
     seats: Array(r.seats).fill(null), button: null, prevBB: null, prevSB: null, handNo: 0, hand: null,
     hostPlayerId, hostEpoch: 1, createdAt: now, startedAt: null, nextSeq: 0,
-    tournament: null, waitingReason: 'Waiting for players', dueAt: null, events: [], error: null, lastActivityAt: now,
+    tournament: null, waitingReason: 'Waiting for players', dueAt: null, idleCheckAt: null, events: [], error: null, lastActivityAt: now,
   };
 }
 
@@ -275,6 +275,9 @@ function startNextHand(t: TableState, now: number, ctx: TickContext, effects: Ef
   if (t.status !== 'running') return;
   t.hand = null;
   const cash = t.rules.mode === 'cash';
+  // Nothing drives a held table except the scheduler, so always leave a wake-up: presence is re-checked every hold period
+  // until a hand can start or the abandonment window closes the table.
+  t.idleCheckAt = now + T.nobodyPresentHoldMs;
   if (!anyonePresent(t, ctx, now, T.nobodyPresentHoldMs)) { t.waitingReason = 'Waiting for someone to return'; return; }
   const n = t.seats.length;
   const cand = (s: SeatState | null): s is SeatState => !!s && s.stack > 0 && !s.leaving && s.eliminatedPlace === null && s.status === 'in';
@@ -362,7 +365,7 @@ function startNextHand(t: TableState, now: number, ctx: TickContext, effects: Ef
     const s = t.seats[utg]!;
     if (s.stack - Math.min(ante, s.stack) >= 2 * bb) h.straddleOffer = { seat: utg, decided: s.straddlePref, accepted: s.straddlePref };
   }
-  t.button = button; t.prevBB = bbSeat; t.prevSB = sbSeat ?? sbPos ?? sbSeat; t.hand = h; t.waitingReason = null;
+  t.button = button; t.prevBB = bbSeat; t.prevSB = sbSeat ?? sbPos ?? sbSeat; t.hand = h; t.waitingReason = null; t.idleCheckAt = null;
 }
 
 // ---------- dealer's choice & straddle ----------
@@ -862,7 +865,7 @@ export function computeDue(t: TableState): void {
     if ((h.phase === 'vote' || h.phase === 'offer') && h.vote) c.push(h.vote.deadline);
     if (h.phase === 'runout' && h.runoutQueue.length) c.push(h.runoutQueue[0].at);
     if (h.phase === 'result' && h.nextAt !== null) c.push(h.nextAt);
-  }
+  } else if (t.status === 'running' && t.idleCheckAt !== null) c.push(t.idleCheckAt);
   t.dueAt = c.length ? Math.min(...c) : null;
 }
 

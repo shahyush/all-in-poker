@@ -560,23 +560,177 @@ describe('tournament levels and eliminations', () => {
     tick(t, n + 70_000, ctxAll(t, n + 70_000, ctx.rng)); // actor timed out etc., but blinds unchanged
     expect(h.bb).toBe(10);
   });
-  it('R4-22: eliminations only after settlement, ranked by hand-start stack with shared places', () => {
-    const { t, now, ctx } = makeTable([1000, 1000, 1000, 1000], { mode: 'tournament', unit: 1000, levels });
-    // force equal small stacks: seats 0 and 1 start with 100 each, seat 2 with 300
-    t.seats[0]!.stack = 100; t.seats[1]!.stack = 100; t.seats[2]!.stack = 300; t.seats[3]!.stack = 1000;
-    let n = start(t, now, ctx);
-    const h = t.hand!;
-    while (h.phase === 'betting') { const a = h.actor!; const la = legalActions(t, a, n); act(t, a, la.allInTo ? { type: 'raise', raiseTo: la.allInTo } : { type: la.owed ? 'call' : 'check' }, n, ctx); }
-    n = autoplay(t, n, ctx, (x) => x.hand!.phase === 'result');
-    const busted = t.seats.filter((s) => s && s.stack === 0);
-    expect(t.seats.every((s) => s && s.eliminatedPlace === null)).toBe(true); // not before boundary
-    n = autoplay(t, n, ctx, (x) => x.handNo === 2 || x.status !== 'running');
-    const places = t.seats.map((s) => s!.eliminatedPlace);
-    if (busted.length >= 2 && t.seats[0]!.stack === 0 && t.seats[1]!.stack === 0) {
-      expect(places[0]).toBe(places[1]);
-      if (t.seats[2]!.stack === 0) expect(places[2]).toBe(2);
+  it('R4-22 (short-stack forced all-in): a big blind below the blind posts all-in, the hand is contested, elimination happens only after settlement', () => {
+    const lv = [{ sb: 10, bb: 20, ante: 0, minutes: 60 }];
+    let eliminatedSeen = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      const { t, now, ctx } = makeTable([1000, 1000, 1000], { mode: 'tournament', unit: 1000, levels: lv }, 1_000_000, seededRng(seed));
+      startTable(t, now, ctx);
+      const h = t.hand!;
+      const bb = h.bbSeat!;
+      t.seats[bb]!.stack = 15; // below the 20 big blind
+      const total = totalChips(t);
+      chooseVariant(t, h.chooserSeat, 'holdem', now, ctx);
+      let n = h.actionReadyAt!;
+      const bbp = h.players.find((p) => p.seat === bb)!;
+      expect(bbp.allIn).toBe(true); expect(bbp.bet).toBe(15);
+      expect(h.currentBet).toBe(20); // nominal bring-in stays 20
+      // the other two call the nominal blind; the short stack is contested, not walked
+      while (h.phase === 'betting') { const a = h.actor!; const la = legalActions(t, a, n); act(t, a, { type: la.owed ? 'call' : 'check' }, n, ctx); }
+      const effects: ReturnType<typeof tick> = [];
+      for (let g = 0; g < 50 && h.phase !== 'result'; g++) { n = Math.max(n, t.dueAt!); effects.push(...tick(t, n, ctxAll(t, n, ctx.rng))); }
+      expect(h.phase).toBe('result');
+      expect(h.result!.uncontested).toBe(false);
+      expect(t.seats[bb]!.eliminatedPlace).toBeNull(); // never before the boundary, even at zero chips
+      expect(totalChips(t)).toBe(total);
+      n = h.nextAt!;
+      effects.push(...tick(t, n, ctxAll(t, n, ctx.rng)));
+      expect(totalChips(t)).toBe(total);
+      if (t.seats[bb]!.stack === 0) {
+        eliminatedSeen++;
+        expect(t.seats[bb]!.eliminatedPlace).toBe(3);
+        expect(t.tournament!.eliminations).toEqual([{ playerId: 'p' + bb, name: 'P' + bb, place: 3, handNo: 1 }]);
+        expect(effects.some((e) => e.type === 'eliminated' && e.playerId === 'p' + bb && e.place === 3)).toBe(true);
+        expect(t.status).toBe('running');
+        expect(t.hand!.players.length).toBe(2); // play continues heads-up, the busted seat is never dealt in
+        expect(t.hand!.players.some((p) => p.seat === bb)).toBe(false);
+      } else {
+        expect(t.seats[bb]!.stack).toBeGreaterThan(15); // won the main pot or a share of it
+        expect(t.seats[bb]!.eliminatedPlace).toBeNull();
+        expect(t.hand!.players.length).toBe(3);
+      }
     }
-    if (t.status === 'finished') expect(t.tournament!.winnerPlayerId).not.toBeNull();
+    expect(eliminatedSeen).toBeGreaterThan(0);
+  });
+
+  it('timeout-only tournament: levels rise on the clock, blinds and antes follow, chips are conserved, and the fold rotation legitimately never finishes', () => {
+    // Every player is present but nobody acts: each actor times out (check if possible, otherwise fold). Preflop the
+    // under-the-gun and small blind fold and the big blind collects. Over one full orbit each seat is big blind once and
+    // small blind once, so the net transfer is zero: no stack ever drops below a blind and nobody is eliminated.
+    // That is correct tournament behaviour, not a stall, so this test asserts progression and bounds the hand count.
+    const lv = [{ sb: 5, bb: 10, ante: 0, minutes: 1 }, { sb: 10, bb: 20, ante: 0, minutes: 1 }, { sb: 20, bb: 40, ante: 5, minutes: 1 }];
+    const { t, now, ctx } = makeTable([1000, 1000, 1000], { mode: 'tournament', unit: 1000, levels: lv });
+    startTable(t, now, ctx);
+    let n = now;
+    const bbs: number[] = [];
+    let lastHand = 0;
+    for (let g = 0; g < 2000 && t.handNo < 30; g++) {
+      n = Math.max(n, t.dueAt ?? n + 1000) + 1;
+      tick(t, n, ctxAll(t, n, ctx.rng));
+      if (t.hand && t.handNo !== lastHand) { lastHand = t.handNo; bbs.push(t.hand.bb); }
+      expect(totalChips(t)).toBe(3000);
+    }
+    expect(t.handNo).toBe(30);
+    expect(t.status).toBe('running');
+    expect(t.tournament!.level).toBe(2);
+    expect(t.hand!.bb).toBe(40); expect(t.hand!.ante).toBe(5);
+    expect(bbs[0]).toBe(10);
+    for (let i = 1; i < bbs.length; i++) expect(bbs[i]).toBeGreaterThanOrEqual(bbs[i - 1]); // never decreases
+    expect(new Set(bbs)).toEqual(new Set([10, 20, 40]));
+    expect(t.tournament!.eliminations).toEqual([]);
+    for (const s of t.seats) { expect(s!.stack).toBeGreaterThan(800); expect(s!.stack).toBeLessThan(1200); }
+    // every hand ended uncontested by timeouts: the log of the last completed hand shows folds flagged as timeouts
+    expect(t.events.filter((e) => e.type === 'action' && e.action === 'fold').length).toBeGreaterThan(0);
+  });
+
+  it('simulated shoves: a tournament with active betting completes with a unique winner, full standings and an archive effect', () => {
+    const lv = [{ sb: 5, bb: 10, ante: 0, minutes: 1 }, { sb: 10, bb: 20, ante: 0, minutes: 1 }, { sb: 20, bb: 40, ante: 5, minutes: 1 }];
+    const { t, now, ctx } = makeTable([1000, 1000, 1000, 1000], { mode: 'tournament', unit: 1000, levels: lv }, 1_000_000, seededRng(7));
+    const effects: ReturnType<typeof tick> = [];
+    let n = now;
+    let hands = 0;
+    const bbs: number[] = [];
+    effects.push(...startTable(t, now, ctx));
+    for (let g = 0; g < 5000 && t.status === 'running'; g++) {
+      const h = t.hand;
+      if (!h) { n = Math.max(n, t.dueAt ?? n) + 1; effects.push(...tick(t, n, ctxAll(t, n, ctx.rng))); continue; }
+      if (h.phase === 'choice') { chooseVariant(t, h.chooserSeat, 'holdem', n, ctx); n = h.actionReadyAt!; hands++; bbs.push(h.bb); continue; }
+      if (h.phase === 'betting' && h.actor !== null) {
+        // one designated seat shoves each hand (rotating); everyone else calls, so every hand is contested by all
+        const alive = t.seats.map((s, i) => (s && s.stack > 0 && s.eliminatedPlace === null ? i : -1)).filter((i) => i >= 0);
+        const shover = alive[(h.handNo - 1) % alive.length];
+        // the shover goes all in once it is not the biggest stack (equal starting stacks would make hand one a four-way
+        // all-in and end the event in one hand); as the chip leader it opens for a bounded raise instead
+        const la = legalActions(t, h.actor, n);
+        const biggest = Math.max(...alive.map((i) => t.seats[i]!.stack + (h.players.find((p) => p.seat === i)?.bet ?? 0)));
+        const mine = t.seats[h.actor]!.stack + (h.players.find((p) => p.seat === h.actor)?.bet ?? 0);
+        if (h.actor === shover && h.street === 'preflop' && la.raise && mine < biggest) effects.push(...act(t, h.actor, { type: 'raise', raiseTo: la.allInTo ?? la.raise.maxTo }, n, ctx));
+        else if (h.actor === shover && h.street === 'preflop' && la.raise) effects.push(...act(t, h.actor, { type: 'raise', raiseTo: Math.max(la.raise.minTo, Math.min(la.raise.maxTo, 250)) }, n, ctx));
+        else effects.push(...act(t, h.actor, { type: la.owed ? 'call' : 'check' }, n, ctx));
+        expect(totalChips(t)).toBe(4000);
+        continue;
+      }
+      if (h.phase === 'result') {
+        for (const p of h.players) if (t.seats[p.seat]!.stack === 0) expect(t.seats[p.seat]!.eliminatedPlace).toBeNull(); // busted this hand: ranked only at the boundary
+        n = Math.max(n, h.nextAt!) + 70_000; // a level passes between hands
+        effects.push(...tick(t, n, ctxAll(t, n, ctx.rng)));
+        continue;
+      }
+      n = Math.max(n, t.dueAt ?? n) + 1; effects.push(...tick(t, n, ctxAll(t, n, ctx.rng)));
+    }
+    expect(t.status).toBe('finished');
+    expect(hands).toBeLessThan(40);
+    expect(hands).toBeGreaterThanOrEqual(3);
+    const tr = t.tournament!;
+    const winner = t.seats.find((s) => s && s.playerId === tr.winnerPlayerId)!;
+    expect(winner.stack).toBe(4000);
+    expect(winner.eliminatedPlace).toBe(1);
+    const places = tr.eliminations.map((e) => e.place).sort((a, b) => a - b);
+    expect(tr.eliminations.length).toBe(4);
+    expect(places[0]).toBe(1);
+    // competition ranking: each place is either the next number or shared with the previous bust (equal hand-start stacks)
+    for (let i = 1; i < places.length; i++) expect(places[i] === i + 1 || places[i] === places[i - 1]).toBe(true);
+    expect(new Set(tr.eliminations.map((e) => e.playerId)).size).toBe(4);
+    expect(t.seats.every((s) => s && s.eliminatedPlace !== null)).toBe(true);
+    expect(bbs[0]).toBe(10); expect(Math.max(...bbs)).toBe(40);
+    for (let i = 1; i < bbs.length; i++) expect(bbs[i]).toBeGreaterThanOrEqual(bbs[i - 1]);
+    expect(effects.filter((e) => e.type === 'eliminated').length).toBe(3);
+    expect(effects.some((e) => e.type === 'tournament_finished' && !e.abandoned && e.winnerPlayerId === tr.winnerPlayerId)).toBe(true);
+    expect(effects.some((e) => e.type === 'archive' && e.reason === 'finished')).toBe(true);
+    expect(t.hand).toBeNull();
+    expect(t.dueAt).toBeNull();
+  });
+
+  it('all players absent: new hands hold after 45 s, resume when someone returns, and a 30-minute absence abandons the tournament (closes a cash table with exits)', () => {
+    const lv = [{ sb: 5, bb: 10, ante: 0, minutes: 60 }];
+    for (const mode of ['tournament', 'cash'] as const) {
+      const { t, now, ctx } = makeTable([1000, 1000, 1000], mode === 'tournament' ? { mode, unit: 1000, levels: lv } : {});
+      let n = start(t, now, ctx);
+      n = autoplay(t, n, ctx, (x) => x.hand!.phase === 'result');
+      const h = t.hand!;
+      const nobody = { presence: {}, rng: ctx.rng };
+      n = h.nextAt! + T.nobodyPresentHoldMs + 1;
+      let fx = tick(t, n, nobody);
+      expect(fx.some((e) => e.type === 'history')).toBe(true); // the finished hand is still recorded
+      expect(t.hand).toBeNull(); expect(t.status).toBe('running'); expect(t.waitingReason).toBe('Waiting for someone to return');
+      expect(t.dueAt).toBe(n + T.nobodyPresentHoldMs); // the scheduler keeps re-checking presence while held
+      n += 10 * 60_000; tick(t, n, nobody);
+      expect(t.dueAt).toBe(n + T.nobodyPresentHoldMs);
+      expect(t.hand).toBeNull(); expect(t.status).toBe('running');
+      // one player comes back: a hand starts again
+      n += 1000; tick(t, n, { presence: { p1: n }, rng: ctx.rng });
+      expect(t.hand).not.toBeNull(); expect(t.handNo).toBe(2);
+      n = autoplay(t, n, ctx, (x) => x.hand!.phase === 'result');
+      const total = totalChips(t);
+      n = t.hand!.nextAt! + T.abandonmentMs + 1;
+      fx = tick(t, n, nobody);                 // settles the hand, holds, arms the idle check
+      expect(t.status).toBe('running');
+      fx.push(...tick(t, t.dueAt!, nobody));   // the scheduler's next visit abandons
+      if (mode === 'tournament') {
+        expect(t.status).toBe('abandoned');
+        expect(fx.some((e) => e.type === 'tournament_finished' && e.abandoned && e.winnerPlayerId === null)).toBe(true);
+        expect(t.tournament!.winnerPlayerId).toBeNull();
+        expect(t.seats.filter((s) => s).reduce((a, s) => a + s!.stack, 0)).toBe(total); // stacks untouched for the record
+      } else {
+        expect(t.status).toBe('closed');
+        const exits = fx.filter((e) => e.type === 'exit');
+        expect(exits.length).toBe(3);
+        expect(exits.reduce((a, e) => a + (e.type === 'exit' ? e.amount : 0), 0)).toBe(total);
+        expect(t.seats.every((s) => !s)).toBe(true);
+      }
+      expect(fx.some((e) => e.type === 'archive' && e.reason === 'abandoned')).toBe(true);
+      expect(t.hand).toBeNull(); expect(t.dueAt).toBeNull();
+    }
   });
 });
 

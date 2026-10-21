@@ -1,0 +1,47 @@
+# All In — frontend hosting on Netlify (free tier, works with a private GitHub repository, no card required).
+# Netlify builds this repo on every push to main and serves web/dist at https://<site-name>.netlify.app/.
+# Only public values live here: the publishable key is designed for browsers and every table is guarded by RLS.
+[build]
+  command = "npm run build -w web"
+  publish = "web/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NPM_FLAGS = "--no-audit --no-fund"
+  VITE_BASE = "/"
+  VITE_SUPABASE_URL = "https://vlnkslhmmbkkvbpvzuiw.supabase.co"
+  VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_6BV7f_xPQjKkayenn8q0Kw_XvcrIxLo"
+
+# single-page app: every route is served by the shell and resolved by the in-app router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Content-Type = "application/manifest+json; charset=utf-8"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "same-origin"

@@ -10,7 +10,7 @@ function stampServiceWorker(base: string): Plugin {
     name: 'allin-stamp-sw',
     apply: 'build',
     closeBundle() {
-      const build = process.env.VITE_BUILD_ID || String(Date.now());
+      const build = process.env.VITE_BUILD_ID || process.env.COMMIT_REF || String(Date.now());
       const assets = readdirSync('dist/assets').map((f) => `${base}assets/${f}`);
       const shell = [...assets, `${base}manifest.webmanifest`, `${base}icons/icon-192.png`];
       let sw = readFileSync('dist/sw.js', 'utf8');

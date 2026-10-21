@@ -1,0 +1,38 @@
+name: Deploy edge functions (standard route)
+# The supported Supabase deployment: the CLI uploads supabase/functions/* (api via static.ts + the committed bundle).
+# Needs ONE repository secret: SUPABASE_ACCESS_TOKEN (Supabase → Account → Access Tokens → Generate new token;
+# GitHub → Settings → Secrets and variables → Actions → New repository secret). Without it the job exits early.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['supabase/functions/**', 'supabase/config.toml', '.github/workflows/deploy-functions.yml']
+permissions:
+  contents: read
+concurrency:
+  group: deploy-functions
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for the access token
+        id: token
+        run: |
+          if [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ]; then echo "present=false" >> "$GITHUB_OUTPUT"; echo "SUPABASE_ACCESS_TOKEN secret is not set; skipping"; else echo "present=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.present == 'true'
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+        if: steps.token.outputs.present == 'true'
+      - run: npm run test -w engine && npm run bundle:function && git diff --exit-code -- supabase/functions/api/bundle/server.js
+        if: steps.token.outputs.present == 'true'
+        name: Verify the committed bundle matches the sources
+      - uses: supabase/setup-cli@v1
+        if: steps.token.outputs.present == 'true'
+        with: { version: latest }
+      - run: supabase functions deploy api code app --project-ref vlnkslhmmbkkvbpvzuiw
+        if: steps.token.outputs.present == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

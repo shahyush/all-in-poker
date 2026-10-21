@@ -1,3 +1,13 @@
+-- Migration 1/4: core schema (APPLIED to vlnkslhmmbkkvbpvzuiw on 2026-10-21 via MCP execute_sql; recorded in schema_migrations)
+-- Changes: new columns on profiles/tables/table_members/table_secrets/hole_cards/hand_history; new tables group_settings,
+--   recovery_codes, ledger, reload_requests, session_participants, command_receipts, table_tombstones, app_settings,
+--   app_assets(encoding), diagnostics; helper functions; select-only RLS policies; write grants revoked from anon/authenticated;
+--   realtime publication + replica identity; handle_new_user() becomes a no-op (the auth.users trigger stays).
+-- Existing data: preserved. Only additive columns with defaults; profiles.auth_user_id back-filled from id; closed legacy
+--   tables tagged summary={"legacy":true}. No rows deleted.
+-- Rollback: drop the new tables (they hold only V1 data), drop the added columns, restore the previous profiles policies
+--   ("profiles readable by signed-in users", self insert/update) and re-grant writes if the old prototype must run again.
+--   Legacy prototype tables/functions (commit_table, app_assets rows app.js/engine.js/index.html) were never touched.
 -- All In V1: forward-only migration on the existing project. No drops of user data.
 -- Identity model: profiles.id is the stable player id; profiles.auth_user_id binds the current authenticated session.
 

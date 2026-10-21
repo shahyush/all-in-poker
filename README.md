@@ -4,7 +4,7 @@ A phone-first progressive web app for a closed group: one shared group password 
 identity per device, dealer's-choice cash games and tournaments, a server-authoritative engine, and saved history.
 No real money, no email, no phone numbers.
 
-* **App URL (GitHub Pages):** https://shahyush.github.io/all-in-poker/ — goes live once the repository is public (see `docs/RELEASE.md`)
+* **App URL:** Netlify (free tier, private repo) — `https://<site-name>.netlify.app/` once the owner connects the repo (see `docs/RELEASE.md`)
 * **Backend:** Supabase project `vlnkslhmmbkkvbpvzuiw` (free plan) — Postgres + RLS, anonymous auth, Realtime, Edge Functions, pg_cron
 * **Status and evidence:** `docs/RELEASE.md` · **How to host / play / install:** `docs/GUIDE.md`
 
@@ -32,8 +32,8 @@ npm run test:e2e -w web          # Playwright journeys against the two dev serve
 
 ## Build and deploy
 
-* **PWA:** `.github/workflows/pages.yml` builds `web/` and deploys to GitHub Pages on every push to `main`
-  (`VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` default to this project; override with repository variables).
+* **PWA:** Netlify builds `web/` on every push to `main` using `netlify.toml` (base `/`, SPA redirect, cache headers).
+  GitHub Pages (`pages.yml`) is kept manual-only: it needs a public repo or GitHub Pro.
 * **Database:** apply `supabase/migrations/*.sql` in order (`supabase db push`, or the SQL editor). All four are recorded in
   `supabase_migrations.schema_migrations` on the live project.
 * **API:** `npm run bundle:function` → `supabase/functions/api/bundle/server.js`. The deployed `api` function loads that exact

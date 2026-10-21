@@ -1,3 +1,7 @@
+-- Migration 4/4: scheduler (APPLIED 2026-10-21). Enables pg_cron + pg_net, app_settings keys job_key/function_url/anon_key,
+--   allin_dispatch_due() and the every-second cron job 'allin-dispatch-due' that POSTs due table ids to /functions/v1/api/jobs.
+-- Existing data: untouched. Rollback: select cron.unschedule('allin-dispatch-due'); drop function allin_dispatch_due();
+--   (extensions may stay). Cost: the job only issues HTTP calls while a table has due_at set.
 -- Autonomous timers: pg_cron polls for due tables every second and asks the API (via pg_net) to resolve them.
 -- Production only (requires pg_cron and pg_net, available on the hosted platform).
 create extension if not exists pg_cron;

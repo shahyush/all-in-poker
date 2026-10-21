@@ -1,4 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
+
+// every test opens several phone contexts; close them so later tests do not inherit their polling load
+test.afterEach(async ({ browser }) => { for (const c of browser.contexts()) await c.close().catch(() => undefined); });
 import { player, actWhenMyTurn, shiftClock } from './helpers.ts';
 
 async function hostTable(page: Page, opts: { name: string; units?: string; straddle?: boolean }): Promise<string> {
@@ -17,7 +20,12 @@ async function joinVia(page: Page, url: string, units = '2,000') {
   await expect(page.getByText(/starts the game/)).toBeVisible();
 }
 async function turnOf(pages: Page[]): Promise<Page | null> {
-  for (const p of pages) if (await p.getByRole('group', { name: 'Actions' }).getByRole('button', { name: 'Fold' }).isEnabled().catch(() => false)) return p;
+  // isEnabled() waits for a missing element (forever with no timeout); a page that has left the table has no action bar
+  for (const p of pages) {
+    const fold = p.getByRole('group', { name: 'Actions' }).getByRole('button', { name: 'Fold' });
+    if (await fold.count() === 0) continue;
+    if (await fold.isEnabled({ timeout: 1000 }).catch(() => false)) return p;
+  }
   return null;
 }
 async function chooseIfAsked(pages: Page[], variant = /Hold'em/) {
@@ -71,9 +79,9 @@ test('reconnect, rotation, uncontested reveal, reload approval, leave, history a
   // finish hand 2 by checking down
   for (let i = 0; i < 20; i++) { if (await h.page.getByText(/Pot detail/).isVisible().catch(() => false)) break; const p = await turnOf(pages); if (!p) { await h.page.waitForTimeout(300); continue; } const call = p.getByRole('group', { name: 'Actions' }).getByRole('button', { name: /^Call/ }); if (await call.isVisible()) await actWhenMyTurn(p, 'Call'); else await actWhenMyTurn(p, 'Check'); }
   await expect(h.page.locator('.g-stakes')).toContainText('Hand 3', { timeout: 20_000 });
-  const stackAfter = (await g.page.locator('.hero-meta b').textContent())!;
-  expect(Number(stackAfter.replace(/,/g, '')) - Number(stackBefore.replace(/,/g, ''))).toBeGreaterThanOrEqual(1000 - 15);
-  void stackBefore;
+  // the guest's own screen must show the credit once it has caught up with hand 3 (clients poll/subscribe independently)
+  await expect(g.page.locator('.g-stakes')).toContainText('Hand 3', { timeout: 20_000 });
+  await expect.poll(async () => Number((await g.page.locator('.hero-meta b').textContent())!.replace(/,/g, '')) - Number(stackBefore.replace(/,/g, '')), { timeout: 10_000 }).toBeGreaterThanOrEqual(1000 - 15);
   // run-it proposal on the flop: propose twice, other agrees -> two boards
   await chooseIfAsked(pages);
   for (let i = 0; i < 30; i++) { if (await h.page.locator('.board-label', { hasText: /^flop$/i }).isVisible().catch(() => false)) break; const p = await turnOf(pages); if (!p) { await h.page.waitForTimeout(300); continue; } const call = p.getByRole('group', { name: 'Actions' }).getByRole('button', { name: /^Call/ }); if (await call.isVisible()) await actWhenMyTurn(p, 'Call'); else await actWhenMyTurn(p, 'Check'); }
@@ -129,6 +137,7 @@ test('server timers run with every browser closed; a timed-out player folds and 
 });
 
 test('tournament: create with levels, play out to a winner, standings', async ({ browser }) => {
+  test.setTimeout(180_000);
   const h = await player(browser, 'Tan');
   const g = await player(browser, 'Aay');
   await h.page.getByRole('button', { name: 'Host a table' }).click();
@@ -145,8 +154,8 @@ test('tournament: create with levels, play out to a winner, standings', async ({
   const pages = [h.page, g.page];
   for (const p of pages) await expect(p.locator('.game')).toBeVisible();
   await expect(h.page.locator('.g-stakes')).toContainText('Level 1');
-  // shove every turn until someone has everything
-  for (let i = 0; i < 40; i++) {
+  // shove every turn until someone has everything (two players: the first called shove decides it unless they tie)
+  for (let i = 0; i < 80; i++) {
     if (await h.page.getByText('Final standings').isVisible().catch(() => false)) break;
     await chooseIfAsked(pages);
     const p = await turnOf(pages);

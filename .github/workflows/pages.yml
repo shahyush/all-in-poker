@@ -1,8 +1,8 @@
 name: Deploy PWA to GitHub Pages
+# Manual only. GitHub Pages is free for PUBLIC repositories; on a private repository it needs GitHub Pro (paid), and the
+# configure-pages step fails with "Resource not accessible by integration". The supported free host for this private repo
+# is Netlify (see netlify.toml). Keep this for the day the repository is public.
 on:
-  push:
-    branches: [main]
-    paths: ['web/**', 'engine/src/**', 'package.json', 'package-lock.json', '.github/workflows/pages.yml']
   workflow_dispatch:
 permissions:
   contents: read

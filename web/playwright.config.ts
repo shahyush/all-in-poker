@@ -7,6 +7,6 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: [['list'], ['json', { outputFile: 'test-results/e2e.json' }]],
-  use: { baseURL: process.env.E2E_BASE ?? 'http://127.0.0.1:5173', trace: 'retain-on-failure', screenshot: 'only-on-failure', ...devices['iPhone 13'], defaultBrowserType: 'chromium' },
+  use: { actionTimeout: 20_000, baseURL: process.env.E2E_BASE ?? 'http://127.0.0.1:5173', trace: 'retain-on-failure', screenshot: 'only-on-failure', ...devices['iPhone 13'], defaultBrowserType: 'chromium' },
   projects: [{ name: 'phone', use: { ...devices['iPhone 13'], browserName: 'chromium' } }],
 });
