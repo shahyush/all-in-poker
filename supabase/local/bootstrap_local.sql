@@ -53,3 +53,14 @@ begin
   end if;
   return s;
 end $$;
+
+-- Local stand-in for pg_net so the dispatcher function can be exercised by the server tests: records every call.
+create schema if not exists net;
+create table if not exists net.local_calls (id bigserial primary key, url text, body jsonb, headers jsonb, created_at timestamptz default now());
+create or replace function net.http_post(url text, body jsonb default '{}'::jsonb, params jsonb default '{}'::jsonb, headers jsonb default '{}'::jsonb, timeout_milliseconds int default 5000)
+returns bigint language plpgsql as $$
+declare rid bigint;
+begin
+  insert into net.local_calls (url, body, headers) values (url, body, headers) returning id into rid;
+  return rid;
+end $$;

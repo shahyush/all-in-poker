@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // every test opens several phone contexts; close them so later tests do not inherit their polling load
 test.afterEach(async ({ browser }) => { for (const c of browser.contexts()) await c.close().catch(() => undefined); });
-import { player, actWhenMyTurn } from './helpers.ts';
+import { player, actWhenMyTurn, PASSWORD } from './helpers.ts';
 
 test('three friends: invite → entry → buy-in → start → dealer choice → a full hand → next hand', async ({ browser }) => {
   const host = await player(browser, 'Tanisha');
@@ -27,7 +27,7 @@ test('three friends: invite → entry → buy-in → start → dealer choice →
     await page.goto(inviteUrl);
     await expect(page.getByText("You are invited")).toBeVisible();
     await page.getByLabel('Your nickname').fill(name);
-    await page.getByLabel('Group password').fill('friday-night');
+    await page.getByLabel('Group password').fill(PASSWORD);
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(page.getByRole('heading', { name: 'Friday at ours' })).toBeVisible();
     await page.getByRole('button', { name: '2,000' }).click();

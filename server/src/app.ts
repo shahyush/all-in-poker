@@ -40,8 +40,10 @@ export class App {
       if (path.endsWith('/cmd')) return { status: 200, body: await this.cmd(req), headers: h };
       return { status: 404, body: { ok: false, error: { code: 'not_found', message: 'Unknown endpoint' } }, headers: h };
     } catch (e) {
-      if (e instanceof ApiError) return { status: e.status, body: { ok: false, error: { code: e.code, message: e.message, detail: e.detail ?? null }, correlationId }, headers: h };
-      if (e instanceof EngineError) return { status: 409, body: { ok: false, error: { code: e.code, message: e.message, detail: null }, correlationId }, headers: h };
+      // diagnostics: command type + outcome only, never payloads, tokens or passwords
+      const kind = req.body && typeof req.body === 'object' ? String((req.body as Record<string, unknown>).type ?? '') : '';
+      if (e instanceof ApiError) { console.warn('[allin]', correlationId, kind, '->', e.status, e.code); return { status: e.status, body: { ok: false, error: { code: e.code, message: e.message, detail: e.detail ?? null }, correlationId }, headers: h }; }
+      if (e instanceof EngineError) { console.warn('[allin]', correlationId, kind, '-> 409', e.code); return { status: 409, body: { ok: false, error: { code: e.code, message: e.message, detail: null }, correlationId }, headers: h }; }
       console.error('[allin]', correlationId, (e as Error).name, (e as Error).message);
       return { status: 500, body: { ok: false, error: { code: 'server_error', message: 'Something went wrong on our side. Please try again.' }, correlationId }, headers: h };
     }

@@ -29,7 +29,12 @@ async function turnOf(pages: Page[]): Promise<Page | null> {
   return null;
 }
 async function chooseIfAsked(pages: Page[], variant = /Hold'em/) {
-  for (const p of pages) { const b = p.getByRole('button', { name: variant }); if (await b.isVisible().catch(() => false)) { await b.click(); return; } }
+  // the choice buttons are disabled while a choice request is in flight or once the deal has started
+  for (const p of pages) {
+    const b = p.getByRole('button', { name: variant });
+    if (await b.count() === 0) continue;
+    if (await b.isVisible().catch(() => false) && await b.isEnabled({ timeout: 500 }).catch(() => false)) { await b.click({ timeout: 3000 }).catch(() => undefined); return; }
+  }
 }
 
 test('reconnect, rotation, uncontested reveal, reload approval, leave, history and recovery', async ({ browser }) => {
