@@ -1,7 +1,6 @@
 node_modules/
 dist/
 web/dist/
-supabase/functions/api/bundle/
 .env
 .env.*
 !.env.example
