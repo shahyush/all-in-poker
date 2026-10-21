@@ -24,7 +24,7 @@ export class SupabaseTransport implements Transport {
     this.watching = true;
     this.client.auth.onAuthStateChange((event, session) => {
       try {
-        if (session?.access_token && session.refresh_token) localStorage.setItem(MIRROR_KEY, JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token }));
+        if (session?.access_token && session.refresh_token) { localStorage.setItem(MIRROR_KEY, JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token })); this.setRealtimeAuth(session.access_token); }
         else if (event === 'SIGNED_OUT') localStorage.removeItem(MIRROR_KEY);
       } catch { /* storage unavailable: nothing to mirror */ }
     });
@@ -33,20 +33,24 @@ export class SupabaseTransport implements Transport {
     const m = this.mirror();
     if (!m) return null;
     const { data, error } = await this.client.auth.setSession({ access_token: m.access_token, refresh_token: m.refresh_token }).catch((e: Error) => ({ data: { session: null }, error: e }));
-    if (data.session) { this.lastAuthError = null; return data.session; }
+    if (data.session) { this.lastAuthError = null; this.setRealtimeAuth(data.session.access_token); return data.session; }
     this.lastAuthError = error?.message ?? 'restore failed';
     try { localStorage.removeItem(MIRROR_KEY); } catch { /* ignore */ }
     return null;
   }
+  private setRealtimeAuth(token: string | undefined): void {
+    try { if (token) this.client.realtime.setAuth(token); } catch { /* realtime optional */ }
+  }
   async ensureSession(): Promise<string> {
     this.watch();
     const { data, error } = await this.client.auth.getSession();
-    if (data.session?.user) return data.session.user.id;
+    if (data.session?.user) { this.setRealtimeAuth(data.session.access_token); return data.session.user.id; }
     if (error) this.lastAuthError = error.message;
     const restored = await this.restore();
     if (restored?.user) return restored.user.id;
     const r = await this.client.auth.signInAnonymously();
     if (r.error || !r.data.user) throw new TransportError('auth', r.error?.message ?? 'Could not start a session', 401);
+    this.setRealtimeAuth(r.data.session?.access_token);
     return r.data.user.id;
   }
   async signOut(): Promise<void> { try { localStorage.removeItem(MIRROR_KEY); } catch { /* ignore */ } await this.client.auth.signOut(); }
