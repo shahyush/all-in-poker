@@ -19,7 +19,8 @@ export class App {
 
   cors(origin?: string): Record<string, string> {
     const allowed = (this.env.corsOrigin ?? '*').split(',').map((s) => s.trim()).filter(Boolean);
-    const pick = allowed.includes('*') ? '*' : origin && allowed.includes(origin) ? origin : allowed[0] ?? '*';
+    const matches = (o: string, pat: string) => pat === o || (pat.includes('*') && new RegExp('^' + pat.split('*').map((x) => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[a-z0-9-]+') + '$', 'i').test(o));
+    const pick = allowed.includes('*') ? '*' : origin && allowed.some((pat) => matches(origin, pat)) ? origin : allowed.find((a) => !a.includes('*')) ?? 'null';
     return {
       'Access-Control-Allow-Origin': pick,
       'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-allin-job',

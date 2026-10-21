@@ -7,7 +7,7 @@ Current state and blockers: `CHECKPOINT.md`. Release gates and evidence: `docs/R
 ## Non-negotiable rules
 - **Private repository stays private.** Never change visibility, never enable GitHub Pro/Pages-on-private or any paid plan.
 - **No costs.** Supabase free plan only; no paid add-ons, custom domains, or third-party paid services. Free hosts only
-  (Netlify free tier via `netlify.toml` is the chosen frontend host; GitHub Pages is unavailable for a private free repo).
+  (Cloudflare Pages free plan is the frontend host, configured by `wrangler.toml`, `web/.env.production`, `web/public/_redirects` and `_headers`; GitHub Pages is unavailable for a private free repo; Supabase cannot serve HTML).
 - **Preserve the existing Supabase project `vlnkslhmmbkkvbpvzuiw` and its data.** Forward-only migrations, no drops of user
   data, no project reset. Legacy rows (3 email users, 2 closed tables, prototype `app_assets`) stay.
 - **Never ask for or paste secrets in chat** (passwords, service-role keys, access tokens). Secrets go in Supabase Edge
@@ -25,6 +25,7 @@ Current state and blockers: `CHECKPOINT.md`. Release gates and evidence: `docs/R
   `scripts/local-db-reset.sh`), `npm run typecheck -w web`, and `npm run test:e2e -w web` when the web or engine changed.
   Keep regression tests for BUG01–05, antes in the pot, missed blinds, chip conservation, timeouts/presence and the
   tournament cases (timeout-only progression stays separate from active-betting completion).
+- **Group ownership**: the first player admitted with the bootstrap `GROUP_PASSWORD` becomes the owner. The owner enters first, before any invitation is shared, and saves their player code.
 - **Honest status.** Never call the app share-ready until a hosted multiplayer game (separate identities, all streets,
   awards, next hand, reload, reconnect, saved history) has been played on the deployed URL. Mark device checks that were
   not run as NOT VERIFIED.

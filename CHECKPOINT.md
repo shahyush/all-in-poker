@@ -42,8 +42,8 @@ Branch `main` on github.com/shahyush/all-in-poker (private). Read `CLAUDE.md` fo
   rebuilt bundle `f2d9b05d…` is committed; redeploying `api` is the next production step (see below).
 
 ## Remaining tasks
-1. Frontend hosting on a free host that supports a private repo (Netlify, `netlify.toml` ready) — needs the owner to connect
-   the repo once. Then set `app_settings.app_origins` to the site URL (one small SQL update) and redeploy `api`.
+1. Frontend hosting on Cloudflare Pages (free plan, private repo) — needs the owner to connect the repo once (settings in
+   `docs/RELEASE.md`). `app_settings.app_origins` is pre-set for `all-in-poker.pages.dev` and its preview origins.
 2. Owner: allow anonymous sign-ins; set `GROUP_PASSWORD` edge secret.
 3. Redeploy `api` with the current bundle (upload `edge/server.js` with the new sha through the asset store, or the standard
    CLI route once `SUPABASE_ACCESS_TOKEN` exists as a GitHub secret — `.github/workflows/deploy-functions.yml`).

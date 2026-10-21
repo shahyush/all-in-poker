@@ -1,0 +1,5 @@
+# Cloudflare Pages project configuration (free plan). The build command is set once in the dashboard when the project is
+# created:  build command `npm run build -w web`, build output directory `web/dist`, root directory `/`, Node 22.
+name = "all-in-poker"
+pages_build_output_dir = "web/dist"
+compatibility_date = "2026-10-01"

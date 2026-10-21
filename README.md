@@ -4,7 +4,7 @@ A phone-first progressive web app for a closed group: one shared group password 
 identity per device, dealer's-choice cash games and tournaments, a server-authoritative engine, and saved history.
 No real money, no email, no phone numbers.
 
-* **App URL:** Netlify (free tier, private repo) — `https://<site-name>.netlify.app/` once the owner connects the repo (see `docs/RELEASE.md`)
+* **App URL:** Cloudflare Pages (free plan, private repo) — `https://all-in-poker.pages.dev/` once the owner connects the repo (see `docs/RELEASE.md`)
 * **Backend:** Supabase project `vlnkslhmmbkkvbpvzuiw` (free plan) — Postgres + RLS, anonymous auth, Realtime, Edge Functions, pg_cron
 * **Status and evidence:** `docs/RELEASE.md` · **How to host / play / install:** `docs/GUIDE.md`
 
@@ -32,8 +32,10 @@ npm run test:e2e -w web          # Playwright journeys against the two dev serve
 
 ## Build and deploy
 
-* **PWA:** Netlify builds `web/` on every push to `main` using `netlify.toml` (base `/`, SPA redirect, cache headers).
-  GitHub Pages (`pages.yml`) is kept manual-only: it needs a public repo or GitHub Pro.
+* **PWA:** Cloudflare Pages builds `web/` on every push to `main`: build command `npm run build -w web`, output
+  `web/dist`, Node 22 (`.node-version`). Public build values live in `web/.env.production`; SPA routing and cache headers
+  come from `web/public/_redirects` and `_headers`; `wrangler.toml` records the output directory. Preview deployments get
+  their own `*.all-in-poker.pages.dev` origin, which the API allowlist accepts.
 * **Database:** apply `supabase/migrations/*.sql` in order (`supabase db push`, or the SQL editor). All four are recorded in
   `supabase_migrations.schema_migrations` on the live project.
 * **API:** `npm run bundle:function` → `supabase/functions/api/bundle/server.js`. The deployed `api` function loads that exact

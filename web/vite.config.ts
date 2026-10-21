@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
@@ -22,7 +22,9 @@ function stampServiceWorker(base: string): Plugin {
 
 // Base path is the GitHub Pages project path by default; override with VITE_BASE for other hosts.
 export default defineConfig(({ mode }) => {
-  const base = process.env.VITE_BASE ?? (mode === 'production' ? '/all-in-poker/' : '/');
+  const env = { ...loadEnv(mode, process.cwd(), 'VITE_'), ...process.env };
+  // Cloudflare Pages serves the app at the site root; VITE_BASE overrides for other hosts
+  const base = env.VITE_BASE ?? '/';
   return {
   base,
   plugins: [react(), stampServiceWorker(base)],

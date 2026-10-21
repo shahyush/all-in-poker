@@ -1,7 +1,7 @@
 # All In — host, player and install guide
 
 ## Players
-1. Open the link the host sent you (or the app URL) on your phone. Enter a nickname and the **group password**. That is the
+1. Open the link the host sent you (or the app URL, https://all-in-poker.pages.dev/) on your phone. Enter a nickname and the **group password**. That is the
    whole sign-up; the app creates a private player for this device.
 2. **Save your player code** (Profile → *Save my player code*) once. It restores *your* player on another phone or after
    clearing the browser. Nobody else can use it to become you without it, and it is never in an invite link.
