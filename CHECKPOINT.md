@@ -19,6 +19,20 @@ Branch `main` on github.com/shahyush/all-in-poker (private). Read `CLAUDE.md` fo
 - **Deployment (backend)**: schema + functions + cron live on `vlnkslhmmbkkvbpvzuiw`; edge functions `api` (v3), `code` (v2),
   `app` (v3, redirect) deployed through the Supabase MCP (authorised route).
 
+## Live verification (2026-10-21, hosted)
+On https://all-in-poker.aayush9shah.workers.dev the complete multiplayer journey runs with separate player identities,
+verified by the CI hosted-e2e job and cross-checked against the live hand log:
+- Three friends: invite -> entry -> buy-in -> seat -> start -> Dealer's Choice -> dealing -> betting through every street
+  -> settlement -> next hand. A live hand recorded Omaha 4 with 12 real client actions (no timeouts), all streets, showdown
+  and award, chip-conserving. (journey.spec, passes on live.)
+- Tournament: create with levels, play to a winner, standings. (passes on live.)
+- Reconnect, rotation, uncontested reveal, reload approval, run-it-twice (two boards), leave, history, recovery.
+Key live fixes this session: realtime auth (postgres_changes now deliver to clients — was the main cause of the
+'breaks down after Host table' timing), adaptive polling floor, action-ready margin to stop premature 'not_ready' 409s,
+scheduler dispatch bug (ambiguous 'key'), and the iOS session-restore/token-mirror fix.
+Best-effort note: the 4 s Dealer's Choice and 3 s reveal windows can lapse to the spec defaults (Hold'em / muck) on the
+very first hand of a cold table before realtime/edge warm up; once the table is warm they are reliable.
+
 ## Actual test results (this checkpoint)
 | Layer | Command | Result |
 | --- | --- | --- |

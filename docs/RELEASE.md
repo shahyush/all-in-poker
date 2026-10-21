@@ -1,7 +1,9 @@
 # Release status — All In V1 (2026-10-21)
 
-**Not share-ready yet.** Backend and frontend are deployed and the entry page is verified live; the hosted multiplayer game
-has not been played yet (section 3, live rows).
+**Live and playable.** Backend and frontend are deployed; the complete multiplayer journey has been played on the hosted
+site with separate identities (verified by the CI hosted-e2e against https://all-in-poker.aayush9shah.workers.dev and by
+the live hand log). App URL: https://all-in-poker.aayush9shah.workers.dev/ . Remaining open items are real-device checks
+(section 3). See CHECKPOINT.md for the live-verification detail.
 
 ## 1. Owner actions (in this order)
 
