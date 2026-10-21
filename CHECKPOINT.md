@@ -38,18 +38,23 @@ Branch `main` on github.com/shahyush/all-in-poker (private). Read `CLAUDE.md` fo
 - **e2e flakes (fixed, tests only)**: the reload assertion read the guest screen before its own poll caught up (now waits on
   the guest page); `isEnabled()` on a missing action bar waits forever (now `count()` first + `actionTimeout`); the server
   test suite reset the dev server's database underneath it (dev server now uses `allin_dev`, tests `allin_test`).
-- **Production bundle is one commit behind**: the deployed `api` still runs bundle `4598de2e…` (before the hold fix). The
-  rebuilt bundle `f2d9b05d…` is committed; redeploying `api` is the next production step (see below).
+- **Production bundle is current**: `api` v4 runs bundle `548045ad…` (hold fix + glob origins), uploaded through the
+  publish workflow (run 39635955822) with the one-time token, hash verified in the asset store, token cleared.
 
 ## Remaining tasks
 1. Frontend hosting on Cloudflare Pages (free plan, private repo) — needs the owner to connect the repo once (settings in
    `docs/RELEASE.md`). `app_settings.app_origins` is pre-set for `all-in-poker.pages.dev` and its preview origins.
 2. Owner: allow anonymous sign-ins; set `GROUP_PASSWORD` edge secret.
-3. Redeploy `api` with the current bundle (upload `edge/server.js` with the new sha through the asset store, or the standard
-   CLI route once `SUPABASE_ACCESS_TOKEN` exists as a GitHub secret — `.github/workflows/deploy-functions.yml`).
+3. Standard CLI deploy route (`deploy-functions.yml`) stays dormant until `SUPABASE_ACCESS_TOKEN` exists as a GitHub secret.
 4. Play a full hosted game on real phones with separate identities (all streets, awards, next hand, reload, reconnect,
    history); tick the live rows in `docs/RELEASE.md`; real iPhone/Android, installed PWA, Safari keyboard checks.
 5. Remove the chunk rows `edge/server.js.p00…p10` from `app_assets` once the bundle flow is settled (keep `edge/server.js`).
+
+## Ownership reservation
+Admission bootstraps the owner only while `group_settings` is empty: the first player admitted with the bootstrap
+`GROUP_PASSWORD` becomes `is_owner`, the password hash moves into the database and the env value is never consulted again.
+No invitation has been sent and nobody else knows the password, so entering first reserves ownership. Legacy profiles are
+not owners (`is_owner=false`). The owner should save their player code immediately (Profile → Save my player code).
 
 ## Deployment blockers (exact)
 - **Network**: this cloud environment's policy denies `CONNECT vlnkslhmmbkkvbpvzuiw.supabase.co:443` and

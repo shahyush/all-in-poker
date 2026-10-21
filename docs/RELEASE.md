@@ -20,10 +20,10 @@ code, create a table, and play a hand with two phones. Then section 3's "live" r
 | --- | --- | --- |
 | Postgres schema, RLS, grants, realtime publication | applied to `vlnkslhmmbkkvbpvzuiw`; migrations `20261021140000`–`140300` recorded in `supabase_migrations.schema_migrations`; legacy data kept (3 email users, 2 closed tables tagged `legacy`) | `supabase/migrations/`, advisor run clean of write exposure |
 | pg_cron `allin-dispatch-due` (every second) → pg_net → `/functions/v1/api/jobs` | running: 590 successful runs / 0 failures in the 10 minutes before this note; dispatches only when a table is due | `cron.job_run_details` |
-| Edge function `api` v3 (`verify_jwt=false`, own auth) | live; loads bundle sha `4598de2e…7457` from `code`, verifies the hash before use | `POST /jobs` wrong key → 403; `POST /cmd` no token → 401; `POST /jobs` right key → `{"ok":true,"ran":0}` |
+| Edge function `api` v4 (`verify_jwt=false`, own auth) | live; loads bundle sha `548045ad…ec9a` (current sources) from `code`, verifies the hash before use; allowed origins from `app_settings.app_origins` | v3 smoke: `POST /jobs` wrong key → 403; `POST /cmd` no token → 401; right key → ok. v4 boot NOT YET EXERCISED (no request can reach it from here; first hosted request will show in function logs) |
 | Edge function `code` v2 | live; serves `edge/server.js` byte-identical to `supabase/functions/api/bundle/server.js` (57,083 bytes, same sha256); one-time-token upload endpoint | pg_net GET returned 200, 57,083 bytes, matching sha |
-| Edge function `app` v3 | 302 redirect to the PWA URL (prototype host retired) | |
-| PWA | builds green in CI (`pages.yml` run 39628036053 build job); deploy blocked on owner action 1 | |
+| Edge function `app` v4 | 302 redirect to https://all-in-poker.pages.dev/ (prototype host retired) | |
+| PWA | production build verified locally for the site root (`/assets/...`, `_redirects`, `_headers`, stamped `sw.js`); deploy blocked on owner action 1 | |
 
 ## 3. Gates (from RELEASE_CHECKLIST.csv) — status
 
