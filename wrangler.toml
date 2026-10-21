@@ -1,5 +1,16 @@
-# Cloudflare Pages project configuration (free plan). The build command is set once in the dashboard when the project is
-# created:  build command `npm run build -w web`, build output directory `web/dist`, root directory `/`, Node 22.
+# Cloudflare configuration (free plan). The dashboard created a Worker connected to this repository (Workers Builds):
+#   build command  : npm run build -w web
+#   deploy command : npx wrangler deploy          (default)
+# This Worker has no code of its own; it serves the built PWA from web/dist as static assets at
+# https://all-in-poker.<account>.workers.dev (enable the workers.dev route in Settings → Domains & Routes).
+# `_headers` and `_redirects` inside web/dist are honoured; unknown paths fall back to index.html for the in-app router.
 name = "all-in-poker"
-pages_build_output_dir = "web/dist"
 compatibility_date = "2026-10-01"
+
+[assets]
+directory = "./web/dist"
+not_found_handling = "single-page-application"
+html_handling = "auto-trailing-slash"
+
+[observability]
+enabled = false

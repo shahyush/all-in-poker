@@ -1,2 +1,3 @@
-# Cloudflare Pages: single-page app, every route is served by the shell and resolved by the in-app router
+# Static-asset host (Cloudflare): the single-page-application fallback is configured in wrangler.toml; this file only
+# covers hosts that read _redirects (Cloudflare Pages). Hashed assets and real files are matched before this rule.
 /*  /index.html  200
