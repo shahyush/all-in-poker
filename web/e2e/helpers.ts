@@ -1,6 +1,8 @@
 import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
 
-export const PASSWORD = 'friday-night';
+/** Hosted mode: E2E_HOSTED=1 E2E_BASE=https://all-in-poker.pages.dev E2E_GROUP_PASSWORD=<entered in the environment, never in chat> */
+export const HOSTED = !!process.env.E2E_HOSTED;
+export const PASSWORD = process.env.E2E_GROUP_PASSWORD ?? 'friday-night';
 export const API = process.env.E2E_API ?? 'http://127.0.0.1:8787';
 
 export async function player(browser: Browser, name: string, opts: { landscape?: boolean; reducedMotion?: boolean } = {}): Promise<{ ctx: BrowserContext; page: Page }> {

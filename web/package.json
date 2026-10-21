@@ -8,7 +8,8 @@
     "build": "tsc --noEmit -p . && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p .",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:hosted": "E2E_HOSTED=1 E2E_BASE=${E2E_BASE:-https://all-in-poker.pages.dev} playwright test"
   },
   "dependencies": {
     "react": "19.3.1",

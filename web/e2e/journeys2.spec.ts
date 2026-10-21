@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 // every test opens several phone contexts; close them so later tests do not inherit their polling load
 test.afterEach(async ({ browser }) => { for (const c of browser.contexts()) await c.close().catch(() => undefined); });
-import { player, actWhenMyTurn, shiftClock } from './helpers.ts';
+import { HOSTED, player, actWhenMyTurn, shiftClock } from './helpers.ts';
 
 async function hostTable(page: Page, opts: { name: string; units?: string; straddle?: boolean }): Promise<string> {
   await page.getByRole('button', { name: 'Host a table' }).click();
@@ -123,6 +123,7 @@ test('reconnect, rotation, uncontested reveal, reload approval, leave, history a
 });
 
 test('server timers run with every browser closed; a timed-out player folds and sits out after two misses', async ({ browser }) => {
+  test.skip(HOSTED, 'drives the local dev clock; on the hosted stack timers are observed in the reconnect journey instead');
   const h = await player(browser, 'Host');
   const g = await player(browser, 'Guest');
   const url = await hostTable(h.page, { name: 'Timers' });
