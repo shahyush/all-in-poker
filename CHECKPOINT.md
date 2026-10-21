@@ -29,6 +29,13 @@ Branch `main` on github.com/shahyush/all-in-poker (private). Read `CLAUDE.md` fo
 | Deployed phone browser | — | **NOT RUN**: no public app URL yet (see blockers); anonymous sign-ins still disabled |
 
 ## Known failures / fixed this round
+- **Live sign-in on iPhone Safari (2026-10-21 17:19–17:24 UTC)**: anonymous sign-up and admission succeeded server-side
+  (owner profile created), but the phone then lost its auth-js session without any refresh or sign-out reaching the server,
+  showed "Session expired", and created a new anonymous identity on reload (a second `teens` player). Fix: the browser
+  transport mirrors its tokens and restores the same identity (`setSession`/`refreshSession`), never mints a new identity
+  from a command path, retries the first round trip once, and surfaces the auth error text. Verified on the deployed URL by
+  the CI live smoke (WebKit + Chromium): session → token validation → admission answer → identity survives reload.
+  Open follow-up: the owner flag sits on the first, now unreachable, `teens` profile; move it to the player the owner uses.
 - **Engine bug (fixed)**: a running table held because nobody was present had `dueAt = null`, so the scheduler never revisited
   it: a returning player who only heart-beat never got a new hand, and the 30-minute abandonment never ran. Now `idleCheckAt`
   re-arms every 45 s until a hand starts or the table is abandoned (`engine/src/table.ts`, test "all players absent").

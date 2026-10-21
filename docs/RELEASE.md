@@ -32,7 +32,7 @@ Legend: ✅ verified by automated test or production check · 🟡 implemented, 
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| 01 Private entry & identity | ✅ server logic / 🟡 live | admit, replay, recovery code single-use + rebind, forget-this-device, owner password rotation: `server/test/api.test.ts`; live admission waits on anonymous sign-ins |
+| 01 Private entry & identity | ✅ server logic / ✅ live entry | admit, replay, recovery code single-use + rebind, forget-this-device, owner password rotation: `server/test/api.test.ts`. Live (run 39644204896, WebKit + Chromium against the deployed URL): anonymous session created, API validated the token, admission answered a wrong password with the server's message, identity survived a reload. Owner admitted on 2026-10-21 17:19 UTC (group_settings bootstrapped). iOS Safari lost its auth-js session once on the first device; the client now mirrors and restores tokens (commit 19d4205). |
 | 02 Home, invitations, joining | ✅ | preview before entry, atomic last seat (CAS), one active seat per player, closed invites 404 |
 | 03/04 Create cash / tournament | ✅ | strict validation, unit multiples, Omaha capacity, level schedule |
 | 05 Waiting room & host | ✅ | remove before/during play, host loss → succession after 30 s with epoch bump (`game.test.ts`) |
