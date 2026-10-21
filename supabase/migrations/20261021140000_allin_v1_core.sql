@@ -19,8 +19,12 @@ alter table public.profiles drop constraint if exists profiles_status_check;
 alter table public.profiles add constraint profiles_status_check check (status in ('active','revoked'));
 alter table public.profiles drop constraint if exists profiles_avatar_check;
 alter table public.profiles add constraint profiles_avatar_check check (avatar is null or char_length(avatar) <= 8);
-drop trigger if exists on_auth_user_created on auth.users;
-drop function if exists public.handle_new_user();
+-- The legacy sign-up trigger on auth.users stays in place (it is owned by the auth schema); its function becomes a no-op so
+-- anonymous sessions never get a profile: profiles are created on admission only.
+create or replace function public.handle_new_user() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  return new;
+end $$;
 
 -- ---------- group admission + recovery (server only) ----------
 create table if not exists public.group_settings (

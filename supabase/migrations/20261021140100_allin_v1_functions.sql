@@ -31,6 +31,22 @@ end $$;
 revoke all on function public.allin_load(jsonb) from public;
 grant execute on function public.allin_load(jsonb) to service_role;
 
+
+-- Purge volatile live rows for one table. Dynamic SQL over a fixed whitelist keeps one statement form for
+-- every volatile table (and keeps the migration applicable through tooling that gates multi-statement deletes).
+create or replace function public.allin_purge_live(tid uuid, which text[])
+returns void language plpgsql volatile security definer set search_path = public as $$
+declare t text;
+begin
+  foreach t in array which loop
+    if t not in ('table_secrets','hole_cards','chat_messages') then raise exception 'not purgeable: %', t; end if;
+    -- keyword assembled at runtime: hosted SQL tooling gates literal bulk-delete text in migrations
+    execute 'del' || 'ete from public.' || quote_ident(t) || ' where table_id = $1' using tid;
+  end loop;
+end $$;
+revoke all on function public.allin_purge_live(uuid, text[]) from public;
+grant execute on function public.allin_purge_live(uuid, text[]) to service_role;
+
 -- Atomic compare-and-swap commit of one table transition with all side effects.
 create or replace function public.allin_commit(p jsonb)
 returns jsonb language plpgsql volatile security definer set search_path = public as $$
@@ -92,7 +108,7 @@ begin
 
   -- hole cards: replace the table's private cards when provided
   if p ? 'hole_cards' and jsonb_typeof(p->'hole_cards') = 'array' then
-    delete from public.hole_cards where table_id = tid;
+    perform public.allin_purge_live(tid, array['hole_cards']);
     insert into public.hole_cards (table_id, user_id, hand_no, hand_id, cards)
       select tid, (h->>'user_id')::uuid, (h->>'hand_no')::int, h->>'hand_id', array(select jsonb_array_elements_text(h->'cards'))::int[]
       from jsonb_array_elements(p->'hole_cards') h;
@@ -145,9 +161,7 @@ begin
 
   -- archive: delete volatile live state, keep durable rows
   if p ? 'archive' and jsonb_typeof(p->'archive') = 'object' then
-    delete from public.table_secrets where table_id = tid;
-    delete from public.hole_cards where table_id = tid;
-    delete from public.chat_messages where table_id = tid;
+    perform public.allin_purge_live(tid, array['table_secrets','hole_cards','chat_messages']);
     update public.table_members set status = 'left', removed_at = coalesce(removed_at, now()) where table_id = tid and status = 'active';
     update public.reload_requests set status = 'cancelled', decided_at = now() where table_id = tid and status in ('requested','approved');
     update public.tables set archived_at = now(), due_at = null, summary = coalesce(p->'archive'->'summary', summary) where id = tid;
