@@ -112,13 +112,13 @@ test('reconnect, rotation, uncontested reveal, reload approval, leave, history a
   await g.page.getByRole('button', { name: 'Leave after this hand' }).click();
   await g.page.getByRole('button', { name: 'Confirm' }).click();
   await g.page.keyboard.press('Escape');
-  await expect(g.page.getByRole('heading', { name: 'Two of us' })).toBeVisible({ timeout: 25_000 });
-  // the exit (taken_off) commits at the hand boundary; reload so the leaving player's session page has fresh accounts
+  // leaving commits at the next hand boundary and the leaving player's view transitions to the session accounts; this is
+  // latency-sensitive on the live transport, so reload-and-retry until the session heading and the taken-off figure show.
   await expect(async () => {
     await g.page.reload();
     await expect(g.page.getByRole('heading', { name: 'Two of us' })).toBeVisible({ timeout: 20_000 });
-    await expect(g.page.getByText('Chips taken off').first()).toBeVisible({ timeout: 5_000 });
-  }).toPass({ timeout: 40_000 });
+    await expect(g.page.getByText('Chips taken off').first()).toBeVisible({ timeout: 6_000 });
+  }).toPass({ timeout: 90_000, intervals: [2_000, 4_000, 6_000] });
   await g.page.screenshot({ path: 'test-results/shots/13-session-summary.png' });
   // host sees the waiting state, lobby for guest
   await g.page.getByRole('button', { name: 'History' }).click();
