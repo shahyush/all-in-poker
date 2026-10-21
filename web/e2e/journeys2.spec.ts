@@ -111,14 +111,24 @@ test('reconnect, rotation, uncontested reveal, reload approval, leave, history a
   await g.page.getByRole('button', { name: 'Table menu' }).click();
   await g.page.getByRole('button', { name: 'Leave after this hand' }).click();
   await g.page.getByRole('button', { name: 'Confirm' }).click();
+  // CRITICAL: the leave command is a POST in flight; do not reload until it has reached the server, or the reload aborts
+  // it (net::ERR_ABORTED) and the guest never actually leaves. Wait for proof it landed: the menu now offers to undo the
+  // queued leave, or the boundary has already committed and the guest is on the session summary. Either way it is safe.
+  await expect
+    .poll(async () =>
+      (await g.page.getByRole('button', { name: 'Stay after all' }).isVisible().catch(() => false)) ||
+      (await g.page.getByRole('heading', { name: 'Two of us' }).isVisible().catch(() => false)),
+    { timeout: 25_000 })
+    .toBe(true);
   await g.page.keyboard.press('Escape');
-  // leaving commits at the next hand boundary and the leaving player's view transitions to the session accounts; this is
-  // latency-sensitive on the live transport, so reload-and-retry until the session heading and the taken-off figure show.
+  // the exit (chips taken off) commits at the next hand boundary. Time only advances server-side on a command or the 1 s
+  // cron dispatcher, so once the leave has landed the boundary follows within a few seconds and the guest's view rolls to
+  // the session summary. Poll for it; reload only as a fallback, now that the command cannot be aborted.
   await expect(async () => {
-    await g.page.reload();
-    await expect(g.page.getByRole('heading', { name: 'Two of us' })).toBeVisible({ timeout: 20_000 });
-    await expect(g.page.getByText('Chips taken off').first()).toBeVisible({ timeout: 6_000 });
-  }).toPass({ timeout: 90_000, intervals: [2_000, 4_000, 6_000] });
+    if (!(await g.page.getByRole('heading', { name: 'Two of us' }).isVisible().catch(() => false))) await g.page.reload();
+    await expect(g.page.getByRole('heading', { name: 'Two of us' })).toBeVisible({ timeout: 12_000 });
+    await expect(g.page.getByText('Chips taken off').first()).toBeVisible({ timeout: 8_000 });
+  }).toPass({ timeout: 70_000, intervals: [3_000, 5_000, 5_000] });
   await g.page.screenshot({ path: 'test-results/shots/13-session-summary.png' });
   // host sees the waiting state, lobby for guest
   await g.page.getByRole('button', { name: 'History' }).click();
