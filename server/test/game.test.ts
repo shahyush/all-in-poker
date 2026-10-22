@@ -417,6 +417,44 @@ describe('accounting reconciles through leave, rejoin, rebuy and duplicates (Fri
   });
 });
 
+describe('retry safety: a lost response cannot apply an action twice', () => {
+  it('same actionId replays exactly once; a re-send with a new id after the state moved is rejected', async () => {
+    const x = new Client(W.app, W.db); await x.signIn(); await x.admit('Retry-A');
+    const y = new Client(W.app, W.db); await y.signIn(); await y.admit('Retry-B');
+    const r = await x.cmd<{ tableId: string; inviteCode: string }>('create_table', { rules: { ...cashRules, name: 'Retry', seats: '2' }, buyIn: '1000' });
+    const tid = r.tableId;
+    await y.cmd('join', { code: r.inviteCode, amount: '1000' });
+    await x.cmd('start', {}, tid);
+    await W.advanceClock(RULES.timers.choiceWarmupCapMs + 1000); await W.runJobs([tid]);
+    let st = await W.publicState(tid);
+    if (st.hand?.actionReadyAt) await W.advanceClock(2000);
+    st = await W.publicState(tid);
+    const actor = [x, y].find((c) => c.player!.id === st.seats[st.hand.actor].playerId)!;
+
+    // first delivery of a fold reaches the server and is applied
+    const aid = crypto.randomUUID();
+    const first = await actor.raw('act', { action: 'fold' }, tid, aid);
+    expect(first.body.ok).toBe(true);
+    const afterFirst = await W.publicState(tid);
+
+    // the client never saw the response and retries with the SAME actionId: replayed, no second application
+    const replay = await actor.raw('act', { action: 'fold' }, tid, aid);
+    expect(replay.body.replayed ?? false).toBe(true);
+    const afterReplay = await W.publicState(tid);
+    expect(afterReplay.handNo).toBe(afterFirst.handNo);
+    expect(afterReplay.seats.map((s: { stack: number } | null) => s?.stack ?? 0)).toEqual(afterFirst.seats.map((s: { stack: number } | null) => s?.stack ?? 0));
+
+    // a fresh re-tap (new actionId) after the state has moved on is rejected by the engine, never double-applied
+    const resend = await actor.raw('act', { action: 'fold' }, tid, crypto.randomUUID());
+    expect(resend.body.ok).toBe(false);
+
+    // chips are conserved end to end (no phantom movement from the retries)
+    const fin = await W.publicState(tid);
+    const onTable = fin.seats.filter(Boolean).reduce((a: number, s: { stack: number }) => a + s.stack, 0) + (fin.hand ? fin.hand.pot + fin.hand.players.reduce((a: number, p: { bet: number }) => a + p.bet, 0) : 0);
+    expect(onTable).toBe(2000); // the two 1,000 buy-ins, conserved despite the duplicate/retried folds
+  });
+});
+
 describe('dealer\'s choice readiness (cold start)', () => {
   it('choice_ready re-anchors the window so a chooser who loads late still registers a pick', async () => {
     const extra = [new Client(W.app, W.db), new Client(W.app, W.db)];

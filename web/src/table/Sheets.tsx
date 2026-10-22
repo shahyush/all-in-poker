@@ -205,12 +205,16 @@ export function ReloadSheet({ unit, onClose, run }: { unit: number; onClose: () 
   const [err, setErr] = useState<string | null>(null);
   const m = parseInt(mult, 10);
   const ok = /^[1-9][0-9]*$/.test(mult);
+  // A stable request id per chosen amount: retrying after a lost response reuses it, so the server's on-conflict insert
+  // can never create a second request for the same intent. Changing the amount starts a fresh intent (new id).
+  const reqId = useRef(crypto.randomUUID());
+  useEffect(() => { reqId.current = crypto.randomUUID(); }, [mult]);
   return (
     <Sheet title="Reload chips" onClose={onClose}>
       <div className="chips">{[1, 2, 3, 5].map((k) => <button key={k} type="button" className="chip" aria-pressed={mult === String(k)} onClick={() => setMult(String(k))}>{fmt(k * unit)}</button>)}</div>
       <label className="field"><span>Or a number of {fmt(unit)}-chip units</span><input className="input" inputMode="numeric" value={mult} onChange={(e) => setMult(e.target.value)} aria-invalid={!ok} />{!ok && <span className="error">Whole number of units</span>}</label>
       {err && <div className="error" role="alert">{err}</div>}
-      <button type="button" className="btn btn-primary" disabled={!ok} onClick={async () => { try { await run('reload_request', { amount: String(m * unit) }); onClose(); } catch (e) { setErr((e as Error).message); } }}>Request {ok ? fmt(m * unit) : ''}</button>
+      <button type="button" className="btn btn-primary" disabled={!ok} onClick={async () => { try { await run('reload_request', { requestId: reqId.current, amount: String(m * unit) }); onClose(); } catch (e) { setErr((e as Error).message); } }}>Request {ok ? fmt(m * unit) : ''}</button>
       <p className="fine">The host approves reloads. Chips are added before the next hand.</p>
     </Sheet>
   );
