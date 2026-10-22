@@ -165,6 +165,14 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const winTotals = hand?.result?.totals ?? {};
   const winCardsBySeat = new Map<number, Card[]>();
   if (hand?.result) for (const a of hand.result.awards) for (const w of a.winners) winCardsBySeat.set(w.seat, [...(winCardsBySeat.get(w.seat) ?? []), ...w.cards]);
+  // ordered showdown reveal: losing hands turn over first, the winner's hand last, each a beat apart (the hold is long
+  // enough to read them). Only for a contested showdown (shows present); reduced motion collapses the delays to 0.
+  const revealDelay = new Map<number, number>();
+  if (hand?.result && !hand.result.uncontested && hand.result.shows) {
+    const shown = Object.keys(hand.result.shows).map(Number);
+    shown.sort((a, b) => (winTotals[a] ? 1 : 0) - (winTotals[b] ? 1 : 0)); // winners last
+    shown.forEach((seat, i) => revealDelay.set(seat, i * 450));
+  }
 
   // Compact last-hand recap: captured when a hand settles, shown through the next hand. Winner, amount and the made-hand
   // name only — never a mucked hole card (we read awards/totals, which expose nothing a loser kept face-down).
@@ -212,7 +220,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
           const shows = hand?.result?.shows?.[i] ?? null;
           const revealed = hand?.revealedCards?.[i];
           const shown: Card[] | null = shows ? shows : revealed && revealed.length ? Array.from({ length: hand!.players.find((p) => p.seat === i)?.holeCount ?? 0 }, (_, k) => revealed.find((r) => r.index === k)?.card ?? null).filter((c): c is Card => c !== null) : null;
-          return <SeatView key={i} index={i} seat={seat} hand={hand} pos={positions[i]} betPos={betPosition(positions[i], landscape)} isHost={seat.playerId === t.hostPlayerId} present={presence.get(seat.playerId) ?? false} now={now} isMe={false} shownCards={shown} winCards={winCardsBySeat.get(i) ?? null} won={winTotals[i] ?? null} />;
+          return <SeatView key={i} index={i} seat={seat} hand={hand} pos={positions[i]} betPos={betPosition(positions[i], landscape)} isHost={seat.playerId === t.hostPlayerId} present={presence.get(seat.playerId) ?? false} now={now} isMe={false} shownCards={shown} winCards={winCardsBySeat.get(i) ?? null} won={winTotals[i] ?? null} revealDelayMs={revealDelay.get(i)} />;
         })}
         {hand && hand.button !== null && positions[hand.button] && <span className="dealer-token motion" aria-label="Dealer button" style={marker(positions[hand.button], 0.12)}>D</span>}
         {hand && hand.street === 'preflop' && hand.sbSeat !== null && positions[hand.sbSeat] && <span className="blind-chip" style={marker(positions[hand.sbSeat], 0.26)} aria-label={`Small blind ${fmt(hand.sb)}`}>SB</span>}

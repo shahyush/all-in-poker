@@ -4,10 +4,10 @@ import { fmt } from '../components/ui.tsx';
 
 export interface SeatProps {
   index: number; seat: SeatState; hand: PublicHand | null; pos: { left: number; top: number }; betPos: { left: number; top: number };
-  isHost: boolean; present: boolean; now: number; isMe: boolean; shownCards: Card[] | null; winCards: Card[] | null; won: number | null;
+  isHost: boolean; present: boolean; now: number; isMe: boolean; shownCards: Card[] | null; winCards: Card[] | null; won: number | null; revealDelayMs?: number;
 }
 
-export function SeatView({ index, seat, hand, pos, betPos, isHost, present, now, isMe, shownCards, winCards, won }: SeatProps) {
+export function SeatView({ index, seat, hand, pos, betPos, isHost, present, now, isMe, shownCards, winCards, won, revealDelayMs }: SeatProps) {
   const hp = hand?.players.find((p) => p.seat === index) ?? null;
   const inHand = !!hp;
   const actor = hand?.phase === 'betting' && hand.actor === index;
@@ -26,7 +26,7 @@ export function SeatView({ index, seat, hand, pos, betPos, isHost, present, now,
   return (
     <div className={`seat ${actor ? 'is-actor' : ''} ${hp?.folded ? 'is-folded' : ''} ${won != null && won > 0 ? 'is-winner' : ''} ${hp?.allIn && !hp.folded ? 'is-allin' : ''}`} style={{ left: pos.left + '%', top: pos.top + '%' }} data-seat={index} aria-label={label} role="group">
       <div className="seat-cards" aria-hidden={shownCards ? undefined : 'true'}>
-        {shownCards ? shownCards.map((c, i) => <PlayingCard key={i} card={c} size="sm" win={!!winCards && winCards.includes(c)} dim={!!winCards && !winCards.includes(c)} flip />)
+        {shownCards ? shownCards.map((c, i) => <PlayingCard key={i} card={c} size="sm" win={!!winCards && winCards.includes(c)} dim={!!winCards && !winCards.includes(c)} flip delayMs={revealDelayMs} />)
           : Array.from({ length: Math.min(backs, 6) }).map((_, i) => <span key={i} className="pc back sm" data-slot={i} style={{ marginLeft: i ? -8 : 0, opacity: 0.95 }} />)}
       </div>
       <div className="seat-core">
