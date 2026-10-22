@@ -4,7 +4,7 @@
 .g-title { flex: 1; min-width: 0; font-family: var(--display); font-size: 20px; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .g-icon { width: 44px; height: 44px; border-radius: var(--r-btn); display: inline-flex; align-items: center; justify-content: center; color: var(--game-text); position: relative; flex: none; }
 .g-icon:active { background: var(--seat); }
-.badge { position: absolute; top: 4px; right: 4px; min-width: 18px; height: 18px; border-radius: 9px; background: var(--accent-table); color: var(--on-accent); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
+.badge { position: absolute; top: 4px; right: 4px; min-width: 18px; height: 18px; border-radius: 9px; background: var(--accent-table); color: var(--on-table); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
 .g-stakes { display: flex; gap: 10px; font-size: 13px; color: var(--game-muted); flex-wrap: wrap; }
 .g-stakes b { color: var(--game-text); font-weight: 600; }
 .g-notice { font-size: 13px; color: var(--game-muted); min-height: 18px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -38,10 +38,10 @@
 .choice-grid button { min-height: 48px; border-radius: 10px; background: var(--table); color: var(--game-text); font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
 .choice-grid button span:last-child { font-size: 11px; color: var(--game-muted); font-weight: 500; }
 .choice-grid button:disabled { opacity: 0.4; }
-.choice-grid button.chosen { opacity: 1; background: var(--accent, #c9a227); color: #1a1205; box-shadow: 0 0 0 2px var(--accent, #c9a227); }
+.choice-grid button.chosen { opacity: 1; background: var(--accent-table); color: var(--on-table); box-shadow: 0 0 0 2px var(--accent-table); }
 .choice-grid button.chosen span:last-child { color: inherit; }
 .btn-game { min-height: 44px; padding: 0 14px; border-radius: 10px; background: var(--table); color: var(--game-text); font-weight: 600; }
-.btn-game-primary { background: var(--accent-table); color: var(--on-accent); font-weight: 700; }
+.btn-game-primary { background: var(--accent-table); color: var(--on-table); font-weight: 700; }
 .btn-game:disabled { opacity: 0.5; }
 
 /* cards */

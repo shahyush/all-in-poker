@@ -1,9 +1,10 @@
-/* After Hours working direction: oxblood table, deep plum surround, warm ivory pages. One theme file. */
+/* After Hours working direction: royal sapphire felt and surround, gold accents, warm ivory pages with deep-navy ink.
+   One theme file. Ink + ivory + sapphire + gold is the identity; cards stay ivory, gold marks the live moment. */
 :root {
-  --page: #EEE7DA; --paper: #FAF6ED; --ink: #2C171F; --muted: #705F65; --line: #C8B8B6;
-  --accent: #912F48; --on-accent: #FFF7ED; --danger: #9C283D;
-  --table: #482332; --table-line: #815264; --game: #211720; --seat: #342431; --game-text: #FFF7ED; --game-muted: #CBB7BF; --accent-table: #C94A68;
-  --card: #FFFCF4; --card-ink: #291E24; --card-red: #A53741; --card-back: #5B2A3E;
+  --page: #ECE7DB; --paper: #FAF6EC; --ink: #17203A; --muted: #5E6276; --line: #CFC6B5;
+  --accent: #1C4486; --on-accent: #FBF7EE; --danger: #9C283D;
+  --table: #1A4080; --table-line: #5486DA; --game: #0A1324; --seat: #17294A; --game-text: #F3F7FF; --game-muted: #9FB6E0; --accent-table: #E7B63E; --on-table: #1A1205;
+  --card: #FFFCF4; --card-ink: #201820; --card-red: #BE1F2D; --card-back: #1A4080;
   --display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, 'Times New Roman', serif;
   --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, system-ui, sans-serif;
   --r-btn: 10px; --r-card: 5px;
@@ -65,7 +66,7 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; 
 .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22px; letter-spacing: 0.08em; overflow-wrap: anywhere; }
 
 /* sheets */
-.sheet-backdrop { position: fixed; inset: 0; background: rgba(16, 11, 22, 0.55); z-index: 20; }
+.sheet-backdrop { position: fixed; inset: 0; background: rgba(6, 11, 24, 0.58); z-index: 20; }
 .sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: 86vh; max-height: 86dvh; background: var(--paper); color: var(--ink); border-radius: 20px 20px 0 0; box-shadow: 0 -10px 60px rgba(0,0,0,0.35); z-index: 21; display: flex; flex-direction: column; padding-bottom: var(--safe-b); }
 .sheet-head { display: flex; align-items: center; gap: 10px; padding: 12px 10px 8px 18px; flex: none; }
 .sheet-head h2 { flex: 1; min-width: 0; overflow-wrap: anywhere; }
