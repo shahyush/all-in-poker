@@ -72,7 +72,7 @@ export function Hero(p: HeroProps) {
             <button type="button" className="raise" disabled={!myTurn || busy || !ready || !legal?.raise} onClick={() => setComposer(true)}>{legal?.raise?.isBet ? 'Bet' : 'Raise'}</button>
           </div>
           <div className="dock-note">{!ready && inHand ? 'Dealing…' : legal?.raiseClosed && myTurn ? legal.raiseClosed : legal?.raise && legal.allInTo === null && legal.raise.maxTo < legal.stack + legal.bet ? `Max ${fmt(legal.raise.maxTo)}` : ''}</div>
-          {canPropose && <div className="propose-row"><span className="dock-note">Run it:</span><button type="button" disabled={busy} onClick={() => p.onPropose(1)}>once</button><button type="button" disabled={busy || !hand!.canRunTwice} onClick={() => p.onPropose(2)}>twice</button></div>}
+          {canPropose && <div className="propose-row"><span className="dock-note">End betting, deal the rest:</span><button type="button" disabled={busy} onClick={() => p.onPropose(1)}>Run once</button><button type="button" disabled={busy || !hand!.canRunTwice} onClick={() => p.onPropose(2)}>Run twice</button></div>}
         </>
       )}
       {composer && legal?.raise && <Composer legal={legal} hand={hand!} onClose={() => setComposer(false)} onSubmit={(to) => { setComposer(false); p.onAct('raise', to); }} />}
