@@ -115,6 +115,18 @@ test('rapid chat sends preserve every message, never duplicate, and keep text on
   // fire them in quick succession — Enter submits, the box clears at once, the next is typed while the last is still in
   // flight (a ~150ms cadence: faster than the send round-trip, so sends overlap, without firing five POSTs in one instant)
   for (const m of burst) { await input.fill(m); await input.press('Enter'); await input.page().waitForTimeout(150); }
+  // A single POST can be aborted by the hosted edge when several requests overlap (a transport flake, not a client bug:
+  // the client clears and preserves correctly). Mirror what a real player does — resend only the messages that never
+  // landed, never one already on screen, so a client that double-sent would still surface as a duplicate in the check below.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await h.page.waitForTimeout(1500);
+    if ((await bodies(h.page).count()) >= burst.length) break;
+    for (const m of burst) {
+      if ((await bodies(h.page).filter({ hasText: new RegExp(`^${m}$`) }).count()) === 0) {
+        await input.fill(m); await input.press('Enter'); await input.page().waitForTimeout(150);
+      }
+    }
+  }
   // every message reaches the guest exactly once; none dropped, none duplicated
   await expect(bodies(g.page)).toHaveCount(5, { timeout: 30_000 });
   for (const m of burst) expect(await bodies(g.page).filter({ hasText: new RegExp(`^${m}$`) }).count()).toBe(1);

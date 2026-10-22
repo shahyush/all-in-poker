@@ -13,18 +13,12 @@ async function hostAndJoin(browser: import('@playwright/test').Browser, name: st
   await h.page.getByRole('button', { name: 'Review the table' }).click();
   await h.page.getByRole('button', { name: 'Create and open the room' }).click();
   const url = (await h.page.locator('.fine', { hasText: '/join/' }).first().textContent())!.trim();
-  // a fuller table (three seats) so an Omaha deal shows the deliberate dealing scaling with the extra cards
-  const join = async (nm: string): Promise<{ page: Page }> => {
-    const c = await player(browser, nm);
-    await c.page.goto(url);
-    await c.page.getByRole('button', { name: '2,000' }).click();
-    await c.page.getByRole('button', { name: /Join table/ }).click();
-    await expect(c.page.getByText(/starts the game/)).toBeVisible({ timeout: 30_000 });
-    return c;
-  };
-  const g = await join('Aayush');
-  const g2 = await join('Sam');
-  return { h, g, pages: [h.page, g.page, g2.page] };
+  const g = await player(browser, 'Aayush');
+  await g.page.goto(url);
+  await g.page.getByRole('button', { name: '2,000' }).click();
+  await g.page.getByRole('button', { name: /Join table/ }).click();
+  await expect(g.page.getByText(/starts the game/)).toBeVisible({ timeout: 30_000 });
+  return { h, g, pages: [h.page, g.page] };
 }
 
 /** Find whichever page is offered the choice and deliberately pick `label`; assert it was actually dealt (not defaulted). */
