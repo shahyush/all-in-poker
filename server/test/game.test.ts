@@ -331,6 +331,92 @@ describe('leaving as the result window lapses', () => {
   });
 });
 
+describe('accounting reconciles through leave, rejoin, rebuy and duplicates (Friday-table regression)', () => {
+  // Reproduces the live "Friday table": teens buys in 3,000, Shahyush joins 2,000, a hand moves chips, teens cashes out
+  // while Shahyush is still seated. Chips must always reconcile: everything added is either still in play or taken off,
+  // and the summary's per-player net (taken off + own chips still at the table − added) sums to zero AT EVERY STEP —
+  // including while a player is still seated (the case the summary used to miss by the seated stack).
+  let teens: Client, shah: Client, tid = '', code = '';
+
+  async function reconcile(tableId: string) {
+    const st = await W.publicState(tableId);
+    const parts = await W.db.select<{ user_id: string; added: string; taken_off: string; left_at: string | null }>('session_participants', { table_id: tableId });
+    const added = parts.reduce((a, p) => a + Number(p.added), 0);
+    const exits = (await W.db.select<{ amount: string }>('ledger', { table_id: tableId, kind: 'exit' })).reduce((a, l) => a + Number(l.amount), 0);
+    let inPlay = st.seats.filter(Boolean).reduce((a: number, s: { stack: number }) => a + Number(s.stack), 0);
+    if (st.hand) inPlay += Number(st.hand.pot) + st.hand.players.reduce((a: number, p: { bet: number }) => a + Number(p.bet), 0);
+    // global conservation
+    expect(added).toBe(inPlay + exits);
+    // per-player summary net sums to zero, counting chips still at the table for the seated
+    const seatStack = (pid: string) => { const i = st.seats.findIndex((s: { playerId: string } | null) => s && s.playerId === pid); if (i < 0) return 0; return Number(st.seats[i].stack) + Number(st.hand?.players.find((p: { seat: number; bet: number }) => p.seat === i)?.bet ?? 0); };
+    const nets = parts.map((p) => Number(p.taken_off) + seatStack(p.user_id) - Number(p.added));
+    expect(nets.reduce((a, b) => a + b, 0)).toBe(0);
+    return { st, parts, added, exits, inPlay, seatStack };
+  }
+  async function playUncontestedHand(tableId: string) {
+    await W.advanceClock(RULES.timers.choiceWarmupCapMs + 1000); await W.runJobs([tableId]);
+    let st = await W.publicState(tableId);
+    if (st.hand?.actionReadyAt) await W.advanceClock(2000);
+    st = await W.publicState(tableId);
+    const actor = [teens, shah].find((c) => c.player!.id === st.seats[st.hand.actor].playerId)!;
+    await actor.cmd('act', { action: 'fold' }, tableId);           // heads-up fold -> uncontested award
+  }
+
+  it('buy-ins, a hand, host leave, rejoin, rebuy and a duplicate request all keep chips reconciled', async () => {
+    teens = new Client(W.app, W.db); await teens.signIn(); await teens.admit('teens-r');
+    shah = new Client(W.app, W.db); await shah.signIn(); await shah.admit('Shahyush-r');
+    const r = await teens.cmd<{ tableId: string; inviteCode: string }>('create_table', { rules: { ...cashRules, name: 'Friday regression', seats: '2' }, buyIn: '3000' });
+    tid = r.tableId; code = r.inviteCode;
+    await shah.cmd('join', { code, amount: '2000' });
+    await reconcile(tid);                                            // 5,000 added, all in play, nets 0
+
+    await teens.cmd('start', {}, tid);
+    await playUncontestedHand(tid);
+    const afterHand = await reconcile(tid);                          // chips moved, still 5,000 in play, nets 0
+    expect(afterHand.inPlay).toBe(5000); expect(afterHand.exits).toBe(0);
+
+    // teens (host) cashes out while Shahyush is still seated — the exact Friday-table state
+    await teens.cmd('leave', {}, tid);
+    for (let i = 0; i < 12; i++) { const s = await W.publicState(tid); if (!s.seats.some((x: { playerId: string } | null) => x && x.playerId === teens.player!.id)) break; await W.advanceClock(RULES.timers.revealMs + 31000); await W.runJobs([tid]); }
+    const left = await reconcile(tid);                               // THE regression: seated Shahyush's stack is counted
+    const shahPart = left.parts.find((p) => p.user_id === shah.player!.id)!;
+    const teensPart = left.parts.find((p) => p.user_id === teens.player!.id)!;
+    expect(teensPart.left_at).not.toBeNull();                        // teens settled (cashed out)
+    expect(shahPart.left_at).toBeNull();                             // Shahyush still seated
+    expect(left.seatStack(shah.player!.id)).toBeGreaterThan(0);      // his chips are represented, not dropped
+    expect(Number(teensPart.taken_off) + left.seatStack(shah.player!.id)).toBe(5000); // taken off + in play = added
+
+    // leaving again after already cashing out must never produce a second exit (whether it replays or is rejected)
+    const leaveAid = crypto.randomUUID();
+    await teens.raw('leave', {}, tid, leaveAid);
+    await teens.raw('leave', {}, tid, leaveAid);                     // same action id
+    await teens.raw('leave', {}, tid, crypto.randomUUID());          // different action id
+    expect((await W.db.select('ledger', { table_id: tid, user_id: teens.player!.id, kind: 'exit' })).length).toBe(1);
+    await reconcile(tid);
+
+    // teens rejoins as a fresh episode with a new buy-in; the earlier exit stays on the books
+    await teens.cmd('join', { code, amount: '1000' });
+    const rejoined = await reconcile(tid);
+    expect(rejoined.added).toBe(6000);                               // 3,000 + 2,000 + 1,000
+    expect(rejoined.exits).toBe(Number(teensPart.taken_off));        // the original cash-out is preserved
+
+    // a rebuy (reload) approved by the host, with duplicate requests that must not double-credit
+    const reqId = crypto.randomUUID();
+    const rlAid = crypto.randomUUID();
+    const firstReload = await shah.raw('reload_request', { requestId: reqId, amount: '1000' }, tid, rlAid);
+    expect(firstReload.body.ok, JSON.stringify(firstReload.body)).toBe(true);
+    await shah.raw('reload_request', { requestId: reqId, amount: '1000' }, tid, rlAid);              // same action id
+    await shah.raw('reload_request', { requestId: reqId, amount: '1000' }, tid, crypto.randomUUID()); // same request id, new action id
+    expect((await W.db.select('reload_requests', { table_id: tid, user_id: shah.player!.id })).length).toBe(1); // deduped
+    const host = (await W.publicState(tid)).hostPlayerId;
+    const hostClient = [teens, shah].find((c) => c.player!.id === host)!;
+    await hostClient.cmd('reload_decide', { requestId: reqId, approve: true }, tid);
+    for (let i = 0; i < 10; i++) { const rr = await W.db.select<{ status: string }>('reload_requests', { table_id: tid, user_id: shah.player!.id }); if (rr[0]?.status === 'credited' || rr[0]?.status === 'approved') { await playUncontestedHand(tid).catch(() => undefined); } const rr2 = await W.db.select<{ status: string }>('reload_requests', { table_id: tid, user_id: shah.player!.id }); if (rr2[0]?.status === 'credited') break; await W.advanceClock(RULES.timers.revealMs + 31000); await W.runJobs([tid]); }
+    const afterReload = await reconcile(tid);                        // reload credited: added grew, still reconciles, nets 0
+    expect(afterReload.added).toBe(7000);                            // 6,000 + the 1,000 reload
+  });
+});
+
 describe('dealer\'s choice readiness (cold start)', () => {
   it('choice_ready re-anchors the window so a chooser who loads late still registers a pick', async () => {
     const extra = [new Client(W.app, W.db), new Client(W.app, W.db)];

@@ -5,7 +5,7 @@ import type { ParticipantRow } from '../state/table.ts';
 import type { TableRules } from '@allin/engine/public';
 import { ordinal } from '../table/Seat.tsx';
 
-interface Row { id: string; name: string; mode: string; status: string; created_at: string; archived_at: string | null; config: TableRules; summary: { tournament?: { winnerPlayerId: string | null; eliminations: { playerId: string; place: number }[] }; legacy?: boolean } | null }
+interface Row { id: string; name: string; mode: string; status: string; created_at: string; archived_at: string | null; config: TableRules; summary: { tournament?: { winnerPlayerId: string | null; eliminations: { playerId: string; place: number }[] }; legacy?: boolean } | null; state?: { seats: ({ playerId: string; stack: number } | null)[]; hand: { players: { seat: number; bet: number }[] } | null } | null }
 
 export function HistoryPage({ go }: { go: (to: string) => void }) {
   const s = useSession();
@@ -73,19 +73,32 @@ export function SessionPage({ tableId, go }: { tableId: string; go: (to: string)
   if (!row) return <Page back="History" onBack={() => go('/history')}><Spinner /></Page>;
   const me = parts.find((p) => p.user_id === s.player!.id);
   const cash = row.mode === 'cash';
-  const net = (p: ParticipantRow) => Number(p.taken_off) + Number(p.final_stack ?? 0) * (row.archived_at ? 0 : 1) - Number(p.added);
+  // chips still at the table for a player who has not left: read the live public stacks (+ anything in front this hand),
+  // because a seated player's remaining chips are not in session_participants until they cash out.
+  const seats = row.state?.seats ?? [];
+  const liveHand = row.state?.hand ?? null;
+  const seatIdx = (pid: string) => seats.findIndex((x) => x && x.playerId === pid);
+  const seatedNow = (pid: string) => seatIdx(pid) >= 0;
+  const inPlayOf = (pid: string) => { const i = seatIdx(pid); if (i < 0) return 0; return Number(seats[i]!.stack) + (liveHand?.players.find((p) => p.seat === i)?.bet ?? 0); };
+  // a cash session is settled only once every player has cashed out (or the table was archived)
+  const settled = !cash || !!row.archived_at || parts.every((p) => !!p.left_at);
+  const inPlay = (p: ParticipantRow) => (seatedNow(p.user_id) ? inPlayOf(p.user_id) : 0);
+  const net = (p: ParticipantRow) => Number(p.taken_off) + inPlay(p) - Number(p.added);
+  const sign = (n: number) => `${n > 0 ? '+' : ''}${fmt(n)}`;
   return (
     <Page back="History" onBack={() => go('/history')}>
       <div className="stack" style={{ gap: 8 }}><div className="eyebrow">{new Date(row.created_at).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })} · {cash ? 'Cash' : 'Tournament'}{row.status === 'abandoned' ? ' · abandoned' : ''}</div><h1>{row.name}</h1></div>
-      {me && cash && <KV rows={[['Chips added', fmt(Number(me.added))], ['Chips taken off', fmt(Number(me.taken_off))], ['Net', `${net(me) > 0 ? '+' : ''}${fmt(net(me))}`]]} />}
+      {cash && <div className="notice">{settled ? 'Settled — every player has cashed out and all chips are accounted for.' : 'In progress — some players are still at the table, so these are current figures, not a final settlement.'}</div>}
+      {me && cash && <KV rows={[['Chips added', fmt(Number(me.added))], ['Chips taken off', fmt(Number(me.taken_off))], ...(seatedNow(me.user_id) ? [['Still at the table', fmt(inPlay(me))] as [string, string]] : []), [settled ? 'Net' : 'Net so far', sign(net(me))]]} />}
       {me && !cash && <KV rows={[['Your place', me.place ? ordinal(me.place) : row.status === 'abandoned' ? 'Unfinished' : '—']]} />}
       <div>
         <div className="eyebrow" style={{ padding: '8px 0' }}>{cash ? 'Everyone' : 'Final standings'}</div>
-        {parts.slice().sort((a, b) => cash ? net(b) - net(a) : (a.place ?? 99) - (b.place ?? 99)).map((p) => <div className="kv" key={p.user_id}><span style={{ color: 'inherit' }}>{!cash && p.place ? `${ordinal(p.place)} · ` : ''}{p.name}{p.user_id === s.player!.id ? ' (you)' : ''}</span><span>{cash ? `${net(p) > 0 ? '+' : ''}${fmt(net(p))}` : p.place === 1 ? 'Winner' : ''}</span></div>)}
+        {parts.slice().sort((a, b) => cash ? net(b) - net(a) : (a.place ?? 99) - (b.place ?? 99)).map((p) => <div className="kv" key={p.user_id}><span style={{ color: 'inherit' }}>{!cash && p.place ? `${ordinal(p.place)} · ` : ''}{p.name}{p.user_id === s.player!.id ? ' (you)' : ''}{cash && seatedNow(p.user_id) ? <span className="fine"> · still in · {fmt(inPlay(p))} in play</span> : ''}</span><span style={{ fontWeight: 600, color: cash && net(p) < 0 ? 'var(--danger)' : 'inherit' }}>{cash ? sign(net(p)) : p.place === 1 ? 'Winner' : ''}</span></div>)}
+        {cash && <div className="kv" style={{ borderTop: '2px solid var(--line)' }}><span style={{ color: 'var(--muted)' }}>All nets</span><span style={{ fontWeight: 700 }}>{sign(parts.reduce((a, p) => a + net(p), 0))}</span></div>}
       </div>
       <button type="button" className="btn btn-secondary" onClick={() => setShowHands(!showHands)}>{showHands ? 'Hide hands' : `Hands (${hands.length})`}</button>
       {showHands && hands.map((h) => <div key={h.hand_no} className="card-box" style={{ gap: 4 }}><b>Hand {h.hand_no} · {h.results.variant}</b><span className="fine">{h.results.players.filter((p) => p.won > 0).map((p) => `${p.name} +${fmt(p.won)}`).join(', ') || '—'}{h.results.result?.uncontested ? ' · everyone else folded' : ''}</span></div>)}
-      <p className="fine">{cash ? 'Net = chips taken off + final stack − chips added. Settled nets across everyone sum to zero.' : 'Tournament chips are not play-chip profit or loss.'}</p>
+      <p className="fine">{cash ? 'Net = chips taken off + chips still at the table − chips added. All nets sum to zero once everyone has cashed out.' : 'Tournament chips are not play-chip profit or loss.'}</p>
     </Page>
   );
 }
