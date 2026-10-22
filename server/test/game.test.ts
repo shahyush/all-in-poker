@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { resetDb, world, Client, type World } from './harness.ts';
+import { RULES } from '@allin/engine';
 
 let W: World;
 beforeAll(async () => { resetDb(); W = await world(4, ['Tanisha', 'Aayush', 'Sam', 'Priya']); });
@@ -263,5 +264,41 @@ describe('two independent tables and tournaments', () => {
     const hist = await W.db.select('hand_history', { table_id: t1.tableId });
     expect(hist.length).toBeGreaterThanOrEqual(1);
     expect((await W.db.select('table_secrets', { table_id: t1.tableId })).length).toBe(0);
+  });
+});
+
+describe('leaving as the result window lapses', () => {
+  it('cashes the leaving player out at the boundary instead of dealing them into a stalled next hand', async () => {
+    const extra = [new Client(W.app, W.db), new Client(W.app, W.db)];
+    for (const [i, c] of extra.entries()) { await c.signIn(); await c.admit('Lv' + i); }
+    const [x, y] = extra;
+    const r = await x.cmd<{ tableId: string; inviteCode: string }>('create_table', { rules: { ...cashRules, name: 'LeaveRace', seats: '2' }, buyIn: '1000' });
+    const tid = r.tableId;
+    await y.cmd('join', { code: r.inviteCode, amount: '1000' });
+    await x.cmd('start', {}, tid);
+    // hand 1 defaults to Hold'em once the 15s choice window lapses
+    await W.advanceClock(RULES.timers.choiceMs + 200); await W.runJobs([tid]);
+    let st = await W.publicState(tid);
+    expect(st.hand.phase).toBe('betting');
+    // heads-up: the first actor (button/SB) folds -> uncontested -> result phase with a short next-hand window
+    await waitBetting(tid);
+    const firstPid = st.seats[st.hand.actor].playerId;
+    const first = [x, y].find((c) => c.player!.id === firstPid)!;
+    await first.cmd('act', { action: 'fold' }, tid);
+    st = await W.publicState(tid);
+    expect(st.hand.phase).toBe('result');
+    // the result window lapses BEFORE the leave request is processed (the live race). The leave command ticks first, so
+    // with the pre-tick leave flag the boundary cashes the leaver out now rather than dealing them a fresh hand.
+    await W.advanceClock(RULES.timers.awardToNextChoiceMs + 500);
+    await y.cmd('leave', {}, tid);
+    st = await W.publicState(tid);
+    expect(st.seats.some((s: { playerId: string } | null) => s && s.playerId === y.player!.id)).toBe(false); // cashed out
+    expect(st.hand).toBeNull();                 // only one player remains: no new hand was dealt
+    expect(st.status).toBe('running');          // the table waits for players, it is not stuck mid-hand
+    const part = (await W.db.select<{ left_at: string | null; taken_off: number }>('session_participants', { table_id: tid, user_id: y.player!.id }))[0];
+    expect(part.left_at).not.toBeNull();
+    // chip conservation: the remaining stack plus the leaver's cashed-out chips equal the two 1,000 buy-ins
+    const xStack = Number(st.seats.find((s: { playerId: string } | null) => s && s.playerId === x.player!.id)!.stack);
+    expect(xStack + Number(part.taken_off)).toBe(2000);
   });
 });

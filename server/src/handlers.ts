@@ -130,13 +130,16 @@ export class Handlers {
   }
 
   // ---------- tables ----------
-  private async withTable<T = unknown>(tableId: string, receipt: Receipt | null, fn: (L: Loaded, ctx: TickContext) => { effects: Effect[]; result: unknown; extras?: CommitExtras }): Promise<{ result: T; duplicate?: Receipt }> {
+  private async withTable<T = unknown>(tableId: string, receipt: Receipt | null, fn: (L: Loaded, ctx: TickContext) => { effects: Effect[]; result: unknown; extras?: CommitExtras }, prepare?: (L: Loaded) => void): Promise<{ result: T; duplicate?: Receipt }> {
     if (!isUuid(tableId)) bad(400, 'bad_table', 'Unknown table');
     for (let attempt = 0; attempt < 4; attempt++) {
       const L = await loadTable(this.db, tableId);
       const approved = await this.db.select<{ id: string; user_id: string; amount: number }>('reload_requests', { table_id: tableId, status: 'approved' }, { order: 'requested_at' });
       const ctx: TickContext = { presence: presenceOf(L.members), credits: approved.map((r) => ({ playerId: r.user_id, amount: Number(r.amount), id: r.id })) };
       const before = structuredClone(L.t);
+      // prepare runs AFTER the compare-and-set base is captured but BEFORE deadlines are resolved, so an intent such as
+      // "leaving" is honoured by any hand boundary that this pre-tick advances (otherwise the leaver is dealt the next hand).
+      if (prepare) prepare(L);
       const pre = tick(L.t, L.now, ctx);
       const out = fn(L, ctx);
       const effects = [...pre, ...out.effects];
@@ -242,9 +245,33 @@ export class Handlers {
   }
 
   async game(player: Player, receipt: Receipt, tableId: string, type: string, p: Record<string, unknown>): Promise<HandlerResult> {
+    // For leave/remove, record the leaving intent BEFORE the pre-tick resolves any due boundary, so a hand that starts in
+    // that pre-tick excludes the departing player instead of dealing them in (which would strand the table on timeouts).
+    const prepare = (type === 'leave' || type === 'remove') ? (L: Loaded): void => {
+      const targetId = type === 'remove' ? String(p.playerId ?? '') : player.id;
+      const i = seatOf(L.t, targetId);
+      if (i === -1) return;
+      const tourneyRunning = L.t.rules.mode === 'tournament' && L.t.status === 'running';
+      if (!tourneyRunning || type === 'remove') { L.t.seats[i]!.leaving = true; L.t.seats[i]!.leaveReason = type === 'remove' ? 'removed' : 'leave'; }
+    } : undefined;
     const r = await this.withTable(tableId, receipt, (L, ctx) => {
       const t = L.t; const now = L.now;
       if (t.error) bad(409, 'table_error', 'This table stopped after a problem. Please tell the host.');
+      // leave/remove: the pre-tick (with the leaving flag already set) may have cashed the player out at a boundary. If so
+      // the seat is gone and the exit is already in the pre-tick effects — nothing more to do.
+      if (type === 'leave') {
+        const eff = seatOf(t, player.id) !== -1 ? requestLeave(t, player.id, 'leave', now, ctx) : [];
+        return { effects: eff, result: { ok: true, version: t.version + 1 }, extras: { touch: player.id } };
+      }
+      if (type === 'remove') {
+        this.requireHost(L, player);
+        const target = String(p.playerId);
+        if (target === player.id) bad(400, 'self', 'Use Leave to leave your own table');
+        const eff = seatOf(t, target) !== -1 ? requestLeave(t, target, 'removed', now, ctx) : [];
+        const extras: CommitExtras = { touch: player.id };
+        if (t.rules.mode === 'tournament') extras.members = [{ user_id: target, status: 'removed', seat: null }];
+        return { effects: eff, result: { ok: true }, extras };
+      }
       const seat = this.seatFor(L, player);
       let effects: Effect[] = [];
       switch (type) {
@@ -267,22 +294,11 @@ export class Handlers {
         case 'return': effects = tick(t, now, ctx); requestReturn(t, player.id, !!p.post, now); effects.push(...tick(t, now, ctx)); break;
         case 'post_pref': setPostToPlay(t, player.id, !!p.post); break;
         case 'straddle_pref': setStraddlePref(t, player.id, !!p.pref); break;
-        case 'leave': effects = requestLeave(t, player.id, 'leave', now, ctx); break;
         case 'cancel_leave': cancelLeave(t, player.id); break;
-        case 'remove': {
-          this.requireHost(L, player);
-          const target = String(p.playerId);
-          if (target === player.id) bad(400, 'self', 'Use Leave to leave your own table');
-          if (seatOf(t, target) === -1) bad(404, 'not_seated', 'That player is not here');
-          effects = requestLeave(t, target, 'removed', now, ctx);
-          const extras: CommitExtras = { touch: player.id };
-          if (t.rules.mode === 'tournament') extras.members = [{ user_id: target, status: 'removed', seat: null }];
-          return { effects, result: { ok: true }, extras };
-        }
         default: bad(400, 'bad_type', 'Unknown command');
       }
       return { effects, result: { ok: true, version: t.version + 1 }, extras: { touch: player.id } };
-    });
+    }, prepare);
     return { result: r.result };
   }
 

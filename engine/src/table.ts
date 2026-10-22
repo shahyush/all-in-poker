@@ -816,14 +816,18 @@ export function setStraddlePref(t: TableState, playerId: string, pref: boolean):
 
 /** Leave (or host removal). Cash: queued to the next boundary; the player keeps any all-in claim. Tournament: no cash-out. */
 export function requestLeave(t: TableState, playerId: string, reason: 'leave' | 'removed', now: number, ctx: TickContext): Effect[] {
+  const i0 = seatOf(t, playerId); if (i0 === -1) fail('not_seated', 'Not seated');
+  const tourneyRunning = t.rules.mode === 'tournament' && t.status === 'running';
+  // Mark the seat as leaving BEFORE resolving due timers. If a hand boundary happens to resolve inside this tick (e.g. the
+  // request arrives just after the result window lapses, which is easy under live latency), the leaving player is then
+  // excluded from the next hand and cashed out immediately — instead of being dealt into a fresh hand that nobody drives,
+  // which would strand the table on 30 s action timeouts and never surface the leaver's session summary.
+  if (!tourneyRunning || reason === 'removed') { t.seats[i0]!.leaving = true; t.seats[i0]!.leaveReason = reason; }
   const effects = tick(t, now, ctx);
-  const i = seatOf(t, playerId); if (i === -1) fail('not_seated', 'Not seated');
+  if (tourneyRunning) { computeDue(t); return effects; } // stack stays in play
+  const i = seatOf(t, playerId);
+  if (i === -1) { computeDue(t); return effects; } // the tick already cashed us out at a boundary
   const s = t.seats[i]!;
-  if (t.rules.mode === 'tournament' && t.status === 'running') {
-    if (reason === 'removed') { s.leaving = true; s.leaveReason = reason; }
-    return effects; // stack stays in play
-  }
-  s.leaving = true; s.leaveReason = reason;
   const h = t.hand;
   const inHand = h && h.phase !== 'result' && h.players.some((p) => p.seat === i);
   if (!inHand) {
