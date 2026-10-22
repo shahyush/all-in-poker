@@ -95,26 +95,32 @@ export function ChatSheet({ chat, reactions, names, myId, onSend, onReact, onClo
 
 export function AccountsSheet({ t, ledger, participants, mode, onClose, turnCue, onReturn }: { t: PublicTable; ledger: LedgerRow[]; participants: ParticipantRow[]; mode: string; onClose: () => void; turnCue: string | null; onReturn: () => void }) {
   const rows = accountsRows(t, ledger, participants);
+  const settled = rows.every((r) => r.status === 'finished');
+  const allNets = rows.reduce((a, r) => a + r.net, 0);
+  const tag: Record<string, string> = { playing: 'Playing', leaving: 'Leaving', finished: 'Finished' };
   return (
-    <Sheet title={mode === 'cash' ? 'Session accounts' : 'Standings'} onClose={onClose} turnCue={turnCue} onReturn={onReturn}>
+    <Sheet title={mode === 'cash' ? 'Table accounts' : 'Standings'} onClose={onClose} turnCue={turnCue} onReturn={onReturn}>
       {mode === 'cash' ? (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-            <thead><tr style={{ textAlign: 'right', color: 'var(--muted)', fontSize: 12 }}><th style={{ textAlign: 'left', padding: '6px 0' }}>Player</th><th>Added</th><th>In play</th><th>Taken off</th><th>Net</th></tr></thead>
-            <tbody>{rows.map((r) => <tr key={r.id} style={{ textAlign: 'right', borderTop: '1px solid var(--line)' }}><td style={{ textAlign: 'left', padding: '8px 0', overflowWrap: 'anywhere' }}>{r.name}{r.left ? <span className="fine"> · left</span> : ''}</td><td>{fmt(r.added)}</td><td>{fmt(r.inPlay)}</td><td>{fmt(r.takenOff)}</td><td style={{ fontWeight: 700, color: r.net < 0 ? 'var(--danger)' : 'inherit' }}>{r.net > 0 ? '+' : ''}{fmt(r.net)}</td></tr>)}</tbody>
-          </table>
-          <p className="fine" style={{ marginTop: 8 }}>In play = stack plus chips committed this hand. Net = in play + taken off − added. Play chips only.</p>
-        </div>
+        <>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+              <thead><tr style={{ textAlign: 'right', color: 'var(--muted)', fontSize: 12 }}><th style={{ textAlign: 'left', padding: '6px 0' }}>Player</th><th>Added</th><th>In play</th><th>Taken off</th><th>Net</th></tr></thead>
+              <tbody>{rows.map((r) => <tr key={r.id} style={{ textAlign: 'right', borderTop: '1px solid var(--line)' }}><td style={{ textAlign: 'left', padding: '8px 0', overflowWrap: 'anywhere' }}>{r.name} <span className={`acct-tag ${r.status}`}>{tag[r.status]}</span></td><td>{fmt(r.added)}</td><td>{fmt(r.inPlay)}</td><td>{fmt(r.takenOff)}</td><td style={{ fontWeight: 700, color: r.net < 0 ? 'var(--danger)' : 'inherit' }}>{r.net > 0 ? '+' : ''}{fmt(r.net)}{r.status !== 'finished' ? <div className="fine" style={{ fontWeight: 400 }}>provisional</div> : null}</td></tr>)}</tbody>
+            </table>
+            <div className="kv" style={{ borderTop: '2px solid var(--line)', marginTop: 4 }}><span className="fine">{settled ? 'Settled · all nets' : 'All nets so far'}</span><span style={{ fontWeight: 700 }}>{allNets > 0 ? '+' : ''}{fmt(allNets)}</span></div>
+          </div>
+          <p className="fine" style={{ marginTop: 8 }}>In play = stack plus chips committed this hand. Net = in play + taken off − added — chips still at the table are counted, never a loss. All nets sum to zero once everyone cashes out.</p>
+        </>
       ) : <Standings t={t} participants={participants} />}
     </Sheet>
   );
 }
 
 export function accountsRows(t: PublicTable, ledger: LedgerRow[], participants: ParticipantRow[]) {
-  const byId = new Map<string, { id: string; name: string; added: number; takenOff: number; inPlay: number; net: number; left: boolean }>();
-  for (const p of participants) byId.set(p.user_id, { id: p.user_id, name: p.name, added: Number(p.added), takenOff: Number(p.taken_off), inPlay: 0, net: 0, left: !!p.left_at });
-  for (const l of ledger) { const r = byId.get(l.user_id); if (!r) continue; }
-  for (const s of t.seats) if (s) { const r = byId.get(s.playerId); if (r) { r.inPlay = s.stack + (t.hand?.players.find((p) => p.seat === t.seats.indexOf(s))?.bet ?? 0); r.left = false; } }
+  void ledger;
+  const byId = new Map<string, { id: string; name: string; added: number; takenOff: number; inPlay: number; net: number; status: 'playing' | 'leaving' | 'finished' }>();
+  for (const p of participants) byId.set(p.user_id, { id: p.user_id, name: p.name, added: Number(p.added), takenOff: Number(p.taken_off), inPlay: 0, net: 0, status: 'finished' });
+  t.seats.forEach((s, i) => { if (!s) return; const r = byId.get(s.playerId); if (r) { r.inPlay = s.stack + (t.hand?.players.find((p) => p.seat === i)?.bet ?? 0); r.status = s.leaving ? 'leaving' : 'playing'; } });
   for (const r of byId.values()) r.net = r.inPlay + r.takenOff - r.added;
   return [...byId.values()].sort((a, b) => b.net - a.net);
 }

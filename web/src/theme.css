@@ -107,6 +107,12 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; 
 .emoji-btn { width: 44px; height: 48px; flex: none; border: 1px solid var(--line); border-radius: var(--r-btn); background: var(--paper); font-size: 22px; display: flex; align-items: center; justify-content: center; }
 .emoji-btn[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
+/* session-account status chips */
+.acct-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border-radius: 4px; padding: 1px 6px; white-space: nowrap; vertical-align: middle; }
+.acct-tag.playing { background: color-mix(in srgb, var(--accent) 16%, var(--paper)); color: var(--accent); }
+.acct-tag.leaving { background: color-mix(in srgb, var(--danger) 14%, var(--paper)); color: var(--danger); }
+.acct-tag.finished { background: var(--page); color: var(--muted); }
+
 /* toasts */
 .toast { position: fixed; left: 50%; bottom: calc(16px + var(--safe-b)); transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 30; max-width: 90vw; }
 
