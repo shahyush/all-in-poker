@@ -36,8 +36,9 @@ async function pickAndExpect(pages: Page[], label: string): Promise<void> {
   }
   expect(chooser, `a player is offered the dealer's choice for ${label}`).not.toBeNull();
   await chooser!.getByRole('button', { name: label }).click();
-  // the chooser sees their selection lock immediately, before the deal round-trips
-  await expect(chooser!.getByText(/Locked in/).first()).toBeVisible({ timeout: 4_000 });
+  // immediate feedback ("Submitting…"), then confirmed ("Locked in") once the server accepts — no optimistic lock
+  await expect(chooser!.getByText(/Submitting|Locked in/).first()).toBeVisible({ timeout: 4_000 });
+  await expect(chooser!.getByText(/Locked in/).first()).toBeVisible({ timeout: 15_000 });
   // every client ends up on the chosen variant — a dropped/defaulted choice would read "Hold'em" and fail here
   for (const p of pages) await expect(p.locator('.g-stakes')).toContainText(label, { timeout: 15_000 });
 }

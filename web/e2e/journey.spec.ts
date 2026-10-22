@@ -87,7 +87,7 @@ test('three friends: invite → entry → buy-in → start → dealer choice →
   // accounts: added = in play + taken off − net consistency
   await pages[0].getByRole('button', { name: 'Table menu' }).click();
   await pages[0].getByRole('button', { name: 'Accounts' }).click();
-  await expect(pages[0].getByRole('dialog', { name: 'Session accounts' })).toBeVisible();
+  await expect(pages[0].getByRole('dialog', { name: 'Table accounts' })).toBeVisible();
   await pages[0].screenshot({ path: 'test-results/shots/07-accounts.png' });
   const nets = await pages[0].locator('table tbody tr td:last-child').allTextContents();
   const sum = nets.reduce((a, s) => a + Number(s.replace(/[^\d-]/g, '')), 0);

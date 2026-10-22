@@ -148,7 +148,7 @@ export function SessionPage({ tableId, go }: { tableId: string; go: (to: string)
           {mine.status === 'playing' && <p className="fine">Provisional: chips still in front of you are counted, not lost.</p>}
         </div>
       )}
-      {mine && !cash && <KV rows={[['Your place', mine.place ? ordinal(mine.place) : row.status === 'abandoned' ? 'Unfinished' : '—']]} />}
+      {mine && !cash && <KV rows={[['Your place', mine.place === 1 ? '1st · Winner' : mine.place ? ordinal(mine.place) : row.status === 'abandoned' ? 'Unfinished' : '—']]} />}
 
       {/* Everyone else — clearly separated, each marked Playing / Leaving / Finished; active results are provisional. */}
       {others.length > 0 && (

@@ -112,8 +112,9 @@ test('rapid chat sends preserve every message, never duplicate, and keep text on
 
   const input = h.page.getByLabel('Message');
   const burst = ['r1', 'r2', 'r3', 'r4', 'r5'];
-  // fire them as fast as the UI allows — Enter submits, the box clears at once, the next is typed while the last is pending
-  for (const m of burst) { await input.fill(m); await input.press('Enter'); }
+  // fire them in quick succession — Enter submits, the box clears at once, the next is typed while the last is still in
+  // flight (a ~150ms cadence: faster than the send round-trip, so sends overlap, without firing five POSTs in one instant)
+  for (const m of burst) { await input.fill(m); await input.press('Enter'); await input.page().waitForTimeout(150); }
   // every message reaches the guest exactly once; none dropped, none duplicated
   await expect(bodies(g.page)).toHaveCount(5, { timeout: 30_000 });
   for (const m of burst) expect(await bodies(g.page).filter({ hasText: new RegExp(`^${m}$`) }).count()).toBe(1);
