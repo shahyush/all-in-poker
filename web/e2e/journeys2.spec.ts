@@ -49,12 +49,14 @@ test('reconnect, rotation, uncontested reveal, reload approval, leave, history a
   for (const p of pages) await expect(p.locator('.game')).toBeVisible();
   await chooseIfAsked(pages);
   // reconnect mid-hand: reload the guest page; same seat, own cards return, no second deal
-  await expect(g.page.locator('.own-cards .pc:not(.back)')).toHaveCount(2, { timeout: 15_000 });
-  const labels = async () => (await g.page.locator('.own-cards .pc:not(.back)').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).join('|');
-  const before = await labels();
+  const labels = async () => (await g.page.locator('.own-cards .pc:not(.back)').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? ''))).filter(Boolean).join('|');
+  // capture only once both named hole cards are actually on screen (during the cold-start deal the faces can lag the count)
+  let before = '';
+  await expect.poll(async () => { before = await labels(); return before.split('|').filter(Boolean).length; }, { timeout: 20_000 }).toBe(2);
   await g.page.reload();
-  await expect(g.page.locator('.own-cards .pc:not(.back)')).toHaveCount(2, { timeout: 15_000 });
-  expect(await labels()).toBe(before);
+  // the same two cards come back after the reload (reconnect restores the seat and hand; no second deal)
+  await expect.poll(labels, { timeout: 20_000 }).toBe(before);
+  await expect(g.page.locator('.own-cards .pc:not(.back)')).toHaveCount(2);
   // rotate mid-hand: layout changes, state does not
   await g.page.setViewportSize({ width: 844, height: 390 });
   await expect(g.page.locator('.own-cards .pc:not(.back)')).toHaveCount(2);
