@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Card, PublicEvent, VariantId } from '@allin/engine/public';
+import { currentBest } from '@allin/engine/public';
 import { useSession } from '../state/session.tsx';
 import { useNow, type TableView } from '../state/table.ts';
 import { TransportError } from '../transport/index.ts';
@@ -117,6 +118,16 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   else stakes.push(`Blinds ${hand?.sb ?? row.config.sb}/${hand?.bb ?? row.config.bb}${(hand?.ante ?? row.config.ante) ? ` · ante ${hand?.ante ?? row.config.ante}` : ''}`);
   const notice = !view.connected ? 'Reconnecting… the server clock keeps running' : t.error ? 'This table stopped after a problem. Tell the host.' : err ?? (hand?.phase === 'result' ? 'Next hand in a moment' : t.waitingReason ?? '');
 
+  // the viewer's own best made hand so far (flop onward), with the contributing cards for an on-tap highlight
+  const made = useMemo(() => {
+    const own = view.own; const b = hand?.board ?? [];
+    if (!hand || !hand.variant || hand.phase === 'result' || !own || own.handId !== hand.id) return null;
+    try { return currentBest(own.cards, b, hand.variant); } catch { return null; }
+  }, [hand, view.own]);
+  const [madeShown, setMadeShown] = useState(false);
+  useEffect(() => { setMadeShown(false); }, [hand?.id]);
+  const madeSet = useMemo(() => (madeShown && made ? new Set<Card>(made.cards) : null), [madeShown, made]);
+
   const winTotals = hand?.result?.totals ?? {};
   const winCardsBySeat = new Map<number, Card[]>();
   if (hand?.result) for (const a of hand.result.awards) for (const w of a.winners) winCardsBySeat.set(w.seat, [...(winCardsBySeat.get(w.seat) ?? []), ...w.cards]);
@@ -148,11 +159,12 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
           const shown: Card[] | null = shows ? shows : revealed && revealed.length ? Array.from({ length: hand!.players.find((p) => p.seat === i)?.holeCount ?? 0 }, (_, k) => revealed.find((r) => r.index === k)?.card ?? null).filter((c): c is Card => c !== null) : null;
           return <SeatView key={i} index={i} seat={seat} hand={hand} pos={positions[i]} betPos={betPosition(positions[i], landscape)} isHost={seat.playerId === t.hostPlayerId} present={presence.get(seat.playerId) ?? false} now={now} isMe={false} shownCards={shown} winCards={winCardsBySeat.get(i) ?? null} won={winTotals[i] ?? null} />;
         })}
-        <Centre t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} chosen={chosen} onChoose={(v: VariantId) => { setChosen(v); void quiet('choose', { variant: v }); }} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} />
+        <Centre t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} chosen={chosen} onChoose={(v: VariantId) => { setChosen(v); void quiet('choose', { variant: v }); }} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} madeBoard={madeSet} />
       </div>
       <Hero seatNames={t.seats.map((x) => x?.name ?? null)} hand={hand} mySeat={mySeat} me={meSeat} own={view.own?.cards ?? null} ownHandId={view.own?.handId ?? null} now={now} busy={pending !== null} pending={pending} legal={legal} dealt={dealt} connected={view.connected} isCash={row.mode === 'cash'}
         onAct={(a, to) => void quiet('act', a === 'raise' ? { action: 'raise', raiseTo: String(to) } : { action: a })}
-        onPropose={(runs) => void quiet('propose', { runs })} onReveal={(what) => void quiet('reveal', what === 'all' || what === 'muck' ? { what } : { indices: what })} onReturn={(post) => void quiet('return', { post })} />
+        onPropose={(runs) => void quiet('propose', { runs })} onReveal={(what) => void quiet('reveal', what === 'all' || what === 'muck' ? { what } : { indices: what })} onReturn={(post) => void quiet('return', { post })}
+        made={made} madeShown={madeShown} madeSet={madeSet} onToggleMade={() => setMadeShown((v) => !v)} />
       {sheet === 'chat' && <ChatSheet chat={view.chat} names={names} myId={me.id} onSend={(body) => run('chat', { body })} onClose={() => setSheet(null)} turnCue={turnCue} onReturn={() => setSheet(null)} draft={draft} setDraft={setDraft} />}
       {sheet === 'menu' && <MenuSheet t={t} rules={row.config} myId={me.id} isHost={isHost} members={view.members} reloads={view.reloads} names={names} onClose={() => setSheet(null)} run={quiet} open={(x) => setSheet(x)} go={go} turnCue={turnCue} onReturn={() => setSheet(null)} />}
       {sheet === 'accounts' && <AccountsSheet t={t} ledger={view.ledger} participants={view.participants} mode={row.mode} onClose={() => setSheet(null)} turnCue={turnCue} onReturn={() => setSheet(null)} />}

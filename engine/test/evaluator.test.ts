@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { eval5, bestHand, categoryOf, combos, describeScore } from '../src/evaluator.ts';
+import { eval5, bestHand, currentBest, categoryOf, combos, describeScore } from '../src/evaluator.ts';
 import { parseCard } from '../src/cards.ts';
 import { parseChipAmount } from '../src/amounts.ts';
 
@@ -38,6 +38,17 @@ describe('evaluator', () => {
   });
   it('rejects duplicate cards', () => {
     expect(() => bestHand(C('As As'), C('Ks Qs Js 9s 7d'), 'holdem')).toThrow();
+  });
+  it('currentBest: live label on a partial board, Omaha exactly-two rule, null before the flop', () => {
+    expect(currentBest(C('Qs Qd'), C('Qh 7c 2d'), 'holdem')!.name).toBe('Three of a kind, Queens');
+    // hold'em flush on the flop: two hole spades plus three board spades
+    expect(categoryOf(currentBest(C('7s 8s'), C('As Ks Qs'), 'holdem')!.score)).toBe(5);
+    // Omaha on the flop: one hole spade cannot make the board-spade flush, but two can
+    expect(categoryOf(currentBest(C('As 2d 3c 4h'), C('Ks Qs Js'), 'omaha4')!.score)).not.toBe(5);
+    expect(categoryOf(currentBest(C('As 2s 3c 4h'), C('Ks Qs Js'), 'omaha4')!.score)).toBe(5);
+    const m = currentBest(C('Ah Ad Kc 7s'), C('As Kd 2h'), 'omaha4')!;
+    expect(m.cards.length).toBe(5);
+    expect(currentBest(C('Ah Kd'), C('Qs Jc'), 'holdem')).toBeNull(); // only two board cards: too early
   });
 });
 

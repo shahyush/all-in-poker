@@ -90,3 +90,23 @@ export function bestHand(hole: readonly Card[], board: readonly Card[], variant:
   best.name = describeScore(best.score);
   return best;
 }
+
+/** The viewer's best made hand so far, from their own hole cards and the community cards dealt up to now (flop onward).
+ *  Hold'em uses any of the hole cards; Omaha uses exactly two. Returns null before the flop or with too few cards.
+ *  Evaluates only public board + the caller's own hole cards — safe to run on the client. `cards` lists the five used. */
+export function currentBest(hole: readonly Card[], board: readonly Card[], variant: VariantId): BestHand | null {
+  if (board.length < 3) return null;
+  let best: BestHand = { score: -1, cards: [], name: '' };
+  if (variant === 'holdem') {
+    const pool = [...hole, ...board];
+    if (pool.length < 5) return null;
+    for (const five of combos(pool, 5)) { const s = eval5(five); if (s > best.score) best = { score: s, cards: five, name: '' }; }
+  } else {
+    const need = { omaha4: 4, omaha5: 5, omaha6: 6 }[variant];
+    if (hole.length !== need) return null;
+    for (const h2 of combos(hole, 2)) for (const b3 of combos(board, 3)) { const five = [...h2, ...b3]; const s = eval5(five); if (s > best.score) best = { score: s, cards: five, name: '' }; }
+  }
+  if (best.score < 0) return null;
+  best.name = describeScore(best.score);
+  return best;
+}

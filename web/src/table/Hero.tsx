@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { parseChipAmount, type Card, type LegalActions, type PublicHand, type SeatState } from '@allin/engine/public';
+import { parseChipAmount, type BestHand, type Card, type LegalActions, type PublicHand, type SeatState } from '@allin/engine/public';
 import { PlayingCard } from './Card.tsx';
 import { Sheet, fmt } from '../components/ui.tsx';
 import { timeLeft } from '../lib/format.ts';
@@ -8,6 +8,7 @@ export interface HeroProps {
   seatNames: (string | null)[];
   hand: PublicHand | null; mySeat: number; me: SeatState | null; own: Card[] | null; ownHandId: string | null; now: number; busy: boolean; pending: string | null;
   legal: LegalActions | null; dealt: boolean; connected: boolean; isCash: boolean;
+  made: BestHand | null; madeShown: boolean; madeSet: Set<Card> | null; onToggleMade(): void;
   onAct(action: 'fold' | 'check' | 'call' | 'raise', raiseTo?: number): void;
   onPropose(runs: 1 | 2): void; onReveal(what: number[] | 'all' | 'muck'): void; onReturn(post: boolean): void;
 }
@@ -36,8 +37,8 @@ export function Hero(p: HeroProps) {
         <div className="own-cards" aria-label={showCards ? 'Your cards' : 'Your cards appear here'} data-seat={mySeat} data-own>
           {showCards ? own!.map((c, i) => (
             revealOpen || revealed.has(i)
-              ? <PlayingCard key={i} card={c} as="button" label={`${revealed.has(i) ? 'Shown: ' : 'Tap to show: '}card ${i + 1}`} onClick={() => !revealed.has(i) && p.onReveal([i])} tag={revealed.has(i) ? 'Shown' : undefined} ariaPressed={revealed.has(i)} win={winCards.has(c)} />
-              : <PlayingCard key={i} card={c} win={winCards.has(c)} dim={winCards.size > 0 && !winCards.has(c)} />
+              ? <PlayingCard key={i} card={c} as="button" label={`${revealed.has(i) ? 'Shown: ' : 'Tap to show: '}card ${i + 1}`} onClick={() => !revealed.has(i) && p.onReveal([i])} tag={revealed.has(i) ? 'Shown' : undefined} ariaPressed={revealed.has(i)} win={winCards.has(c)} hi={!!p.madeSet?.has(c)} />
+              : <PlayingCard key={i} card={c} win={winCards.has(c)} dim={winCards.size > 0 && !winCards.has(c)} hi={!!p.madeSet?.has(c)} />
           )) : inHand && hand ? Array.from({ length: myHp?.holeCount || 2 }).map((_, i) => <span key={i} className="pc back" data-slot={i} aria-hidden="true" style={{ opacity: myHp?.folded ? 0.4 : 1 }} />) : <span className="dock-note">{me ? (me.status === 'sitout' ? 'Sitting out' : hand ? 'Dealt in next hand' : '') : 'Watching'}</span>}
         </div>
         <div className="hero-meta">
@@ -48,6 +49,11 @@ export function Hero(p: HeroProps) {
           {myHp?.allIn && !myHp.folded && <span>All-in</span>}
         </div>
       </div>
+      {showCards && p.made && (
+        <button type="button" className="hand-label" aria-pressed={p.madeShown} onClick={p.onToggleMade}>
+          <span>Your hand</span><b>{p.made.name}</b><span className="hint">{p.madeShown ? 'tap to hide' : 'tap to see which cards'}</span>
+        </button>
+      )}
       <div className={`turn-line ${myTurn && secs <= 10 ? 'urgent' : ''}`} aria-live="polite"><span>{turnLabel}</span><span>{myTurn && deadline ? `${secs}s` : ''}</span></div>
       <div className="turn-bar" aria-hidden="true"><i className="motion" style={{ width: (myTurn ? frac * 100 : 0) + '%' }} /></div>
       {me && me.status === 'sitout' && !hand?.players.some((x) => x.seat === mySeat) && (

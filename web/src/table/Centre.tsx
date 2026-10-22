@@ -8,9 +8,10 @@ export interface CentreProps {
   chosen?: VariantId | null;
   onChoose(v: VariantId): void; onStraddle(accept: boolean): void; onVote(choice: string): void; onPots(): void;
   newBoardKeys: Set<string>;
+  madeBoard?: Set<Card> | null;
 }
 
-export function Centre({ t, hand, now, mySeat, busy, chosen, onChoose, onStraddle, onVote, onPots, newBoardKeys }: CentreProps) {
+export function Centre({ t, hand, now, mySeat, busy, chosen, onChoose, onStraddle, onVote, onPots, newBoardKeys, madeBoard }: CentreProps) {
   if (!hand) {
     return <div className="centre"><div className="centre-card"><div className="centre-title">{t.status === 'running' ? (t.waitingReason ?? 'Waiting') : 'Paused'}</div><div className="centre-copy">{t.status === 'running' ? 'Hands continue automatically.' : ''}</div></div></div>;
   }
@@ -55,7 +56,7 @@ export function Centre({ t, hand, now, mySeat, busy, chosen, onChoose, onStraddl
         <div key={bi} className="stack" style={{ gap: 2, alignItems: 'center' }}>
           {b.label && <div className="board-label">{b.label}</div>}
           <div className="board" aria-label={b.label ?? 'Community cards'}>
-            {Array.from({ length: 5 }).map((_, i) => (b.cards[i] !== undefined ? <PlayingCard key={b.cards[i]} card={b.cards[i]} win={res ? winCards.has(b.cards[i]) : false} dim={res ? winCards.size > 0 && !winCards.has(b.cards[i]) : false} flip={newBoardKeys.has(`${bi}:${b.cards[i]}`)} /> : <SlotCard key={'s' + i} />))}
+            {Array.from({ length: 5 }).map((_, i) => (b.cards[i] !== undefined ? <PlayingCard key={b.cards[i]} card={b.cards[i]} win={res ? winCards.has(b.cards[i]) : false} dim={res ? winCards.size > 0 && !winCards.has(b.cards[i]) : false} hi={!res && !!madeBoard?.has(b.cards[i])} flip={newBoardKeys.has(`${bi}:${b.cards[i]}`)} /> : <SlotCard key={'s' + i} />))}
           </div>
         </div>
       ))}
