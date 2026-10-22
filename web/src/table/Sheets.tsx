@@ -35,7 +35,7 @@ export function ChatSheet({ chat, reactions, names, myId, onSend, onReact, onClo
   }
   async function send(e: React.FormEvent) {
     e.preventDefault();
-    const body = draft.trim(); if (!body) return;
+    const body = draftRef.current.trim(); if (!body) return; // read the synchronous mirror, not the lagging React state
     // clear optimistically so the input is free for the next message the instant this one is sent; a rapid second
     // message (or fast typing during the round-trip) is never wiped.
     setErr(null); write(''); setPicker(false); setBusy(true);
