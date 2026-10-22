@@ -173,6 +173,33 @@ describe('full cash session through the API', () => {
     expect(added).toBe(onTable + takenOff);
   });
 
+  it('table chat carries emoji; reactions toggle, dedupe, count, and stay private to members', async () => {
+    await host.cmd('chat', { body: 'nice hand 🎉' }, tableId);
+    const msgs = await W.db.select<{ id: number; body: string }>('chat_messages', { table_id: tableId }, { order: 'id' });
+    const mid = msgs[msgs.length - 1].id;
+    expect(msgs[msgs.length - 1].body).toContain('🎉');
+    // two players thumbs-up the same message; one also adds a heart
+    await host.cmd('react', { messageId: mid, emoji: '👍', op: 'add' }, tableId);
+    await a.cmd('react', { messageId: mid, emoji: '👍', op: 'add' }, tableId);
+    await a.cmd('react', { messageId: mid, emoji: '❤️', op: 'add' }, tableId);
+    let rx = await W.db.select<{ emoji: string; user_id: string }>('chat_reactions', { table_id: tableId, message_id: mid });
+    expect(rx.filter((r) => r.emoji === '👍').length).toBe(2);
+    expect(rx.filter((r) => r.emoji === '❤️').length).toBe(1);
+    // adding the same reaction again is idempotent (a fresh action id, no duplicate row)
+    await a.cmd('react', { messageId: mid, emoji: '❤️', op: 'add' }, tableId);
+    rx = await W.db.select('chat_reactions', { table_id: tableId, message_id: mid });
+    expect(rx.length).toBe(3);
+    // removing takes away only that player's own reaction
+    await host.cmd('react', { messageId: mid, emoji: '👍', op: 'remove' }, tableId);
+    rx = await W.db.select<{ emoji: string }>('chat_reactions', { table_id: tableId, message_id: mid });
+    expect(rx.filter((r) => r.emoji === '👍').length).toBe(1);
+    // an emoji outside the allowlist is refused, and an unknown message id cannot be reacted to
+    expect((await a.raw('react', { messageId: mid, emoji: '🚫', op: 'add' }, tableId)).body.error?.code).toBe('bad_emoji');
+    expect((await a.raw('react', { messageId: 999999999, emoji: '👍', op: 'add' }, tableId)).body.ok).toBe(false);
+    // members see the reactions; the whole feed is member-scoped by RLS like chat
+    expect((await host.see('chat_reactions', { table_id: tableId })).length).toBeGreaterThan(0);
+  });
+
   it('leave after the hand records the exit, frees the seat, keeps history for the departed player', async () => {
     await a.cmd('leave', {}, tableId);
     for (let i = 0; i < 12; i++) { const s = await W.publicState(tableId); if (!s.seats.some((x: { playerId: string } | null) => x && x.playerId === a.player!.id)) break; await W.advanceClock(31000); await W.runJobs(); }

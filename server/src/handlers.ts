@@ -1,7 +1,7 @@
 import {
   RULES, act, cancelLeave, chooseVariant, choiceReady, createTable, eligibleToStart, parseChipAmount, propose, renamePlayer,
   requestLeave, requestReturn, requestSitOut, respondStraddle, respondVote, reveal, seatOf, seatPlayer, secureCode,
-  setPostToPlay, setStraddlePref, startTable, tick, transferHost, validateRules, isChipInt, type Effect, type TableRules, type TableState, type TickContext, type VariantId,
+  setPostToPlay, setStraddlePref, startTable, tick, transferHost, validateRules, isChipInt, isReaction, type Effect, type TableRules, type TableState, type TickContext, type VariantId,
 } from '@allin/engine';
 import type { Db } from './db.ts';
 import { ApiError, bad } from './errors.ts';
@@ -341,6 +341,23 @@ export class Handlers {
       return { effects: [], result: { ok: true }, extras: { chat: [{ user_id: player.id, body }], touch: player.id } };
     });
     return { result: r.result };
+  }
+
+  async react(player: Player, receipt: Receipt, tableId: string, p: { messageId?: unknown; emoji?: unknown; op?: unknown }, authUid: string): Promise<HandlerResult> {
+    if (!isUuid(tableId)) bad(400, 'bad_table', 'Unknown table');
+    if (!isReaction(p.emoji)) bad(400, 'bad_emoji', 'Pick a reaction');
+    const messageId = Number(p.messageId);
+    if (!Number.isInteger(messageId) || messageId <= 0) bad(400, 'bad_message', 'Unknown message');
+    const op = p.op === 'remove' ? 'remove' : 'add';
+    // only a member of this table may react (keeps reactions private to the table, like chat)
+    const member = await this.db.select('table_members', { table_id: tableId, user_id: player.id, status: 'active' }, { limit: 1 });
+    if (!member.length) bad(403, 'not_member', 'Join the table first');
+    await this.rateLimit(authUid, 'react', 60, 30, 'Slow down a little');
+    await this.db.rpc('allin_react', { table_id: tableId, message_id: messageId, user_id: player.id, emoji: p.emoji, op });
+    // react does not pass through allin_commit (no game state), so record its receipt here for replay protection
+    const result = { ok: true };
+    await this.db.rpc('allin_receipt', { ...receipt, result });
+    return { result };
   }
 
   async transferHost(player: Player, receipt: Receipt, tableId: string, p: { playerId?: unknown }): Promise<HandlerResult> {

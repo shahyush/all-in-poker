@@ -33,6 +33,12 @@ export const RULES = {
 
 export const VARIANT_IDS: VariantId[] = ['holdem', 'omaha4', 'omaha5', 'omaha6'];
 
+/** The curated set of one-tap message reactions. Shared by the client picker and the server allowlist so the two never
+ *  drift. Kept small and legible at phone size; message bodies may still carry any emoji the picker inserts. */
+export const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '💰', '🙌', '😎', '🤯', '👏', '🎉'] as const;
+export type Reaction = typeof REACTIONS[number];
+export const isReaction = (s: unknown): s is Reaction => typeof s === 'string' && (REACTIONS as readonly string[]).includes(s);
+
 /** Cards needed for one full board with n dealt players of this variant (no burns). */
 export function cardsForOneBoard(n: number, variant: VariantId): number {
   return n * RULES.variants[variant].holeCards + 5;

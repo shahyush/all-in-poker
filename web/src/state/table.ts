@@ -5,6 +5,7 @@ import { useSession } from './session.tsx';
 export interface TableRow { id: string; name: string; status: string; mode: string; config: TableRules; invite_code: string; host_id: string; version: number; state: PublicTable; archived_at: string | null; summary: unknown }
 export interface MemberRow { user_id: string; role: string; seat: number | null; status: string; last_seen: string | null; joined_at: string }
 export interface ChatRow { id: number; user_id: string; body: string; created_at: string }
+export interface ReactionRow { id: number; message_id: number; user_id: string; emoji: string; created_at: string }
 export interface ReloadRow { id: string; user_id: string; amount: number; status: string; requested_at: string; decided_at: string | null; credited_hand_no: number | null }
 export interface LedgerRow { id: number; user_id: string; kind: string; amount: number; hand_no: number; created_at: string }
 export interface ParticipantRow { user_id: string; name: string; added: number; taken_off: number; final_stack: number | null; place: number | null; left_at: string | null }
@@ -14,6 +15,7 @@ export interface TableView {
   row: TableRow | null;
   members: MemberRow[];
   chat: ChatRow[];
+  reactions: ReactionRow[];
   reloads: ReloadRow[];
   ledger: LedgerRow[];
   participants: ParticipantRow[];
@@ -31,6 +33,7 @@ export function useTable(tableId: string): TableView {
   const [row, setRow] = useState<TableRow | null>(null);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [chat, setChat] = useState<ChatRow[]>([]);
+  const [reactions, setReactions] = useState<ReactionRow[]>([]);
   const [reloads, setReloads] = useState<ReloadRow[]>([]);
   const [ledger, setLedger] = useState<LedgerRow[]>([]);
   const [participants, setParticipants] = useState<ParticipantRow[]>([]);
@@ -61,11 +64,12 @@ export function useTable(tableId: string): TableView {
   }, [t, tableId, s.player]);
   const loadMembers = useCallback(async () => { try { setMembers(await t.query<MemberRow>('table_members', { table_id: tableId })); } catch { /* ignore */ } }, [t, tableId]);
   const loadChat = useCallback(async () => { try { setChat(await t.query<ChatRow>('chat_messages', { table_id: tableId }, { order: 'id', limit: 200 })); } catch { /* ignore */ } }, [t, tableId]);
+  const loadReactions = useCallback(async () => { try { setReactions(await t.query<ReactionRow>('chat_reactions', { table_id: tableId }, { order: 'id', limit: 1000 })); } catch { /* ignore */ } }, [t, tableId]);
   const loadReloads = useCallback(async () => { try { setReloads(await t.query<ReloadRow>('reload_requests', { table_id: tableId }, { order: 'requested_at' })); } catch { /* ignore */ } }, [t, tableId]);
   const loadLedger = useCallback(async () => {
     try { setLedger(await t.query<LedgerRow>('ledger', { table_id: tableId }, { order: 'id' })); setParticipants(await t.query<ParticipantRow>('session_participants', { table_id: tableId })); } catch { /* ignore */ }
   }, [t, tableId]);
-  const reload = useCallback(async () => { await Promise.all([loadTable(), loadOwn(), loadMembers(), loadChat(), loadReloads(), loadLedger()]); }, [loadTable, loadOwn, loadMembers, loadChat, loadReloads, loadLedger]);
+  const reload = useCallback(async () => { await Promise.all([loadTable(), loadOwn(), loadMembers(), loadChat(), loadReactions(), loadReloads(), loadLedger()]); }, [loadTable, loadOwn, loadMembers, loadChat, loadReactions, loadReloads, loadLedger]);
 
   useEffect(() => {
     versionRef.current = -1;
@@ -73,7 +77,8 @@ export function useTable(tableId: string): TableView {
     const subs = [
       t.subscribe('tables', tableId, () => { void loadTable(); void loadLedger(); }),
       t.subscribe('hole_cards', tableId, loadOwn),
-      t.subscribe('chat_messages', tableId, loadChat),
+      t.subscribe('chat_messages', tableId, () => { void loadChat(); void loadReactions(); }),
+      t.subscribe('chat_reactions', tableId, loadReactions),
       t.subscribe('reload_requests', tableId, loadReloads),
       t.subscribe('table_members', tableId, loadMembers),
     ];
@@ -106,9 +111,9 @@ export function useTable(tableId: string): TableView {
     window.addEventListener('online', vis);
     window.addEventListener('focus', vis);
     return () => { subs.forEach((u) => u()); if (pollTimer) clearTimeout(pollTimer); clearInterval(hb); document.removeEventListener('visibilitychange', vis); window.removeEventListener('online', vis); window.removeEventListener('focus', vis); };
-  }, [t, tableId, reload, loadTable, loadOwn, loadChat, loadReloads, loadMembers, loadLedger]);
+  }, [t, tableId, reload, loadTable, loadOwn, loadChat, loadReactions, loadReloads, loadMembers, loadLedger]);
 
-  return { row, members, chat, reloads, ledger, participants, own, error, loaded, reload, connected };
+  return { row, members, chat, reactions, reloads, ledger, participants, own, error, loaded, reload, connected };
 }
 
 /** Server-clock aware ticking value (re-renders at ~4Hz while a deadline is pending). */

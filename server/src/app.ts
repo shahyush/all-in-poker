@@ -9,7 +9,7 @@ export interface ApiRequest { method: string; path: string; headers: Record<stri
 export interface ApiResponse { status: number; body: unknown; headers?: Record<string, string> }
 
 const PRE_ADMISSION = new Set(['admit', 'recover', 'me']);
-const TABLE_CMDS = new Set(['start', 'choose', 'choice_ready', 'straddle', 'act', 'propose', 'vote', 'reveal', 'sitout', 'return', 'post_pref', 'straddle_pref', 'leave', 'cancel_leave', 'remove', 'reload_request', 'reload_cancel', 'reload_decide', 'chat', 'transfer_host']);
+const TABLE_CMDS = new Set(['start', 'choose', 'choice_ready', 'straddle', 'act', 'propose', 'vote', 'reveal', 'sitout', 'return', 'post_pref', 'straddle_pref', 'leave', 'cancel_leave', 'remove', 'reload_request', 'reload_cancel', 'reload_decide', 'chat', 'react', 'transfer_host']);
 
 export class App {
   handlers: Handlers;
@@ -108,6 +108,7 @@ export class App {
       if (type === 'start') out = await H.start(player, receipt, tableId);
       else if (type === 'reload_request' || type === 'reload_cancel' || type === 'reload_decide') out = await H.reload(player, receipt, tableId, type, payload);
       else if (type === 'chat') out = await H.chat(player, receipt, tableId, payload, authUid);
+      else if (type === 'react') out = await H.react(player, receipt, tableId, payload, authUid);
       else if (type === 'transfer_host') out = await H.transferHost(player, receipt, tableId, payload);
       else out = await H.game(player, receipt, tableId, type, payload);
       return { ok: true, result: out.result };

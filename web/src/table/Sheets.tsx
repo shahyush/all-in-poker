@@ -1,33 +1,78 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PublicHand, PublicTable, TableRules } from '@allin/engine/public';
+import { REACTIONS } from '@allin/engine/public';
 import { Sheet, KV, fmt } from '../components/ui.tsx';
-import type { ChatRow, LedgerRow, MemberRow, ParticipantRow, ReloadRow } from '../state/table.ts';
+import type { ChatRow, LedgerRow, MemberRow, ParticipantRow, ReactionRow, ReloadRow } from '../state/table.ts';
+
+// a few more faces for composing a message, on top of the one-tap reaction set
+const COMPOSE_EMOJI = [...REACTIONS, '😅', '😍', '🤔', '😬', '🙃', '😤', '🥳', '💀', '🫡', '👀', '🤝', '🍀', '♠️', '♥️', '♦️', '♣️', '🃏', '🤑', '😭', '🤷'];
 import { rulesRows } from '../lib/format.ts';
 import { PlayingCard } from './Card.tsx';
 import { ordinal } from './Seat.tsx';
 
 const common = { turnCue: undefined as string | null | undefined };
 
-export function ChatSheet({ chat, names, myId, onSend, onClose, turnCue, onReturn, draft, setDraft }: { chat: ChatRow[]; names: Map<string, string>; myId: string; onSend: (body: string) => Promise<void>; onClose: () => void; turnCue: string | null; onReturn: () => void; draft: string; setDraft: (s: string) => void }) {
+export function ChatSheet({ chat, reactions, names, myId, onSend, onReact, onClose, turnCue, onReturn, draft, setDraft }: { chat: ChatRow[]; reactions: ReactionRow[]; names: Map<string, string>; myId: string; onSend: (body: string) => Promise<void>; onReact: (messageId: number, emoji: string, op: 'add' | 'remove') => void; onClose: () => void; turnCue: string | null; onReturn: () => void; draft: string; setDraft: (s: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [stuck, setStuck] = useState(true);
-  useEffect(() => { if (stuck && listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [chat, stuck]);
+  const [picker, setPicker] = useState(false);          // compose emoji picker
+  const [reactFor, setReactFor] = useState<number | null>(null); // which message's reaction picker is open
+  useEffect(() => { if (stuck && listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [chat, reactions, stuck]);
+  const who = (id: string) => (id === myId ? 'You' : names.get(id) ?? 'Player');
+  // group a message's reactions by emoji, preserving who reacted and whether I'm one of them
+  const byMessage = new Map<number, Map<string, { count: number; mine: boolean; names: string[] }>>();
+  for (const r of reactions) {
+    let g = byMessage.get(r.message_id); if (!g) { g = new Map(); byMessage.set(r.message_id, g); }
+    let e = g.get(r.emoji); if (!e) { e = { count: 0, mine: false, names: [] }; g.set(r.emoji, e); }
+    e.count++; e.names.push(who(r.user_id)); if (r.user_id === myId) e.mine = true;
+  }
   async function send(e: React.FormEvent) {
     e.preventDefault(); if (!draft.trim()) return;
     setBusy(true); setErr(null);
-    try { await onSend(draft.trim()); setDraft(''); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); }
+    try { await onSend(draft.trim()); setDraft(''); setPicker(false); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); }
   }
+  function addEmoji(e: string) { setDraft((draft + e).slice(0, 500)); inputRef.current?.focus(); }
   return (
     <Sheet title="Table chat" onClose={onClose} turnCue={turnCue} onReturn={onReturn}>
-      <div ref={listRef} onScroll={() => { const el = listRef.current!; setStuck(el.scrollHeight - el.scrollTop - el.clientHeight < 40); }} style={{ maxHeight: '40vh', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div ref={listRef} onScroll={() => { const el = listRef.current!; setStuck(el.scrollHeight - el.scrollTop - el.clientHeight < 40); }} className="chat-list">
         {chat.length === 0 && <p className="fine">No messages yet.</p>}
-        {chat.map((m) => <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}><span className="fine"><b>{m.user_id === myId ? 'You' : names.get(m.user_id) ?? 'Player'}</b> · {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span><span style={{ overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>{m.body}</span></div>)}
+        {chat.map((m) => {
+          const groups = [...(byMessage.get(m.id)?.entries() ?? [])];
+          const mine = m.user_id === myId;
+          return (
+            <div key={m.id} className={`chat-msg ${mine ? 'mine' : ''}`}>
+              <span className="fine"><b>{who(m.user_id)}</b> · {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              <span className="chat-body">{m.body}</span>
+              <div className="react-row">
+                {groups.map(([emoji, g]) => (
+                  <button key={emoji} type="button" className={`react-chip ${g.mine ? 'mine' : ''}`} aria-pressed={g.mine}
+                    aria-label={`${emoji}, ${g.count}, from ${g.names.join(', ')}. Tap to ${g.mine ? 'remove your' : 'add your'} reaction`} title={g.names.join(', ')}
+                    onClick={() => onReact(m.id, emoji, g.mine ? 'remove' : 'add')}><span aria-hidden="true">{emoji}</span><span className="react-n">{g.count}</span></button>
+                ))}
+                <button type="button" className="react-add" aria-label="Add a reaction" aria-expanded={reactFor === m.id} onClick={() => setReactFor(reactFor === m.id ? null : m.id)}>☺＋</button>
+              </div>
+              {groups.length > 0 && <div className="react-who fine">{groups.map(([emoji, g]) => `${emoji} ${g.names.join(', ')}`).join('   ')}</div>}
+              {reactFor === m.id && (
+                <div className="react-grid" role="group" aria-label="Choose a reaction">
+                  {REACTIONS.map((e) => { const mineE = !!byMessage.get(m.id)?.get(e)?.mine; return <button key={e} type="button" className={mineE ? 'on' : undefined} aria-pressed={mineE} onClick={() => { onReact(m.id, e, mineE ? 'remove' : 'add'); setReactFor(null); }}>{e}</button>; })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
       {!stuck && <button type="button" className="btn btn-quiet" onClick={() => { setStuck(true); listRef.current!.scrollTop = listRef.current!.scrollHeight; }}>Jump to newest</button>}
-      <form className="row" onSubmit={send}>
-        <input className="input" aria-label="Message" value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={500} placeholder="Say something" />
+      {picker && (
+        <div className="emoji-grid" role="group" aria-label="Insert an emoji">
+          {COMPOSE_EMOJI.map((e) => <button key={e} type="button" onClick={() => addEmoji(e)}>{e}</button>)}
+        </div>
+      )}
+      <form className="row chat-compose" onSubmit={send}>
+        <button type="button" className="emoji-btn" aria-label={picker ? 'Hide emoji' : 'Add emoji'} aria-expanded={picker} aria-pressed={picker} onClick={() => setPicker((v) => !v)}>☺</button>
+        <input ref={inputRef} className="input" aria-label="Message" value={draft} onChange={(e) => setDraft(e.target.value)} onFocus={() => { setPicker(false); setTimeout(() => inputRef.current?.scrollIntoView({ block: 'nearest' }), 100); }} maxLength={500} placeholder="Say something" />
         <button type="submit" className="btn btn-primary" disabled={busy || !draft.trim()} style={{ minHeight: 48 }}>Send</button>
       </form>
       {err && <div className="error" role="alert">{err}</div>}
