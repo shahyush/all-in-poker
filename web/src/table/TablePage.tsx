@@ -73,6 +73,17 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
     finally { setPending(null); }
   }, [s, row.id, view]);
   const quiet = useCallback(async (type: string, payload: Record<string, unknown> = {}) => { try { await run(type, payload); } catch { /* toast shown */ } }, [run]);
+  // fire-and-forget command that does NOT flip `pending` (so it never disables the action/choice controls)
+  const silent = useCallback(async (type: string, payload: Record<string, unknown> = {}) => { try { await s.transport.cmd(type, payload, row.id); await view.reload(); } catch { /* ignore */ } }, [s, row.id, view]);
+  // Readiness: the moment the chooser's client actually displays the choice, confirm it to the server so the usable
+  // dealer's-choice window is re-anchored from here. This stops cold-start/idle discovery latency from eating the window.
+  const readyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (hand && hand.phase === 'choice' && hand.chooserSeat === mySeat && readyRef.current !== hand.id) {
+      readyRef.current = hand.id;
+      void silent('choice_ready');
+    }
+  }, [hand, hand?.id, hand?.phase, hand?.chooserSeat, mySeat, silent]);
 
   const names = useMemo(() => { const m = new Map<string, string>(); for (const x of t.seats) if (x) m.set(x.playerId, x.name); for (const p of view.participants) if (!m.has(p.user_id)) m.set(p.user_id, p.name); return m; }, [t.seats, view.participants]);
   const presence = useMemo(() => { const m = new Map<string, boolean>(); for (const mm of view.members) m.set(mm.user_id, !!mm.last_seen && now - new Date(mm.last_seen).getTime() < 30000); return m; }, [view.members, now]);

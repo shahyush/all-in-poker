@@ -1,5 +1,5 @@
 import {
-  RULES, act, cancelLeave, chooseVariant, createTable, eligibleToStart, parseChipAmount, propose, renamePlayer,
+  RULES, act, cancelLeave, chooseVariant, choiceReady, createTable, eligibleToStart, parseChipAmount, propose, renamePlayer,
   requestLeave, requestReturn, requestSitOut, respondStraddle, respondVote, reveal, seatOf, seatPlayer, secureCode,
   setPostToPlay, setStraddlePref, startTable, tick, transferHost, validateRules, isChipInt, type Effect, type TableRules, type TableState, type TickContext, type VariantId,
 } from '@allin/engine';
@@ -276,6 +276,7 @@ export class Handlers {
       let effects: Effect[] = [];
       switch (type) {
         case 'choose': effects = chooseVariant(t, seat, String(p.variant) as VariantId, now, ctx); break;
+        case 'choice_ready': effects = choiceReady(t, seat, now, ctx); break;
         case 'straddle': effects = respondStraddle(t, seat, !!p.accept, now, ctx); break;
         case 'act': {
           const a = String(p.action);

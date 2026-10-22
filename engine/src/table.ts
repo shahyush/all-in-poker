@@ -357,7 +357,10 @@ function startNextHand(t: TableState, now: number, ctx: TickContext, effects: Ef
     id: `${t.handNo}-${secureHex(6)}`, handNo: t.handNo, variant: null, phase: 'choice', street: 'preflop',
     button, sbSeat, bbSeat, straddleSeat: null, chooserSeat: chooser, sb, bb, ante, level,
     players, pot: 0, board: [], boards: null, currentBet: 0, lastFullRaise: bb, actor: null, deadline: null, actionReadyAt: null,
-    choiceDeadline: now + T.choiceMs, straddleOffer: null, vote: null, proposedStreets: [], bettingLocked: false, runs: 1,
+    // Start with a generous warm-up cap, not the usable window: after an idle/cold start the chooser's client can take
+    // several seconds to receive and render the choice. The client re-anchors a full `choiceMs` the moment it displays the
+    // choice (chooseReady); if no client ever confirms, the hand still defaults to Hold'em at the cap.
+    choiceDeadline: now + T.choiceWarmupCapMs, choiceArmed: false, straddleOffer: null, vote: null, proposedStreets: [], bettingLocked: false, runs: 1,
     runoutQueue: [], result: null, revealDeadline: null, nextAt: null, startedAt: now, deck: [], cursor: 0, hole: {}, log: [],
   };
   if (cash && t.rules.straddle && dealt.length >= 3 && bbSeat !== null) {
@@ -383,6 +386,19 @@ export function chooseVariant(t: TableState, seat: number, variant: VariantId, n
   if (!variantAllowed(h.players.length, variant)) fail('capacity', 'Not enough cards for that game with this many players');
   dealHand(t, h, variant, now, ctx, false);
   computeDue(t);
+  return effects;
+}
+
+/** The chooser's client confirms it is displaying the choice: re-anchor a full usable window from now (once per hand).
+ *  This keeps cold-start/idle discovery latency from eating the dealer's-choice window without weakening the default. */
+export function choiceReady(t: TableState, seat: number, now: number, ctx: TickContext): Effect[] {
+  const effects = tick(t, now, ctx);
+  const h = t.hand;
+  if (h && h.phase === 'choice' && !h.choiceArmed && h.chooserSeat === seat) {
+    h.choiceArmed = true;
+    h.choiceDeadline = now + T.choiceMs;
+    computeDue(t);
+  }
   return effects;
 }
 

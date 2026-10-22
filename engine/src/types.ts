@@ -107,6 +107,7 @@ export interface HandState {
   deadline: number | null;
   actionReadyAt: number | null;
   choiceDeadline: number | null;
+  choiceArmed: boolean;            // true once the chooser's client has confirmed it sees the choice (deadline re-anchored)
   straddleOffer: { seat: number; decided: boolean; accepted: boolean } | null;
   vote: Vote | null;
   proposedStreets: Street[];

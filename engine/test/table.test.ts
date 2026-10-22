@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeTable, start, autoplay, seededRng, totalChips, ctxAll } from './helpers.ts';
-import { act, legalActions, tick, chooseVariant, propose, respondVote, reveal, respondStraddle, requestLeave, requestSitOut, requestReturn, startTable, seatPlayer, createTable, publicView, privateCards, canRunTwice, EngineError, setStraddlePref } from '../src/table.ts';
+import { act, legalActions, tick, chooseVariant, choiceReady, propose, respondVote, reveal, respondStraddle, requestLeave, requestSitOut, requestReturn, startTable, seatPlayer, createTable, publicView, privateCards, canRunTwice, EngineError, setStraddlePref } from '../src/table.ts';
 import { RULES, variantAllowed } from '../src/rules.ts';
 import type { TableState } from '../src/types.ts';
 
@@ -186,10 +186,10 @@ describe('betting rules', () => {
     const { t, now, ctx } = makeTable([1000, 1000, 1000], { straddle: true });
     startTable(t, now, ctx);
     const utg = t.hand!.straddleOffer!.seat;
-    tick(t, now + T.choiceMs + 1, ctx);
+    tick(t, now + T.choiceWarmupCapMs + 1, ctx);
     expect(t.hand!.phase).toBe('betting');
     expect(t.hand!.straddleSeat).toBeNull();
-    expect(() => respondStraddle(t, utg, true, now + T.choiceMs + 2, ctx)).toThrow();
+    expect(() => respondStraddle(t, utg, true, now + T.choiceWarmupCapMs + 2, ctx)).toThrow();
   });
   it('A23/R4-09: an ante-exhausted UTG does not move the straddle to another seat', () => {
     const { t, now, ctx } = makeTable([1000, 1000, 1000], { straddle: true, ante: 10 });
@@ -206,7 +206,27 @@ describe('betting rules', () => {
     const { t, now, ctx } = makeTable([1000, 1000, 1000]);
     startTable(t, now, ctx);
     const h = t.hand!;
-    expect(() => chooseVariant(t, h.chooserSeat, 'omaha4', now + T.choiceMs + 1, ctx)).toThrow();
+    expect(() => chooseVariant(t, h.chooserSeat, 'omaha4', now + T.choiceWarmupCapMs + 1, ctx)).toThrow();
+    expect(t.hand!.variant).toBe('holdem');
+  });
+  it('choiceReady re-anchors the usable window from first view, so a cold-start pick still registers', () => {
+    const { t, now, ctx } = makeTable([1000, 1000, 1000]);
+    startTable(t, now, ctx);
+    const h = t.hand!;
+    // the chooser's client only sees the choice late (cold start), but still within the warm-up cap
+    const seen = now + T.choiceWarmupCapMs - 2000;
+    choiceReady(t, h.chooserSeat, seen, ctx);
+    expect(h.choiceArmed).toBe(true);
+    expect(h.choiceDeadline).toBe(seen + T.choiceMs);
+    // a pick a few seconds after first view — past the ORIGINAL cap, but within the re-anchored window — registers
+    chooseVariant(t, h.chooserSeat, 'omaha4', seen + 3000, ctx);
+    expect(t.hand!.variant).toBe('omaha4');
+  });
+  it('without a readiness confirmation the choice still defaults at the warm-up cap', () => {
+    const { t, now, ctx } = makeTable([1000, 1000, 1000]);
+    startTable(t, now, ctx);
+    tick(t, now + T.choiceWarmupCapMs + 1, ctx);
+    expect(t.hand!.phase).toBe('betting');
     expect(t.hand!.variant).toBe('holdem');
   });
   it('BUG02/R4: an action after the deadline is rejected and the timeout is applied first', () => {

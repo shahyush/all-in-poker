@@ -9,7 +9,7 @@ export interface ApiRequest { method: string; path: string; headers: Record<stri
 export interface ApiResponse { status: number; body: unknown; headers?: Record<string, string> }
 
 const PRE_ADMISSION = new Set(['admit', 'recover', 'me']);
-const TABLE_CMDS = new Set(['start', 'choose', 'straddle', 'act', 'propose', 'vote', 'reveal', 'sitout', 'return', 'post_pref', 'straddle_pref', 'leave', 'cancel_leave', 'remove', 'reload_request', 'reload_cancel', 'reload_decide', 'chat', 'transfer_host']);
+const TABLE_CMDS = new Set(['start', 'choose', 'choice_ready', 'straddle', 'act', 'propose', 'vote', 'reveal', 'sitout', 'return', 'post_pref', 'straddle_pref', 'leave', 'cancel_leave', 'remove', 'reload_request', 'reload_cancel', 'reload_decide', 'chat', 'transfer_host']);
 
 export class App {
   handlers: Handlers;

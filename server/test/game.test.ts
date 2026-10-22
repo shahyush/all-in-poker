@@ -128,8 +128,9 @@ describe('full cash session through the API', () => {
     expect(st.handNo).toBe(2);
     expect(st.hand.phase).toBe('choice');
     expect((await W.db.select('hand_history', { table_id: tableId })).length).toBe(1);
-    // nobody chooses: once the 15 s window (RULES.timers.choiceMs) lapses the default is Hold'em
-    await W.advanceClock(15100);
+    // no client ever confirms it is viewing the choice, so the window never re-anchors: the hand defaults to Hold'em once
+    // the warm-up cap (RULES.timers.choiceWarmupCapMs) lapses
+    await W.advanceClock(RULES.timers.choiceWarmupCapMs + 1000);
     await W.runJobs();
     st = await W.publicState(tableId);
     expect(st.hand.variant).toBe('holdem'); expect(st.hand.phase).toBe('betting');
@@ -277,7 +278,7 @@ describe('leaving as the result window lapses', () => {
     await y.cmd('join', { code: r.inviteCode, amount: '1000' });
     await x.cmd('start', {}, tid);
     // hand 1 defaults to Hold'em once the 15s choice window lapses
-    await W.advanceClock(RULES.timers.choiceMs + 200); await W.runJobs([tid]);
+    await W.advanceClock(RULES.timers.choiceWarmupCapMs + 1000); await W.runJobs([tid]);
     let st = await W.publicState(tid);
     expect(st.hand.phase).toBe('betting');
     // heads-up: the first actor (button/SB) folds -> uncontested -> result phase with a short next-hand window
@@ -300,5 +301,31 @@ describe('leaving as the result window lapses', () => {
     // chip conservation: the remaining stack plus the leaver's cashed-out chips equal the two 1,000 buy-ins
     const xStack = Number(st.seats.find((s: { playerId: string } | null) => s && s.playerId === x.player!.id)!.stack);
     expect(xStack + Number(part.taken_off)).toBe(2000);
+  });
+});
+
+describe('dealer\'s choice readiness (cold start)', () => {
+  it('choice_ready re-anchors the window so a chooser who loads late still registers a pick', async () => {
+    const extra = [new Client(W.app, W.db), new Client(W.app, W.db)];
+    for (const [i, c] of extra.entries()) { await c.signIn(); await c.admit('Rd' + i); }
+    const [x, y] = extra;
+    const r = await x.cmd<{ tableId: string; inviteCode: string }>('create_table', { rules: { ...cashRules, name: 'ColdChoice', seats: '2' }, buyIn: '1000' });
+    const tid = r.tableId;
+    await y.cmd('join', { code: r.inviteCode, amount: '1000' });
+    await x.cmd('start', {}, tid);
+    let st = await W.publicState(tid);
+    expect(st.hand.phase).toBe('choice');
+    const chooserPid = st.seats[st.hand.chooserSeat].playerId;
+    const chooser = [x, y].find((c) => c.player!.id === chooserPid)!;
+    // the chooser only receives/renders the choice well past the old 15 s window, but within the warm-up cap
+    await W.advanceClock(20_000);
+    await chooser.cmd('choice_ready', {}, tid);
+    st = await W.publicState(tid);
+    expect(st.hand.phase).toBe('choice');   // not defaulted: the cap absorbed the cold-start latency
+    expect(st.hand.choiceArmed).toBe(true);
+    // and the deliberate pick now registers rather than losing to the timeout default
+    await chooser.cmd('choose', { variant: 'omaha4' }, tid);
+    st = await W.publicState(tid);
+    expect(st.hand.variant).toBe('omaha4');
   });
 });

@@ -12,6 +12,7 @@ export const RULES = {
   defaultVariant: 'holdem' as VariantId,
   timers: {
     choiceMs: 15000,
+    choiceWarmupCapMs: 30000,
     bettingMs: 30000,
     voluntaryVoteMs: 8000,
     forcedOfferMs: 5000,
