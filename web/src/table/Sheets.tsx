@@ -86,7 +86,7 @@ export function ChatSheet({ chat, reactions, names, myId, onSend, onReact, onClo
       <form className="row chat-compose" onSubmit={send}>
         <button type="button" className="emoji-btn" aria-label={picker ? 'Hide emoji' : 'Add emoji'} aria-expanded={picker} aria-pressed={picker} onClick={() => setPicker((v) => !v)}>☺</button>
         <input ref={inputRef} className="input" aria-label="Message" value={draft} onChange={(e) => write(e.target.value)} onFocus={() => { setPicker(false); setTimeout(() => inputRef.current?.scrollIntoView({ block: 'nearest' }), 100); }} maxLength={500} placeholder="Say something" />
-        <button type="submit" className="btn btn-primary" disabled={busy || !draft.trim()} style={{ minHeight: 48 }}>Send</button>
+        <button type="submit" className="btn btn-primary" disabled={!draft.trim()} aria-busy={busy} style={{ minHeight: 48 }}>Send</button>
       </form>
       {err && <div className="error" role="alert">{err}</div>}
     </Sheet>
