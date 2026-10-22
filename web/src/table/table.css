@@ -68,8 +68,22 @@
 .hand-label[aria-pressed="true"] { background: color-mix(in srgb, var(--accent-table) 18%, var(--seat)); }
 .hand-label .hint { color: var(--game-muted); font-size: 11px; }
 .pc.dim { opacity: 0.35; }
-.pc.flip { animation: flip 240ms ease-out; }
-@keyframes flip { from { transform: rotateY(90deg); opacity: 0.4; } to { transform: none; opacity: 1; } }
+.pc.flip { animation: flip 360ms cubic-bezier(.2,.75,.25,1) both; transform-origin: center; }
+@keyframes flip { 0% { transform: rotateY(92deg) scale(.9); opacity: 0; } 55% { opacity: 1; } 70% { transform: rotateY(0) scale(1.06); } 100% { transform: none; opacity: 1; } }
+/* tap feedback: every interactive control gives an immediate press response */
+.btn-game, .dock button, .choice-grid button, .hand-label, .g-icon, .reveal-row button, .propose-row button, .seat-cards button { transition: transform 90ms ease, filter 90ms ease; }
+.btn-game:active:not(:disabled), .dock button:active:not(:disabled), .choice-grid button:active:not(:disabled), .hand-label:active, .g-icon:active, .reveal-row button:active:not(:disabled), .propose-row button:active:not(:disabled) { transform: scale(.96); filter: brightness(.9); }
+/* win + all-in emphasis */
+.seat.is-winner .seat-core { box-shadow: 0 0 0 2px var(--accent-table), 0 0 22px color-mix(in srgb, var(--accent-table) 55%, transparent); animation: winpulse 900ms ease-out 2; }
+@keyframes winpulse { 0%,100% { box-shadow: 0 0 0 2px var(--accent-table), 0 0 14px color-mix(in srgb,var(--accent-table) 35%, transparent); } 50% { box-shadow: 0 0 0 3px var(--accent-table), 0 0 30px color-mix(in srgb,var(--accent-table) 70%, transparent); } }
+.pot.pot-won b { animation: potpop 700ms ease-out; display: inline-block; }
+@keyframes potpop { 0% { transform: scale(1); } 40% { transform: scale(1.22); color: var(--accent-table); } 100% { transform: scale(1); } }
+.seat.is-allin .seat-core { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-table) 70%, #fff 10%); }
+@media (prefers-reduced-motion: reduce) {
+  .pc.flip { animation: none; }
+  .btn-game:active, .dock button:active, .choice-grid button:active, .hand-label:active, .g-icon:active { transform: none; }
+  .seat.is-winner .seat-core, .pot.pot-won b { animation: none; }
+}
 .fly { position: fixed; z-index: 15; pointer-events: none; }
 
 /* hero */
@@ -88,7 +102,7 @@
 .dock button { min-height: 52px; border-radius: 12px; font-weight: 700; font-size: 16px; }
 .dock .fold { background: var(--seat); color: var(--game-text); }
 .dock .call { background: var(--paper); color: var(--ink); }
-.dock .raise { background: var(--accent-table); color: var(--on-accent); }
+.dock .raise { background: var(--accent-table); color: var(--on-table); }
 .dock button:disabled { opacity: 0.45; }
 .dock-note { font-size: 13px; color: var(--game-muted); text-align: center; min-height: 18px; }
 .propose-row { display: flex; gap: 8px; justify-content: center; }

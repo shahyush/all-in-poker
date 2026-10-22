@@ -777,7 +777,9 @@ function settle(t: TableState, h: HandState, now: number, uncontested: boolean):
   h.pot = 0;
   h.result = { uncontested, winnerSeat: uncontested ? h.players.find(live)!.seat : null, refunds, pots, awards, totals, boards, shows };
   h.phase = 'result'; h.actor = null; h.deadline = null; h.vote = null;
-  h.nextAt = now + T.awardToNextChoiceMs;
+  // an uncontested winner gets a usable window to show a card (and the hand lingers that long so the other player
+  // actually receives it); a contested showdown already shows every live hand, so it moves on at the normal pace.
+  h.nextAt = now + (uncontested ? T.revealMs : T.awardToNextChoiceMs);
   h.revealDeadline = uncontested ? h.nextAt : null;
   if (!uncontested) event(t, h, now, { type: 'showdown' });
   event(t, h, now, { type: 'award', awards: Object.entries(totals).map(([s, a]) => ({ seat: +s, amount: a })) });
@@ -804,6 +806,9 @@ export function reveal(t: TableState, seat: number, what: number[] | 'all' | 'mu
     const cards = fresh.map((i) => h.hole[seat][i]);
     h.log.push({ t: 'reveal', seat, indices: fresh, cards });
     event(t, h, now, { type: 'reveal', seat, indices: fresh, cards });
+    // hold the result open a few seconds after the reveal so the other player's client receives and shows the card
+    h.nextAt = Math.max(h.nextAt ?? now, now + T.awardToNextChoiceMs);
+    h.revealDeadline = h.nextAt;
   }
   computeDue(t);
   return effects;

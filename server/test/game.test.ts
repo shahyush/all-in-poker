@@ -290,7 +290,7 @@ describe('leaving as the result window lapses', () => {
     expect(st.hand.phase).toBe('result');
     // the result window lapses BEFORE the leave request is processed (the live race). The leave command ticks first, so
     // with the pre-tick leave flag the boundary cashes the leaver out now rather than dealing them a fresh hand.
-    await W.advanceClock(RULES.timers.awardToNextChoiceMs + 500);
+    await W.advanceClock(RULES.timers.revealMs + 500);
     await y.cmd('leave', {}, tid);
     st = await W.publicState(tid);
     expect(st.seats.some((s: { playerId: string } | null) => s && s.playerId === y.player!.id)).toBe(false); // cashed out

@@ -62,20 +62,17 @@ test('reconnect, rotation, uncontested reveal, reload approval and run it twice'
   await expect(g.page.locator('.own-cards .pc:not(.back)')).toHaveCount(2);
   await g.page.screenshot({ path: 'test-results/shots/10-rotated.png' });
   await g.page.setViewportSize({ width: 390, height: 844 });
-  // uncontested: first actor folds; the winner gets a 3s reveal window and shows one card
+  // uncontested: first actor folds; the winner reveals one card, which MUST propagate to the opponent.
   const first = (await turnOf(pages))!;
   const winner = first === h.page ? g.page : h.page;
   await actWhenMyTurn(first, 'Fold');
-  // 3 s uncontested reveal window: click the first card the instant it is offered. Landing it within 3 s on the live
-  // transport is a best-effort race (if it lapses the winner correctly mucks); reveal correctness is covered by the
-  // engine unit tests. Verify propagation when it lands, otherwise continue — don't fail the rest of the journey.
+  // The uncontested pot lingers the full reveal window (revealMs), and a landed reveal re-extends the linger so the
+  // shown card reaches every client before the next hand. This is a hard assertion now, not a best-effort race:
+  // the winner taps the first card, then the folded opponent must see a face-up card in the winner's seat.
   const revealBtn = winner.getByRole('button', { name: /Tap to show: card 1/ });
-  const revealed = await revealBtn.click({ timeout: 6000 }).then(() => true).catch(() => false);
-  if (revealed) {
-    const sawIt = await first.locator('.seat .pc:not(.back)').first().waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
-    console.log(`[reveal] winner revealed a card; opponent saw it within window: ${sawIt}`);
-    await winner.screenshot({ path: 'test-results/shots/11-reveal.png' });
-  } else { console.log('[reveal] 3 s window lapsed before the reveal registered (winner mucked, per spec)'); }
+  await revealBtn.click({ timeout: 6000 });
+  await expect(first.locator('.seat .pc:not(.back)').first()).toBeVisible({ timeout: 8000 });
+  await winner.screenshot({ path: 'test-results/shots/11-reveal.png' });
   await expect(h.page.locator('.g-stakes')).toContainText('Hand 2', { timeout: 20_000 });
   await chooseIfAsked(pages, /Omaha 5/);
   // reload: guest requests, host approves; credited at the next boundary only

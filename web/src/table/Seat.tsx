@@ -24,7 +24,7 @@ export function SeatView({ index, seat, hand, pos, betPos, isHost, present, now,
   const remaining = actor && hand?.deadline ? Math.max(0, hand.deadline - now) / 30000 : 0;
   const backs = hp && !hp.folded && !shownCards ? hp.holeCount : 0;
   return (
-    <div className={`seat ${actor ? 'is-actor' : ''} ${hp?.folded ? 'is-folded' : ''}`} style={{ left: pos.left + '%', top: pos.top + '%' }} data-seat={index} aria-label={label} role="group">
+    <div className={`seat ${actor ? 'is-actor' : ''} ${hp?.folded ? 'is-folded' : ''} ${won != null && won > 0 ? 'is-winner' : ''} ${hp?.allIn && !hp.folded ? 'is-allin' : ''}`} style={{ left: pos.left + '%', top: pos.top + '%' }} data-seat={index} aria-label={label} role="group">
       <div className="seat-cards" aria-hidden={shownCards ? undefined : 'true'}>
         {shownCards ? shownCards.map((c, i) => <PlayingCard key={i} card={c} size="sm" win={!!winCards && winCards.includes(c)} dim={!!winCards && !winCards.includes(c)} flip />)
           : Array.from({ length: Math.min(backs, 6) }).map((_, i) => <span key={i} className="pc back sm" data-slot={i} style={{ marginLeft: i ? -8 : 0, opacity: 0.95 }} />)}

@@ -16,7 +16,7 @@ export const RULES = {
     bettingMs: 30000,
     voluntaryVoteMs: 8000,
     forcedOfferMs: 5000,
-    revealMs: 3000,
+    revealMs: 6000,
     awardToNextChoiceMs: 3000,
     dealPresentationMaxMs: 1500,
     boardStageMs: 1100,

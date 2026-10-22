@@ -486,14 +486,14 @@ describe('result, reveal and next hand', () => {
     expect(() => reveal(t, w, [0], n + 300, ctx)).toThrow();
     expect(publicView(t).hand!.revealedCards[w].length).toBe(1);
   });
-  it('next hand starts 3 seconds after the award regardless of reveals; reveal never delays it', () => {
+  it('an uncontested pot lingers the reveal window so a shown card propagates before the next hand', () => {
     const { t, now, ctx } = makeTable([1000, 1000, 1000]);
     const n = start(t, now, ctx);
     const h = t.hand!;
     act(t, h.actor!, { type: 'fold' }, n, ctx);
     act(t, h.actor!, { type: 'fold' }, n, ctx);
-    expect(t.dueAt).toBe(n + T.awardToNextChoiceMs);
-    tick(t, n + T.awardToNextChoiceMs, ctx);
+    expect(t.dueAt).toBe(n + T.revealMs);
+    tick(t, n + T.revealMs, ctx);
     expect(t.handNo).toBe(2);
     expect(t.hand!.phase).toBe('choice');
   });
@@ -503,9 +503,9 @@ describe('result, reveal and next hand', () => {
     const h = t.hand!;
     act(t, h.actor!, { type: 'fold' }, n, ctx); act(t, h.actor!, { type: 'fold' }, n, ctx);
     const gone = { ...ctx, presence: {} };
-    tick(t, n + T.awardToNextChoiceMs, gone);
+    tick(t, n + T.revealMs, gone);
     expect(t.hand).toBeNull(); expect(t.waitingReason).toMatch(/return/);
-    tick(t, n + T.awardToNextChoiceMs + 5000, ctxAll(t, n + T.awardToNextChoiceMs + 5000, ctx.rng));
+    tick(t, n + T.revealMs + 5000, ctxAll(t, n + T.revealMs + 5000, ctx.rng));
     expect(t.hand).not.toBeNull();
   });
 });

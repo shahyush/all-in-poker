@@ -42,6 +42,10 @@ h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 24px; 
 .btn-quiet { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; min-height: 44px; padding: 0 6px; font-size: 15px; }
 .btn-danger { color: var(--danger); border: 1px solid var(--line); }
 .btn:disabled { opacity: 0.5; }
+/* tap feedback across the flow screens: host, join, buy-in, seating, sheets */
+.btn, .chip, .seg button, .sheet-close, .list-row { transition: transform 90ms ease, filter 90ms ease; }
+.btn:active:not(:disabled), .chip:active, .seg button:active, .sheet-close:active, .list-row:active { transform: scale(0.97); filter: brightness(0.95); }
+@media (prefers-reduced-motion: reduce) { .btn:active, .chip:active, .seg button:active, .sheet-close:active, .list-row:active { transform: none; } }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 label.field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600; }
 .input { width: 100%; height: 48px; border: 1px solid var(--line); border-radius: var(--r-btn); padding: 0 12px; background: var(--paper); color: var(--ink); font-size: 16px; }

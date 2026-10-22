@@ -52,14 +52,17 @@ export function Centre({ t, hand, now, mySeat, busy, chosen, onChoose, onStraddl
   return (
     <div className="centre">
       {!res && <div className="pot">Pot<b>{fmt(pot)}</b></div>}
-      {boards.map((b, bi) => (
+      {boards.map((b, bi) => {
+        const freshOrder = b.cards.map((c, i) => (newBoardKeys.has(`${bi}:${c}`) ? i : -1)).filter((i) => i >= 0);
+        return (
         <div key={bi} className="stack" style={{ gap: 2, alignItems: 'center' }}>
           {b.label && <div className="board-label">{b.label}</div>}
           <div className="board" aria-label={b.label ?? 'Community cards'}>
-            {Array.from({ length: 5 }).map((_, i) => (b.cards[i] !== undefined ? <PlayingCard key={b.cards[i]} card={b.cards[i]} win={res ? winCards.has(b.cards[i]) : false} dim={res ? winCards.size > 0 && !winCards.has(b.cards[i]) : false} hi={!res && !!madeBoard?.has(b.cards[i])} flip={newBoardKeys.has(`${bi}:${b.cards[i]}`)} /> : <SlotCard key={'s' + i} />))}
+            {Array.from({ length: 5 }).map((_, i) => { if (b.cards[i] === undefined) return <SlotCard key={'s' + i} />; const fresh = newBoardKeys.has(`${bi}:${b.cards[i]}`); return <PlayingCard key={b.cards[i]} card={b.cards[i]} win={res ? winCards.has(b.cards[i]) : false} dim={res ? winCards.size > 0 && !winCards.has(b.cards[i]) : false} hi={!res && !!madeBoard?.has(b.cards[i])} flip={fresh} delayMs={fresh ? freshOrder.indexOf(i) * 90 : undefined} />; })}
           </div>
         </div>
-      ))}
+        );
+      })}
       {!res && <div className="board-label">{hand.street === 'preflop' && hand.board.length === 0 ? 'Pre-flop' : hand.street}</div>}
       {hand.phase === 'vote' && hand.vote && (
         <div className="centre-card" role="group" aria-label="Runout proposal">
