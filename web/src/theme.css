@@ -110,3 +110,6 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; 
 .toast { position: fixed; left: 50%; bottom: calc(16px + var(--safe-b)); transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 30; max-width: 90vw; }
 
 @media (prefers-reduced-motion: reduce) { .motion { transition: none !important; animation: none !important; } }
+/* in-app "Reduce motion" preference (overrides even when the OS setting is off): kill transitions and keyframes */
+:root[data-reduce-motion] * { animation: none !important; transition: none !important; }
+:root[data-reduce-motion] .chip-sweep { display: none; }

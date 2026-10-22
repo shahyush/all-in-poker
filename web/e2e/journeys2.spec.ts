@@ -74,6 +74,8 @@ test('reconnect, rotation, uncontested reveal, reload approval and run it twice'
   await expect(first.locator('.seat .pc:not(.back)').first()).toBeVisible({ timeout: 8000 });
   await winner.screenshot({ path: 'test-results/shots/11-reveal.png' });
   await expect(h.page.locator('.g-stakes')).toContainText('Hand 2', { timeout: 20_000 });
+  // the compact last-hand recap names the previous hand's winner and award (uncontested here) without exposing mucked cards
+  await expect(h.page.locator('.g-recap')).toContainText(/won/, { timeout: 10_000 });
   await chooseIfAsked(pages, /Omaha 5/);
   // reload: guest requests, host approves; credited at the next boundary only
   await g.page.getByRole('button', { name: 'Table menu' }).click();

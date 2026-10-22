@@ -11,6 +11,7 @@ import { AccountsSheet, ChatSheet, MenuSheet, PotSheet, ReloadSheet, RulesSheet 
 import { betPosition, seatPositions } from './geometry.ts';
 import { reducedMotionPreferred, runDealAnimation } from './animator.ts';
 import { limitLabel, variantLabel } from '../lib/format.ts';
+import { playCue } from '../lib/sound.ts';
 import { fmt } from '../components/ui.tsx';
 import './table.css';
 
@@ -124,6 +125,11 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const marker = (p: { left: number; top: number }, f: number) => ({ left: (p.left + (50 - p.left) * f) + '%', top: (p.top + (50 - p.top) * f) + '%' });
   const legal = hand?.phase === 'betting' && hand.actor === mySeat ? hand.actorLegal : null;
   const myTurn = !!legal?.canAct && hand?.phase === 'betting';
+  // optional sound cues (no-op unless the player turned them on): a chime on the rising edge of our turn, and on a win
+  const cuedTurn = useRef(false);
+  useEffect(() => { if (myTurn && !cuedTurn.current) { cuedTurn.current = true; playCue('turn'); } else if (!myTurn) cuedTurn.current = false; }, [myTurn]);
+  const wonCueRef = useRef<string | null>(null);
+  useEffect(() => { if (hand?.result && (hand.result.totals[mySeat] ?? 0) > 0 && wonCueRef.current !== hand.id) { wonCueRef.current = hand.id; playCue('win'); } }, [hand?.id, hand?.result, mySeat]);
   const turnCue = myTurn ? `Your turn${legal!.owed ? ` · ${fmt(legal!.call)} to call` : ''}` : hand?.phase === 'choice' && hand.chooserSeat === mySeat ? 'Your deal: pick the game' : null;
   const unread = seenChat < 0 ? 0 : view.chat.filter((c) => c.id > seenChat && c.user_id !== me.id).length;
   useEffect(() => { if (sheet === 'chat' && view.chat.length) setSeenChat(view.chat[view.chat.length - 1].id); }, [sheet, view.chat]);
@@ -149,6 +155,20 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const winCardsBySeat = new Map<number, Card[]>();
   if (hand?.result) for (const a of hand.result.awards) for (const w of a.winners) winCardsBySeat.set(w.seat, [...(winCardsBySeat.get(w.seat) ?? []), ...w.cards]);
 
+  // Compact last-hand recap: captured when a hand settles, shown through the next hand. Winner, amount and the made-hand
+  // name only — never a mucked hole card (we read awards/totals, which expose nothing a loser kept face-down).
+  const [recap, setRecap] = useState<{ handNo: number; uncontested: boolean; wins: { who: string; amount: number; hand: string }[] } | null>(null);
+  const recapForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!hand?.result || recapForRef.current === hand.id) return;
+    recapForRef.current = hand.id;
+    const res = hand.result;
+    const cat = new Map<number, string>();
+    for (const a of res.awards) for (const w of a.winners) if (w.name) cat.set(w.seat, w.name);
+    const wins = Object.entries(res.totals).map(([seat, amount]) => ({ who: t.seats[+seat]?.name ?? 'Seat', amount: amount as number, hand: cat.get(+seat) ?? '' })).filter((w) => w.amount > 0);
+    if (wins.length) setRecap({ handNo: hand.handNo, uncontested: res.uncontested, wins });
+  }, [hand?.id, hand?.result, hand?.handNo, t.seats]);
+
   return (
     <div className="game" ref={rootRef}>
       <div className="g-head">
@@ -163,6 +183,12 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
           </button>
         </div>
         <div className="g-stakes">{stakes.map((x, i) => <span key={i}>{i === 0 ? <b>{x}</b> : x}</span>)}{hand && <span>Hand {hand.handNo}</span>}</div>
+        {recap && (!hand?.result || hand.handNo !== recap.handNo) && (
+          <div className="g-recap" role="status" aria-label="Last hand result">
+            <span className="g-recap-tag">Last hand</span>
+            <span className="g-recap-body">{recap.wins.map((w, i) => <span key={i}>{i > 0 ? ' · ' : ''}{w.who} won {fmt(w.amount)}{w.hand ? ` — ${w.hand}` : recap.uncontested ? ' — uncontested' : ''}</span>)}</span>
+          </div>
+        )}
         <div className="g-notice" role="status">{notice}</div>
       </div>
       <div className="g-surface">

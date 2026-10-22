@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PublicHand, PublicTable, TableRules } from '@allin/engine/public';
 import { REACTIONS } from '@allin/engine/public';
+import { soundEnabled, setSoundEnabled, playCue } from '../lib/sound.ts';
 import { Sheet, KV, fmt } from '../components/ui.tsx';
 import type { ChatRow, LedgerRow, MemberRow, ParticipantRow, ReactionRow, ReloadRow } from '../state/table.ts';
 
@@ -167,7 +168,8 @@ export function MenuSheet(p: { t: PublicTable; rules: TableRules; myId: string; 
         <div className="grid2"><button type="button" className="btn btn-secondary" onClick={() => { void p.run('return', { post: false }); p.onClose(); }}>I'm back · wait for BB</button><button type="button" className="btn btn-secondary" onClick={() => { void p.run('return', { post: true }); p.onClose(); }}>Post and play</button></div>
       ))}
       {me && cash && p.rules.straddle && <label className="toggle"><span>Straddle automatically when I'm first to act</span><input type="checkbox" checked={me.straddlePref} onChange={(e) => void p.run('straddle_pref', { pref: e.target.checked })} /></label>}
-      <label className="toggle"><span>Reduce motion</span><input type="checkbox" defaultChecked={localStorage.getItem('allin.reducedMotion') === '1'} onChange={(e) => localStorage.setItem('allin.reducedMotion', e.target.checked ? '1' : '0')} /></label>
+      <label className="toggle"><span>Reduce motion</span><input type="checkbox" defaultChecked={localStorage.getItem('allin.reducedMotion') === '1'} onChange={(e) => { try { localStorage.setItem('allin.reducedMotion', e.target.checked ? '1' : '0'); } catch { /* ignore */ } document.documentElement.toggleAttribute('data-reduce-motion', e.target.checked); }} /></label>
+      <label className="toggle"><span>Sound effects</span><input type="checkbox" defaultChecked={soundEnabled()} onChange={(e) => { setSoundEnabled(e.target.checked); if (e.target.checked) playCue('turn'); }} /></label>
       {p.isHost && (
         <div className="stack" style={{ gap: 6 }}>
           <div className="eyebrow">Host</div>

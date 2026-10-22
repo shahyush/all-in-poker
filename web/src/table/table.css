@@ -8,6 +8,9 @@
 .g-stakes { display: flex; gap: 10px; font-size: 13px; color: var(--game-muted); flex-wrap: wrap; }
 .g-stakes b { color: var(--game-text); font-weight: 600; }
 .g-notice { font-size: 13px; color: var(--game-muted); min-height: 18px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.g-recap { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--game-text); min-width: 0; }
+.g-recap-tag { flex: none; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--on-table); background: var(--accent-table); border-radius: 4px; padding: 1px 6px; }
+.g-recap-body { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 .g-surface { position: relative; margin: 2px max(10px, var(--safe-r)) 0 max(10px, var(--safe-l)); min-height: 0; }
 .felt { position: absolute; inset: 8% 4%; border-radius: 48% / 36%; background: var(--table); box-shadow: inset 0 0 0 2px var(--table-line), inset 0 0 60px rgba(0,0,0,0.25); }
