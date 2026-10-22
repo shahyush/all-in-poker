@@ -50,8 +50,9 @@ export function InvitePage({ code, go }: { code: string; go: (to: string, replac
                 <Field label={`Or a number of ${fmt(unit)}-chip units`} inputMode="numeric" value={mult} onChange={setMult} error={m === null || m <= 0 ? 'Enter a whole number of units' : null} hint={total ? `Buy-in ${fmt(total)}` : undefined} />
               </>
             )}
-            {err && <div className="error" role="alert">{err}</div>}
-            <button type="button" className="btn btn-primary" disabled={busy || (p.mode === 'cash' && !total)} onClick={join}>{p.mode === 'cash' ? `Join table · buy-in ${fmt(total ?? 0)}` : `Join tournament · ${fmt(unit)} chips`}</button>
+            {err && <div className="error" role="alert">{err}{busy ? '' : <> · <button type="button" className="btn-quiet" style={{ minHeight: 'auto', padding: 0 }} onClick={join}>Try again</button></>}</div>}
+            <button type="button" className="btn btn-primary" disabled={busy || (p.mode === 'cash' && !total)} onClick={join} aria-busy={busy}>{busy ? 'Joining…' : p.mode === 'cash' ? `Join table · buy-in ${fmt(total ?? 0)}` : `Join tournament · ${fmt(unit)} chips`}</button>
+            {busy && <p className="fine" role="status" aria-live="polite">Taking your seat… the table may be waking up, this can take a few seconds.</p>}
             <p className="fine">Play chips only. Joining takes a seat and records your buy-in once against your player.</p>
           </div>
         )}

@@ -16,8 +16,11 @@ async function hostTable(page: Page, opts: { name: string; units?: string; strad
 async function joinVia(page: Page, url: string, units = '2,000') {
   await page.goto(url);
   await page.getByRole('button', { name: units }).click();
+  const t0 = Date.now();
   await page.getByRole('button', { name: /Join table/ }).click();
+  const sawFeedback = await page.getByText(/Taking your seat/).isVisible({ timeout: 2500 }).catch(() => false);
   await expect(page.getByText(/starts the game/)).toBeVisible({ timeout: 30_000 }); // cold edge/realtime start can be slow
+  console.log(`[join] reached the lobby in ${Date.now() - t0} ms; "Joining…" feedback shown: ${sawFeedback}`);
 }
 async function turnOf(pages: Page[]): Promise<Page | null> {
   // isEnabled() waits for a missing element (forever with no timeout); a page that has left the table has no action bar

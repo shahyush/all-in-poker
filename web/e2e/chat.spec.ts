@@ -14,8 +14,12 @@ async function hostTable(page: Page, name: string): Promise<string> {
 async function joinVia(page: Page, url: string) {
   await page.goto(url);
   await page.getByRole('button', { name: '2,000' }).click();
+  const t0 = Date.now();
   await page.getByRole('button', { name: /Join table/ }).click();
+  // the player must get immediate feedback the join is working, not a frozen button (checked right after the tap)
+  const sawFeedback = await page.getByText(/Taking your seat/).isVisible({ timeout: 2500 }).catch(() => false);
   await expect(page.getByText(/starts the game/)).toBeVisible({ timeout: 30_000 }); // cold edge/realtime start can be slow
+  console.log(`[join] reached the lobby in ${Date.now() - t0} ms; "Joining…" feedback shown: ${sawFeedback}`);
 }
 const openChat = (p: Page) => p.getByRole('button', { name: /Chat/ }).click();
 const bodies = (p: Page) => p.locator('.chat-msg .chat-body');
@@ -90,4 +94,44 @@ test('table chat and reactions across two separate player sessions', async ({ br
   const sb = (await g.page.getByRole('button', { name: 'Send' }).boundingBox())!;
   expect(ib.y + ib.height).toBeLessThanOrEqual(vh);
   expect(sb.y + sb.height).toBeLessThanOrEqual(vh);
+});
+
+// Rapid fire: send several messages back to back and keep typing while earlier ones are still in flight. With the
+// optimistic clear nothing is lost, duplicated or wiped; and when a send fails (offline) both the failed message and
+// any newer draft are preserved in the box for the player to resend.
+test('rapid chat sends preserve every message, never duplicate, and keep text on a failed send', async ({ browser }) => {
+  test.setTimeout(180_000);
+  const h = await player(browser, 'Rohan');
+  const g = await player(browser, 'Meera');
+  const url = await hostTable(h.page, 'Rapids');
+  await joinVia(g.page, url);
+  await h.page.getByRole('button', { name: 'Start the game' }).click();
+  for (const p of [h.page, g.page]) await expect(p.locator('.game')).toBeVisible();
+  await openChat(h.page);
+  await openChat(g.page);
+
+  const input = h.page.getByLabel('Message');
+  const burst = ['r1', 'r2', 'r3', 'r4', 'r5'];
+  // fire them as fast as the UI allows — Enter submits, the box clears at once, the next is typed while the last is pending
+  for (const m of burst) { await input.fill(m); await input.press('Enter'); }
+  // every message reaches the guest exactly once; none dropped, none duplicated
+  await expect(bodies(g.page)).toHaveCount(5, { timeout: 30_000 });
+  for (const m of burst) expect(await bodies(g.page).filter({ hasText: new RegExp(`^${m}$`) }).count()).toBe(1);
+  await expect(bodies(h.page)).toHaveCount(5);
+
+  // typing after the burst is never cleared when the last in-flight send resolves
+  await input.fill('still composing');
+  await h.page.waitForTimeout(1500);
+  await expect(input).toHaveValue('still composing');
+
+  // a failed send (offline) keeps its own text AND anything typed while it was failing
+  await h.ctx.setOffline(true);
+  await input.fill('will fail');
+  await input.press('Enter');
+  await input.fill('typed after');            // a newer draft entered while the send is failing
+  await expect.poll(async () => input.inputValue(), { timeout: 25_000 }).toContain('will fail');
+  expect(await input.inputValue()).toContain('typed after');
+  await h.ctx.setOffline(false);
+  // nothing extra leaked to the guest: the offline message was never delivered, so the count is unchanged
+  await expect(bodies(g.page)).toHaveCount(5);
 });

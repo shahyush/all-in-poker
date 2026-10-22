@@ -21,6 +21,9 @@ export function ChatSheet({ chat, reactions, names, myId, onSend, onReact, onClo
   const [stuck, setStuck] = useState(true);
   const [picker, setPicker] = useState(false);          // compose emoji picker
   const [reactFor, setReactFor] = useState<number | null>(null); // which message's reaction picker is open
+  // mirror the draft synchronously so a failed send can be reconciled against whatever the player has typed since
+  const draftRef = useRef(draft);
+  const write = (v: string) => { const s = v.slice(0, 500); draftRef.current = s; setDraft(s); };
   useEffect(() => { if (stuck && listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [chat, reactions, stuck]);
   const who = (id: string) => (id === myId ? 'You' : names.get(id) ?? 'Player');
   // group a message's reactions by emoji, preserving who reacted and whether I'm one of them
@@ -34,11 +37,17 @@ export function ChatSheet({ chat, reactions, names, myId, onSend, onReact, onClo
     e.preventDefault();
     const body = draft.trim(); if (!body) return;
     // clear optimistically so the input is free for the next message the instant this one is sent; a rapid second
-    // message (or fast typing during the round-trip) is never wiped. Restore the text only if the send fails.
-    setErr(null); setDraft(''); setPicker(false); setBusy(true);
-    try { await onSend(body); } catch (x) { setErr((x as Error).message); setDraft(body); } finally { setBusy(false); }
+    // message (or fast typing during the round-trip) is never wiped.
+    setErr(null); write(''); setPicker(false); setBusy(true);
+    try { await onSend(body); }
+    catch (x) {
+      setErr((x as Error).message);
+      // the send failed: put the failed message back, keeping anything the player typed in the meantime (both survive)
+      const newer = draftRef.current.trim();
+      write(newer && newer !== body ? `${body}\n${newer}` : body);
+    } finally { setBusy(false); }
   }
-  function addEmoji(e: string) { setDraft((draft + e).slice(0, 500)); inputRef.current?.focus(); }
+  function addEmoji(e: string) { write(draftRef.current + e); inputRef.current?.focus(); }
   return (
     <Sheet title="Table chat" onClose={onClose} turnCue={turnCue} onReturn={onReturn}>
       <div ref={listRef} onScroll={() => { const el = listRef.current!; setStuck(el.scrollHeight - el.scrollTop - el.clientHeight < 40); }} className="chat-list">
@@ -76,7 +85,7 @@ export function ChatSheet({ chat, reactions, names, myId, onSend, onReact, onClo
       )}
       <form className="row chat-compose" onSubmit={send}>
         <button type="button" className="emoji-btn" aria-label={picker ? 'Hide emoji' : 'Add emoji'} aria-expanded={picker} aria-pressed={picker} onClick={() => setPicker((v) => !v)}>☺</button>
-        <input ref={inputRef} className="input" aria-label="Message" value={draft} onChange={(e) => setDraft(e.target.value)} onFocus={() => { setPicker(false); setTimeout(() => inputRef.current?.scrollIntoView({ block: 'nearest' }), 100); }} maxLength={500} placeholder="Say something" />
+        <input ref={inputRef} className="input" aria-label="Message" value={draft} onChange={(e) => write(e.target.value)} onFocus={() => { setPicker(false); setTimeout(() => inputRef.current?.scrollIntoView({ block: 'nearest' }), 100); }} maxLength={500} placeholder="Say something" />
         <button type="submit" className="btn btn-primary" disabled={busy || !draft.trim()} style={{ minHeight: 48 }}>Send</button>
       </form>
       {err && <div className="error" role="alert">{err}</div>}
