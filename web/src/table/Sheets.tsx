@@ -31,9 +31,12 @@ export function ChatSheet({ chat, reactions, names, myId, onSend, onReact, onClo
     e.count++; e.names.push(who(r.user_id)); if (r.user_id === myId) e.mine = true;
   }
   async function send(e: React.FormEvent) {
-    e.preventDefault(); if (!draft.trim()) return;
-    setBusy(true); setErr(null);
-    try { await onSend(draft.trim()); setDraft(''); setPicker(false); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); }
+    e.preventDefault();
+    const body = draft.trim(); if (!body) return;
+    // clear optimistically so the input is free for the next message the instant this one is sent; a rapid second
+    // message (or fast typing during the round-trip) is never wiped. Restore the text only if the send fails.
+    setErr(null); setDraft(''); setPicker(false); setBusy(true);
+    try { await onSend(body); } catch (x) { setErr((x as Error).message); setDraft(body); } finally { setBusy(false); }
   }
   function addEmoji(e: string) { setDraft((draft + e).slice(0, 500)); inputRef.current?.focus(); }
   return (

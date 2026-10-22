@@ -15,7 +15,7 @@ async function joinVia(page: Page, url: string) {
   await page.goto(url);
   await page.getByRole('button', { name: '2,000' }).click();
   await page.getByRole('button', { name: /Join table/ }).click();
-  await expect(page.getByText(/starts the game/)).toBeVisible();
+  await expect(page.getByText(/starts the game/)).toBeVisible({ timeout: 30_000 }); // cold edge/realtime start can be slow
 }
 const openChat = (p: Page) => p.getByRole('button', { name: /Chat/ }).click();
 const bodies = (p: Page) => p.locator('.chat-msg .chat-body');
@@ -35,11 +35,14 @@ test('table chat and reactions across two separate player sessions', async ({ br
   await openChat(h.page);
   await openChat(g.page);
 
-  // host sends three messages (one with an emoji); the guest sees exactly three, in order, no duplicates
-  for (const m of ['first up ♠️', 'second here', 'nice pot 🎉']) {
-    await h.page.getByLabel('Message').fill(m);
+  // host sends three messages (one with an emoji), confirming each lands before the next so order is deterministic
+  const msgs = ['first up ♠️', 'second here', 'nice pot 🎉'];
+  for (let i = 0; i < msgs.length; i++) {
+    await h.page.getByLabel('Message').fill(msgs[i]);
     await h.page.getByRole('button', { name: 'Send' }).click();
+    await expect(bodies(h.page)).toHaveCount(i + 1, { timeout: 20_000 });
   }
+  // the guest sees exactly three, in order, no duplicates
   await expect(bodies(g.page)).toHaveCount(3, { timeout: 20_000 });
   await expect(bodies(g.page).nth(0)).toContainText('first up ♠️');
   await expect(bodies(g.page).nth(2)).toContainText('nice pot 🎉');

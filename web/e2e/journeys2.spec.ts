@@ -17,7 +17,7 @@ async function joinVia(page: Page, url: string, units = '2,000') {
   await page.goto(url);
   await page.getByRole('button', { name: units }).click();
   await page.getByRole('button', { name: /Join table/ }).click();
-  await expect(page.getByText(/starts the game/)).toBeVisible();
+  await expect(page.getByText(/starts the game/)).toBeVisible({ timeout: 30_000 }); // cold edge/realtime start can be slow
 }
 async function turnOf(pages: Page[]): Promise<Page | null> {
   // isEnabled() waits for a missing element (forever with no timeout); a page that has left the table has no action bar
