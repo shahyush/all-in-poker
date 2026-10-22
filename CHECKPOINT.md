@@ -1,9 +1,13 @@
-# CHECKPOINT — 2026-10-21 (evening)
+# CHECKPOINT — 2026-10-22
+
+Reliability checkpoint: the full hosted multiplayer suite is green on the live app (CI run 39752698967), including the
+15-second Dealer's Choice with cold-start readiness and the leave→session-summary transition. Visual overhaul not started
+(it is gated behind this checkpoint).
 
 Branch `main` on github.com/shahyush/all-in-poker (private). Read `CLAUDE.md` for the rules and `docs/handoff/` for the contract.
 
 ## Completed features
-- **Engine** (`engine/`): CSPRNG deck, hold'em / Omaha 4-5-6 evaluation (exhaustive check), dealer's choice with 4 s window,
+- **Engine** (`engine/`): CSPRNG deck, hold'em / Omaha 4-5-6 evaluation (exhaustive check), dealer's choice with a 15 s usable window re-anchored to the chooser's first view (30 s warm-up cap, defaults to Hold'em only if nobody is ever ready),
   blinds/antes/straddle, missed-blind policy, moving button (cash) and dead button (tournament), pot-limit cap, TDA reopening,
   side pots / uncalled excess / odd chips, run-it-twice (voluntary + forced offer), uncontested reveal window, tournaments
   (levels on the clock, eliminations after settlement with shared places, winner, abandonment), host succession, nobody-present
@@ -16,31 +20,42 @@ Branch `main` on github.com/shahyush/all-in-poker (private). Read `CLAUDE.md` fo
 - **PWA** (`web/`): After Hours look, portrait + landscape phone table, deck-to-seat dealing and staged board reveals, all
   journeys (entry → invite → buy-in → hands → awards → next hand → reload → sit out / leave → history / session accounts →
   recovery), offline shell via a stamped service worker, reduced-motion support.
-- **Deployment (backend)**: schema + functions + cron live on `vlnkslhmmbkkvbpvzuiw`; edge functions `api` (v3), `code` (v2),
-  `app` (v3, redirect) deployed through the Supabase MCP (authorised route).
+- **Deployment (backend)**: schema + functions + cron live on `vlnkslhmmbkkvbpvzuiw`; edge functions `api` (v8, bundle
+  `2f17bfe6…`), `code` (v2), `app` (v3, redirect) deployed through the Supabase MCP (authorised route).
 
-## Live verification (2026-10-21, hosted)
-On https://all-in-poker.aayush9shah.workers.dev the complete multiplayer journey runs with separate player identities,
-verified by the CI hosted-e2e job and cross-checked against the live hand log:
-- Three friends: invite -> entry -> buy-in -> seat -> start -> Dealer's Choice -> dealing -> betting through every street
-  -> settlement -> next hand. A live hand recorded Omaha 4 with 12 real client actions (no timeouts), all streets, showdown
-  and award, chip-conserving. (journey.spec, passes on live.)
-- Tournament: create with levels, play to a winner, standings. (passes on live.)
+## Live verification (2026-10-22, hosted)
+On https://all-in-poker.aayush9shah.workers.dev the full hosted suite is green (CI run 39752698967, hosted-e2e: 5 passed,
+1 skipped). Sign-in verification is separate (live-smoke: WebKit + Chromium session → token → admission → identity
+survives reload). Gameplay, with separate player identities:
+- Three friends: invite -> entry -> buy-in -> seat -> start -> Dealer's Choice -> dealing -> betting every street ->
+  settlement -> next hand. (journey.spec)
+- A deliberate Dealer's Choice registers after a 30 s idle lobby (no artificial warm-up) and on consecutive hands —
+  cross-checked in the live hand log (the test's "Choosers" table dealt `omaha4` from the deliberate pick, not the
+  default). An unattended choice still defaults to Hold'em. (choice.spec — two separate tests; a missed pick is a failure.)
 - Reconnect, rotation, uncontested reveal, reload approval, run-it-twice (two boards), leave, history, recovery.
-Key live fixes this session: realtime auth (postgres_changes now deliver to clients — was the main cause of the
-'breaks down after Host table' timing), adaptive polling floor, action-ready margin to stop premature 'not_ready' 409s,
-scheduler dispatch bug (ambiguous 'key'), and the iOS session-restore/token-mirror fix.
-Best-effort note: the 4 s Dealer's Choice and 3 s reveal windows can lapse to the spec defaults (Hold'em / muck) on the
-very first hand of a cold table before realtime/edge warm up; once the table is warm they are reliable.
+  The leaving guest's exit commits at the boundary (DB: `left_at` + `taken_off`, chips conserved) and the client
+  transitions itself to the session summary with no manual reload. (journeys2 reconnect)
+- Tournament: create with levels, play to a winner, standings. (passes on live)
+- The server-timer-only test is local (drives the dev clock); skipped on hosted and covered by the reconnect journey.
+Scheduler confirmed advancing live from Supabase logs: the 1 s `allin-dispatch-due` cron POSTs `/api/jobs` → 200 with no
+boot failures, and the `api` function boots on the pinned bundle (`code/server.js?sha=2f17bfe6…` → 200).
+Key fixes this session: 15 s Dealer's Choice with a readiness re-anchor (`choice_ready`, fired by the chooser's client the
+moment it renders the choice) so cold-start/idle latency cannot eat the window; the leave race (mark the seat leaving
+before the pre-tick resolves a boundary, so the leaver is cashed out instead of dealt a stalling hand); the client-driven
+post-leave transition (poll own `left_at`, navigate to the summary); earlier — realtime auth, adaptive poll, action-ready
+margin, scheduler dispatch bug, iOS session-restore/token-mirror.
+Explicitly UNVERIFIED (optional, per instruction): uncontested-reveal propagation to the other player within the 3 s
+window — on the live transport it often lapses to the spec muck; reveal correctness is covered by engine unit tests.
+Real-device checks (actual iPhone/Android hardware, installed PWA, Safari keyboard) remain NOT VERIFIED.
 
 ## Actual test results (this checkpoint)
 | Layer | Command | Result |
 | --- | --- | --- |
-| Local engine | `npm run test -w engine` | **53 passed** (vitest; BUG01–05, antes, missed blinds, chip conservation, timeouts/presence, 4 tournament cases) |
-| Database integration | `npm run test -w server` (Postgres 16, RLS as `authenticated`) | **15 passed** |
-| Independent multiplayer clients | `npm run test:e2e -w web` (Playwright, iPhone 13 emulation, separate browser contexts, local Node API) | **4 passed** in 1.3 min; screenshots in `docs/evidence/` |
-| Deployed backend | pg_net smoke from the DB (used only before the "no pg_net to route around blocks" rule) | `api`: 403 wrong job key, 401 no session, 200 jobs; `code` bundle sha matched |
-| Deployed phone browser | — | **NOT RUN**: no public app URL yet (see blockers); anonymous sign-ins still disabled |
+| Local engine | `npm run test -w engine` | **55 passed** (vitest; BUG01–05, antes, missed blinds, chip conservation, timeouts/presence, 4 tournament cases, dealer's-choice re-anchor + warm-up-cap default) |
+| Database integration | `npm run test -w server` (Postgres 16, RLS as `authenticated`) | **18 passed** (incl. leave-as-result-window-lapses and choice_ready re-anchor through the full API) |
+| Independent multiplayer clients | `npm run test:e2e -w web` (Playwright, iPhone 13 emulation, separate browser contexts, local Node API) | **6 passed** locally (journey, 2× choice, reconnect, server-timers, tournament) |
+| Deployed backend | Supabase logs (authorised) | `api` v8 boots on bundle `2f17bfe6…`; 1 s dispatcher POSTs `/api/jobs` → 200, no boot failures |
+| Deployed phone browser (hosted-e2e) | CI run 39752698967 against the live Worker + Supabase | **5 passed, 1 skipped** (deliberate choice after idle, default choice, journey, reconnect/leave, tournament; local-only server-timer test skipped). Reveal propagation optional/unverified. Real hardware NOT VERIFIED. |
 
 ## Known failures / fixed this round
 - **Live sign-in on iPhone Safari (2026-10-21 17:19–17:24 UTC)**: anonymous sign-up and admission succeeded server-side
@@ -49,7 +64,7 @@ very first hand of a cold table before realtime/edge warm up; once the table is 
   transport mirrors its tokens and restores the same identity (`setSession`/`refreshSession`), never mints a new identity
   from a command path, retries the first round trip once, and surfaces the auth error text. Verified on the deployed URL by
   the CI live smoke (WebKit + Chromium): session → token validation → admission answer → identity survives reload.
-  Open follow-up: the owner flag sits on the first, now unreachable, `teens` profile; move it to the player the owner uses.
+  Resolved 2026-10-22: ownership moved off that orphaned `teens` profile to the owner's active one (see Ownership reservation).
 - **Engine bug (fixed)**: a running table held because nobody was present had `dueAt = null`, so the scheduler never revisited
   it: a returning player who only heart-beat never got a new hand, and the 30-minute abandonment never ran. Now `idleCheckAt`
   re-arms every 45 s until a hand starts or the table is abandoned (`engine/src/table.ts`, test "all players absent").
@@ -59,25 +74,35 @@ very first hand of a cold table before realtime/edge warm up; once the table is 
 - **e2e flakes (fixed, tests only)**: the reload assertion read the guest screen before its own poll caught up (now waits on
   the guest page); `isEnabled()` on a missing action bar waits forever (now `count()` first + `actionTimeout`); the server
   test suite reset the dev server's database underneath it (dev server now uses `allin_dev`, tests `allin_test`).
-- **Production bundle is current**: `api` v4 runs bundle `548045ad…` (hold fix + glob origins), uploaded through the
-  publish workflow (run 39635955822) with the one-time token, hash verified in the asset store, token cleared.
+- **Production bundle is current**: `api` v8 runs bundle `2f17bfe6…` (15 s dealer's choice + readiness re-anchor, leave
+  race fix), rebuilt from source, uploaded through the publish workflow with a one-time token, sha verified in the asset
+  store against the pin in `api/index.ts`, token cleared afterwards.
 
 ## Remaining tasks
-1. Frontend LIVE: Cloudflare Worker `all-in-poker` (assets-only, free plan) at https://all-in-poker.aayush9shah.workers.dev/,
-   deployed and verified by GitHub Actions run 39642606243 (entry page, assets, sw, manifest, SPA fallback). The
-   dashboard's own Git build never replaced the template; `deploy-worker.yml` is now the deployment path on every push.
-   Hosted multiplayer test still pending (needs E2E_GROUP_PASSWORD as a GitHub secret, after the owner has entered).
-2. Owner: allow anonymous sign-ins; set `GROUP_PASSWORD` edge secret.
-3. Standard CLI deploy route (`deploy-functions.yml`) stays dormant until `SUPABASE_ACCESS_TOKEN` exists as a GitHub secret.
-4. Play a full hosted game on real phones with separate identities (all streets, awards, next hand, reload, reconnect,
-   history); tick the live rows in `docs/RELEASE.md`; real iPhone/Android, installed PWA, Safari keyboard checks.
-5. Remove the chunk rows `edge/server.js.p00…p10` from `app_assets` once the bundle flow is settled (keep `edge/server.js`).
+1. Frontend + backend LIVE and the hosted multiplayer suite is green (CI 39752698967). `deploy-worker.yml` deploys the
+   Worker on every push and now auto-runs the hosted journeys after a deploying push whenever the Cloudflare + password
+   secrets are present (still forceable via the `run_hosted_e2e` dispatch input).
+2. Real-device pass: play a full hosted game on actual iPhone/Android hardware with separate identities (all streets,
+   awards, next hand, reload, reconnect, history, installed PWA, Safari keyboard); tick the live rows in `docs/RELEASE.md`.
+   This is the only reliability item still NOT VERIFIED.
+3. Reveal propagation within the 3 s window is intentionally left optional/unverified on the live transport (engine unit
+   tests cover reveal correctness). Revisit only if desired.
+4. Standard CLI deploy route (`deploy-functions.yml`) stays dormant until `SUPABASE_ACCESS_TOKEN` exists as a GitHub secret;
+   until then the `api` bundle ships via the index.ts + app_assets hash-pin path (publish-bundle.yml + MCP redeploy).
+5. Visual overhaul (sapphire/emerald/burgundy palette exploration, dealer-button animation, pacing, hand labels, etc.)
+   is the next phase — gated behind this reliability checkpoint, now met.
+6. Remove the chunk rows `edge/server.js.p00…p10` from `app_assets` once the bundle flow is settled (keep `edge/server.js`).
 
 ## Ownership reservation
 Admission bootstraps the owner only while `group_settings` is empty: the first player admitted with the bootstrap
 `GROUP_PASSWORD` becomes `is_owner`, the password hash moves into the database and the env value is never consulted again.
 No invitation has been sent and nobody else knows the password, so entering first reserves ownership. Legacy profiles are
 not owners (`is_owner=false`). The owner should save their player code immediately (Profile → Save my player code).
+
+Ownership resolved (2026-10-22): the bootstrap had left `is_owner` on an orphaned first `teens` profile
+(`0d8dfc01…`, zero memberships/sessions, never seen). Per the owner's confirmation, ownership moved to their active
+`teens` profile (`62f58b13…`: the player that hosted/played the live tables); the orphan is `is_owner=false`, `status`
+`revoked`. Both profile rows and all records are preserved. Exactly one owner now (`62f58b13…`).
 
 ## Deployment blockers (exact)
 - **Network**: this cloud environment's policy denies `CONNECT vlnkslhmmbkkvbpvzuiw.supabase.co:443` and
