@@ -128,3 +128,11 @@ publication: tables, hole_cards, chat_messages, reload_requests, table_members (
 `edge/server.js` + 11 chunk rows; schema_migrations entries for the 4 migrations. Row counts unchanged: profiles 3,
 tables 2, table_members 3, hand_history 2, auth.users 3. Legacy objects untouched: commit_table(), prototype app_assets
 rows (app.js, engine.js, index.html, manifest, sw.js), trigger on_auth_user_created.
+
+## Known device limitation (documented, non-blocking)
+- **iOS Safari chat keyboard.** On the identified Friday table the composer never reached the server (0 messages, 0
+  reactions persisted) while reactions — which need no keyboard — worked: the signature of the compose box sitting behind
+  the on-screen keyboard. iOS Safari ignores `interactive-widget=resizes-content`, so the fix tracks the VisualViewport
+  and insets the sheet above the keyboard (`--kb`). This is mechanism-verified (code + the two-session hosted chat test,
+  which passes) but NOT verified on real iOS Safari from this environment, which cannot drive a physical device. Treated
+  as a documented limitation, not a blocker; a one-line confirmation from a real iPhone would close it.
