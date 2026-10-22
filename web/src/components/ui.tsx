@@ -34,7 +34,13 @@ export function Sheet({ title, onClose, children, turnCue, onReturn }: { title: 
       }
     };
     document.addEventListener('keydown', key);
-    return () => { document.removeEventListener('keydown', key); prev?.focus?.(); };
+    // Lift the sheet above the on-screen keyboard. iOS Safari ignores interactive-widget, so a fixed bottom:0 sheet
+    // sits behind the keyboard and the composer is unreachable; track the visual viewport and inset by the occluded
+    // height so the input and Send stay visible. No-op where the keyboard doesn't overlay (Chrome Android, desktop).
+    const vv = window.visualViewport;
+    const onVV = () => { const kb = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0; ref.current?.style.setProperty('--kb', kb + 'px'); };
+    if (vv) { vv.addEventListener('resize', onVV); vv.addEventListener('scroll', onVV); onVV(); }
+    return () => { document.removeEventListener('keydown', key); if (vv) { vv.removeEventListener('resize', onVV); vv.removeEventListener('scroll', onVV); } prev?.focus?.(); };
   }, [onClose]);
   return (
     <>

@@ -71,7 +71,8 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; 
 
 /* sheets */
 .sheet-backdrop { position: fixed; inset: 0; background: rgba(6, 11, 24, 0.58); z-index: 20; }
-.sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: 86vh; max-height: 86dvh; background: var(--paper); color: var(--ink); border-radius: 20px 20px 0 0; box-shadow: 0 -10px 60px rgba(0,0,0,0.35); z-index: 21; display: flex; flex-direction: column; padding-bottom: var(--safe-b); }
+.sheet { position: fixed; left: 0; right: 0; bottom: var(--kb, 0px); max-height: 86vh; max-height: 86dvh; background: var(--paper); color: var(--ink); border-radius: 20px 20px 0 0; box-shadow: 0 -10px 60px rgba(0,0,0,0.35); z-index: 21; display: flex; flex-direction: column; padding-bottom: var(--safe-b); transition: bottom 0.12s ease-out; }
+@media (prefers-reduced-motion: reduce) { .sheet { transition: none; } }
 .sheet-head { display: flex; align-items: center; gap: 10px; padding: 12px 10px 8px 18px; flex: none; }
 .sheet-head h2 { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .sheet-close { width: 44px; height: 44px; border-radius: var(--r-btn); background: var(--page); font-size: 22px; display: flex; align-items: center; justify-content: center; flex: none; }
