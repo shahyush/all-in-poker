@@ -7,7 +7,8 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: [['list'], ['json', { outputFile: 'test-results/e2e.json' }]],
-  use: { actionTimeout: 20_000, baseURL: process.env.E2E_BASE ?? 'http://127.0.0.1:5173', trace: 'retain-on-failure', screenshot: 'only-on-failure', ...devices['iPhone 13'], defaultBrowserType: 'chromium' },
+  // Hosted runs record video and keep a screenshot per step so the uploaded artifact carries motion recordings for review.
+  use: { actionTimeout: 20_000, baseURL: process.env.E2E_BASE ?? 'http://127.0.0.1:5173', trace: 'retain-on-failure', screenshot: process.env.E2E_HOSTED ? 'on' : 'only-on-failure', video: process.env.E2E_HOSTED ? 'on' : 'off', ...devices['iPhone 13'], defaultBrowserType: 'chromium' },
   testIgnore: process.env.E2E_LIVE ? [] : ['**/live-smoke.spec.ts'],
   projects: process.env.E2E_LIVE
     ? [

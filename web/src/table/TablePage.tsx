@@ -14,6 +14,13 @@ import { limitLabel, variantLabel } from '../lib/format.ts';
 import { fmt } from '../components/ui.tsx';
 import './table.css';
 
+// a single gold chip that glides from a seat's bet spot into the pot; purely decorative (aria-hidden), self-removing
+function ChipSweep({ from }: { from: { left: number; top: number } }) {
+  const [go, setGo] = useState(false);
+  useEffect(() => { const r = requestAnimationFrame(() => requestAnimationFrame(() => setGo(true))); return () => cancelAnimationFrame(r); }, []);
+  return <span className="chip-sweep" aria-hidden="true" style={{ left: (go ? 50 : from.left) + '%', top: (go ? 50 : from.top) + '%', opacity: go ? 0.1 : 1 }} />;
+}
+
 export function TablePage({ view, go }: { view: TableView; go: (to: string) => void }) {
   const s = useSession();
   const row = view.row!; const t = row.state; const hand = t.hand;
@@ -37,6 +44,8 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const lastSeq = useRef<number>(-1);
   const [dealt, setDealt] = useState(true);           // false while the deal animation is in flight
   const [newBoardKeys, setNewBoardKeys] = useState<Set<string>>(new Set());
+  const [sweeps, setSweeps] = useState<{ id: number; left: number; top: number }[]>([]);
+  const sweepId = useRef(0);
   const cancelAnim = useRef<(() => void) | null>(null);
   useEffect(() => {
     const events = t.events ?? [];
@@ -57,6 +66,12 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
         const keys = (ev as Extract<PublicEvent, { type: 'board' }>).cards.map((c) => `${(ev as { board: number }).board}:${c}`);
         setNewBoardKeys(new Set(keys));
         setTimeout(() => setNewBoardKeys(new Set()), 600);
+        // the previous street's bets have just collected into the pot: sweep a chip in from each contesting seat
+        if (!reduced && hand) {
+          const pos = seatPositions(t.seats.length, mySeat, landscape);
+          const spots = hand.players.filter((p) => !p.folded && pos[p.seat]).map((p) => { const bp = betPosition(pos[p.seat], landscape); return { id: sweepId.current++, left: bp.left, top: bp.top }; });
+          if (spots.length) { setSweeps((cur) => [...cur, ...spots]); const ids = new Set(spots.map((sp) => sp.id)); setTimeout(() => setSweeps((cur) => cur.filter((sp) => !ids.has(sp.id))), 650); }
+        }
       }
     }
   }, [t.seq, t.events, hand]);
@@ -153,6 +168,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
       <div className="g-surface">
         <div className="felt" aria-hidden="true" />
         <span className="deck-anchor" data-deck aria-hidden="true" />
+        {sweeps.map((sp) => <ChipSweep key={sp.id} from={{ left: sp.left, top: sp.top }} />)}
         {t.seats.map((seat, i) => {
           if (i === mySeatIdx) return null;
           if (!seat) return <span key={i} className="seat-empty" style={{ left: positions[i].left + '%', top: positions[i].top + '%' }} aria-hidden="true" />;
