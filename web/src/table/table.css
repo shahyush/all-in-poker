@@ -22,6 +22,12 @@
 .seat-cards { display: flex; gap: 2px; justify-content: center; height: 28px; align-items: flex-end; }
 .seat-bet { position: absolute; font-size: 12px; font-weight: 700; background: rgba(0,0,0,0.35); color: var(--game-text); border-radius: 10px; padding: 1px 7px; white-space: nowrap; }
 .dealer-btn { position: absolute; width: 20px; height: 20px; border-radius: 50%; background: var(--paper); color: var(--ink); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+/* table-level dealer button: one token that slides between seats at each hand */
+.dealer-token { position: absolute; width: 22px; height: 22px; border-radius: 50%; background: var(--card); color: var(--on-table); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 7px rgba(0,0,0,0.5); transform: translate(-50%, -50%); z-index: 3; transition: left 420ms cubic-bezier(.2,.7,.2,1), top 420ms cubic-bezier(.2,.7,.2,1); }
+.blind-chip { position: absolute; transform: translate(-50%, -50%); z-index: 3; font-size: 9px; font-weight: 800; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 999px; background: var(--seat); color: var(--game-muted); border: 1px solid var(--table-line); box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+.blind-chip.bb { color: var(--accent-table); border-color: var(--accent-table); }
+.blind-chip.str { color: var(--game-text); }
+@media (prefers-reduced-motion: reduce) { .dealer-token { transition: none; } }
 .timer-ring { position: absolute; left: 50%; bottom: -6px; width: 44px; height: 3px; margin-left: -22px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; }
 .timer-ring > i { display: block; height: 100%; background: var(--accent-table); }
 

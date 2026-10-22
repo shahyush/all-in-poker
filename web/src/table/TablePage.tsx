@@ -105,6 +105,8 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const names = useMemo(() => { const m = new Map<string, string>(); for (const x of t.seats) if (x) m.set(x.playerId, x.name); for (const p of view.participants) if (!m.has(p.user_id)) m.set(p.user_id, p.name); return m; }, [t.seats, view.participants]);
   const presence = useMemo(() => { const m = new Map<string, boolean>(); for (const mm of view.members) m.set(mm.user_id, !!mm.last_seen && now - new Date(mm.last_seen).getTime() < 30000); return m; }, [view.members, now]);
   const positions = useMemo(() => seatPositions(t.seats.length, mySeat, landscape), [t.seats.length, mySeat, landscape]);
+  // place a small table marker (dealer button, blind chip) just inside a seat, toward the felt centre
+  const marker = (p: { left: number; top: number }, f: number) => ({ left: (p.left + (50 - p.left) * f) + '%', top: (p.top + (50 - p.top) * f) + '%' });
   const legal = hand?.phase === 'betting' && hand.actor === mySeat ? hand.actorLegal : null;
   const myTurn = !!legal?.canAct && hand?.phase === 'betting';
   const turnCue = myTurn ? `Your turn${legal!.owed ? ` · ${fmt(legal!.call)} to call` : ''}` : hand?.phase === 'choice' && hand.chooserSeat === mySeat ? 'Your deal: pick the game' : null;
@@ -159,6 +161,10 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
           const shown: Card[] | null = shows ? shows : revealed && revealed.length ? Array.from({ length: hand!.players.find((p) => p.seat === i)?.holeCount ?? 0 }, (_, k) => revealed.find((r) => r.index === k)?.card ?? null).filter((c): c is Card => c !== null) : null;
           return <SeatView key={i} index={i} seat={seat} hand={hand} pos={positions[i]} betPos={betPosition(positions[i], landscape)} isHost={seat.playerId === t.hostPlayerId} present={presence.get(seat.playerId) ?? false} now={now} isMe={false} shownCards={shown} winCards={winCardsBySeat.get(i) ?? null} won={winTotals[i] ?? null} />;
         })}
+        {hand && hand.button !== null && positions[hand.button] && <span className="dealer-token motion" aria-label="Dealer button" style={marker(positions[hand.button], 0.12)}>D</span>}
+        {hand && hand.street === 'preflop' && hand.sbSeat !== null && positions[hand.sbSeat] && <span className="blind-chip" style={marker(positions[hand.sbSeat], 0.26)} aria-label={`Small blind ${fmt(hand.sb)}`}>SB</span>}
+        {hand && hand.street === 'preflop' && hand.bbSeat !== null && positions[hand.bbSeat] && <span className="blind-chip bb" style={marker(positions[hand.bbSeat], 0.26)} aria-label={`Big blind ${fmt(hand.bb)}`}>BB</span>}
+        {hand && hand.street === 'preflop' && hand.straddleSeat !== null && positions[hand.straddleSeat] && <span className="blind-chip str" style={marker(positions[hand.straddleSeat], 0.26)} aria-label={`Straddle ${fmt(hand.bb * 2)}`}>STR</span>}
         <Centre t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} chosen={chosen} onChoose={(v: VariantId) => { setChosen(v); void quiet('choose', { variant: v }); }} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} madeBoard={madeSet} />
       </div>
       <Hero seatNames={t.seats.map((x) => x?.name ?? null)} hand={hand} mySeat={mySeat} me={meSeat} own={view.own?.cards ?? null} ownHandId={view.own?.handId ?? null} now={now} busy={pending !== null} pending={pending} legal={legal} dealt={dealt} connected={view.connected} isCash={row.mode === 'cash'}

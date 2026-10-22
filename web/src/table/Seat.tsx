@@ -35,7 +35,6 @@ export function SeatView({ index, seat, hand, pos, betPos, isHost, present, now,
         <span className="seat-status">{actor ? 'To act' : chooser ? 'Choosing' : status[0] ?? (hand && !inHand ? '' : ' ')}</span>
         {actor && <span className="timer-ring" aria-hidden="true"><i style={{ width: Math.round(remaining * 100) + '%' }} /></span>}
       </div>
-      {hand?.button === index && <span className="dealer-btn" aria-label="Dealer" style={{ right: -6, top: 22 }}>D</span>}
       {hp && hp.bet > 0 && <span className="seat-bet" style={{ left: `calc(${betPos.left - pos.left}% * 1)`, top: 0, transform: 'translate(-50%, -24px)' }} aria-label={`Bet ${fmt(hp.bet)}`}>{fmt(hp.bet)}</span>}
     </div>
   );
