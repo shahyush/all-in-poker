@@ -5,13 +5,13 @@ import { timeLeft } from '../lib/format.ts';
 
 export interface CentreProps {
   t: PublicTable; hand: PublicHand | null; now: number; mySeat: number; busy: boolean;
-  chosen?: VariantId | null;
+  chosen?: VariantId | null; submitting?: VariantId | null;
   onChoose(v: VariantId): void; onStraddle(accept: boolean): void; onVote(choice: string): void; onPots(): void;
   newBoardKeys: Set<string>;
   madeBoard?: Set<Card> | null;
 }
 
-export function Centre({ t, hand, now, mySeat, busy, chosen, onChoose, onStraddle, onVote, onPots, newBoardKeys, madeBoard }: CentreProps) {
+export function Centre({ t, hand, now, mySeat, busy, chosen, submitting, onChoose, onStraddle, onVote, onPots, newBoardKeys, madeBoard }: CentreProps) {
   if (!hand) {
     return <div className="centre"><div className="centre-card"><div className="centre-title">{t.status === 'running' ? (t.waitingReason ?? 'Waiting') : 'Paused'}</div><div className="centre-copy">{t.status === 'running' ? 'Hands continue automatically.' : ''}</div></div></div>;
   }
@@ -26,10 +26,10 @@ export function Centre({ t, hand, now, mySeat, busy, chosen, onChoose, onStraddl
         <div className="centre-card">
           <div className="centre-copy">Hand {hand.handNo} · Dealer's Choice{isChooser ? ' · Your deal' : ` · ${seatName(hand.chooserSeat)}`}</div>
           <div className="centre-title">{isChooser ? 'Pick the game' : `${seatName(hand.chooserSeat)} is choosing`}</div>
-          <div className="centre-copy" aria-live="polite">{chosen ? <>Locked in — dealing <strong>{RULES.variants[chosen].label}</strong>…</> : <>Hold'em deals in <strong>{secs}s</strong> if nobody chooses.</>}</div>
+          <div className="centre-copy" aria-live="polite">{submitting ? <>Submitting <strong>{RULES.variants[submitting].label}</strong>…</> : chosen ? <>Locked in — dealing <strong>{RULES.variants[chosen].label}</strong>…</> : <>Hold'em deals in <strong>{secs}s</strong> if nobody chooses.</>}</div>
           {isChooser && (
             <div className="choice-grid" role="group" aria-label="Choose the game">
-              {VARIANT_IDS.map((v) => { const ok = variantAllowed(hand.players.length, v); const picked = chosen === v; return <button key={v} type="button" className={picked ? 'chosen' : undefined} aria-pressed={picked} disabled={!ok || busy || chosen != null} onClick={() => onChoose(v)}><span>{RULES.variants[v].label}</span><span>{picked ? 'Locked in' : ok ? (RULES.variants[v].limit === 'NL' ? 'No limit' : 'Pot limit') : 'Too many players'}</span></button>; })}
+              {VARIANT_IDS.map((v) => { const ok = variantAllowed(hand.players.length, v); const isSubmitting = submitting === v; const locked = chosen === v; const picked = isSubmitting || locked; return <button key={v} type="button" className={picked ? 'chosen' : undefined} aria-pressed={picked} disabled={!ok || busy || chosen != null || submitting != null} onClick={() => onChoose(v)}><span>{RULES.variants[v].label}</span><span>{isSubmitting ? 'Submitting…' : locked ? 'Locked in' : ok ? (RULES.variants[v].limit === 'NL' ? 'No limit' : 'Pot limit') : 'Too many players'}</span></button>; })}
             </div>
           )}
           {offer && (

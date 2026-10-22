@@ -778,8 +778,9 @@ function settle(t: TableState, h: HandState, now: number, uncontested: boolean):
   h.result = { uncontested, winnerSeat: uncontested ? h.players.find(live)!.seat : null, refunds, pots, awards, totals, boards, shows };
   h.phase = 'result'; h.actor = null; h.deadline = null; h.vote = null;
   // an uncontested winner gets a usable window to show a card (and the hand lingers that long so the other player
-  // actually receives it); a contested showdown already shows every live hand, so it moves on at the normal pace.
-  h.nextAt = now + (uncontested ? T.revealMs : T.awardToNextChoiceMs);
+  // actually receives it); a contested showdown holds longer still, so players can read the revealed hands, the winning
+  // hand and the amount awarded before the next hand. Neither window touches anyone's decision time (it is after the hand).
+  h.nextAt = now + (uncontested ? T.revealMs : T.showdownMs);
   h.revealDeadline = uncontested ? h.nextAt : null;
   if (!uncontested) event(t, h, now, { type: 'showdown' });
   event(t, h, now, { type: 'award', awards: Object.entries(totals).map(([s, a]) => ({ seat: +s, amount: a })) });

@@ -32,7 +32,8 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const isHost = t.hostPlayerId === me.id;
   const now = useNow(true, s.clockOffset);
   const [pending, setPending] = useState<string | null>(null);
-  const [chosen, setChosen] = useState<VariantId | null>(null);
+  const [chosen, setChosen] = useState<VariantId | null>(null);        // confirmed by the server (locked in)
+  const [submitting, setSubmitting] = useState<VariantId | null>(null); // sent, awaiting the server's acceptance
   const [sheet, setSheet] = useState<null | 'menu' | 'chat' | 'accounts' | 'pots' | 'rules' | 'reload'>(null);
   const [draft, setDraft] = useState('');
   const [seenChat, setSeenChat] = useState(-1);
@@ -81,7 +82,17 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   // hand changed without an animation (reconnect/mid-hand): show settled cards
   useEffect(() => { if (!hand || hand.phase !== 'betting' || (hand.actionReadyAt && now >= hand.actionReadyAt + 2000)) setDealt(true); }, [hand?.id, hand?.phase, hand?.actionReadyAt, now, hand]);
   // clear the local dealer's-choice lock once the hand moves on or a new hand begins
-  useEffect(() => { if (hand?.phase !== 'choice') setChosen(null); }, [hand?.phase, hand?.id]);
+  useEffect(() => { if (hand?.phase !== 'choice') { setChosen(null); setSubmitting(null); } }, [hand?.phase, hand?.id]);
+  // Pick a variant: show "Submitting" until the server accepts, only then "Locked in". A failed request clears the
+  // pending state (no optimistic lock) so the chooser sees the error and can simply tap again — the first command has
+  // already resolved, so retrying never stacks a duplicate.
+  const choose = useCallback(async (v: VariantId) => {
+    if (submitting || chosen) return;
+    setSubmitting(v); setErr(null);
+    try { await s.transport.cmd('choose', { variant: v }, row.id); await view.reload(); setChosen(v); }
+    catch (e) { const msg = e instanceof TransportError ? e.message : 'Could not reach the server'; setErr(msg); s.toast(msg); }
+    finally { setSubmitting(null); }
+  }, [submitting, chosen, s, row.id, view]);
 
   const run = useCallback(async (type: string, payload: Record<string, unknown> = {}) => {
     setPending(type); setErr(null);
@@ -207,7 +218,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
         {hand && hand.street === 'preflop' && hand.sbSeat !== null && positions[hand.sbSeat] && <span className="blind-chip" style={marker(positions[hand.sbSeat], 0.26)} aria-label={`Small blind ${fmt(hand.sb)}`}>SB</span>}
         {hand && hand.street === 'preflop' && hand.bbSeat !== null && positions[hand.bbSeat] && <span className="blind-chip bb" style={marker(positions[hand.bbSeat], 0.26)} aria-label={`Big blind ${fmt(hand.bb)}`}>BB</span>}
         {hand && hand.street === 'preflop' && hand.straddleSeat !== null && positions[hand.straddleSeat] && <span className="blind-chip str" style={marker(positions[hand.straddleSeat], 0.26)} aria-label={`Straddle ${fmt(hand.bb * 2)}`}>STR</span>}
-        <Centre t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} chosen={chosen} onChoose={(v: VariantId) => { setChosen(v); void quiet('choose', { variant: v }); }} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} madeBoard={madeSet} />
+        <Centre t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} chosen={chosen} submitting={submitting} onChoose={(v: VariantId) => void choose(v)} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} madeBoard={madeSet} />
       </div>
       <Hero seatNames={t.seats.map((x) => x?.name ?? null)} hand={hand} mySeat={mySeat} me={meSeat} own={view.own?.cards ?? null} ownHandId={view.own?.handId ?? null} now={now} busy={pending !== null} pending={pending} legal={legal} dealt={dealt} connected={view.connected} isCash={row.mode === 'cash'}
         onAct={(a, to) => void quiet('act', a === 'raise' ? { action: 'raise', raiseTo: String(to) } : { action: a })}

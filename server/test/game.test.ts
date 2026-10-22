@@ -122,7 +122,7 @@ describe('full cash session through the API', () => {
   });
 
   it('server timers advance the hand with no client involved: next hand starts, late choice defaults, timeouts fold', async () => {
-    await W.advanceClock(3100);
+    await W.advanceClock(RULES.timers.showdownMs + 100);  // the contested showdown holds longer so the result is readable
     await W.runJobs();
     let st = await W.publicState(tableId);
     expect(st.handNo).toBe(2);
