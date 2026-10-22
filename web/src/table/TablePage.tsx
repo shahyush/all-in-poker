@@ -165,13 +165,15 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const winTotals = hand?.result?.totals ?? {};
   const winCardsBySeat = new Map<number, Card[]>();
   if (hand?.result) for (const a of hand.result.awards) for (const w of a.winners) winCardsBySeat.set(w.seat, [...(winCardsBySeat.get(w.seat) ?? []), ...w.cards]);
-  // ordered showdown reveal: losing hands turn over first, the winner's hand last, each a beat apart (the hold is long
-  // enough to read them). Only for a contested showdown (shows present); reduced motion collapses the delays to 0.
+  // Showdown reveal order follows table position, not who won: hands turn over clockwise from the first seat left of the
+  // button (the standard order at a checked-down showdown), each a beat apart within the hold — the drama comes from the
+  // measured reveal, the winning-card highlight and the pot award, not from re-ordering by result. Reduced motion → 0.
   const revealDelay = new Map<number, number>();
-  if (hand?.result && !hand.result.uncontested && hand.result.shows) {
-    const shown = Object.keys(hand.result.shows).map(Number);
-    shown.sort((a, b) => (winTotals[a] ? 1 : 0) - (winTotals[b] ? 1 : 0)); // winners last
-    shown.forEach((seat, i) => revealDelay.set(seat, i * 450));
+  if (hand?.result && !hand.result.uncontested && hand.result.shows && hand.button !== null) {
+    const shown = new Set(Object.keys(hand.result.shows).map(Number));
+    const n = t.seats.length;
+    let order = 0;
+    for (let k = 1; k <= n; k++) { const seat = (hand.button + k) % n; if (shown.has(seat)) revealDelay.set(seat, order++ * 450); }
   }
 
   // Compact last-hand recap: captured when a hand settles, shown through the next hand. Winner, amount and the made-hand
