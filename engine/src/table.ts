@@ -3,6 +3,7 @@ import type { VariantId } from './evaluator.ts';
 import { awardPots, buildPots, uncalledExcess } from './pots.ts';
 import { secureHex, secureInt, shuffledDeck, type Rng } from './random.ts';
 import { RULES, VARIANT_IDS, variantAllowed } from './rules.ts';
+import { dealTiming } from './animation.ts';
 import { isChipInt, MAX_CHIPS } from './amounts.ts';
 import {
   EngineError, fail,
@@ -90,10 +91,7 @@ function blindsFor(t: TableState, now: number): { sb: number; bb: number; ante: 
   return { sb: t.rules.sb, bb: t.rules.bb, ante: t.rules.ante, level: null };
 }
 export function dealDurationMs(playerCount: number, holeCount: number): number {
-  const total = playerCount * holeCount;
-  const travel = 180;
-  const gap = total > 1 ? Math.min(55, Math.floor((T.dealPresentationMaxMs - travel) / (total - 1))) : 0;
-  return (total - 1) * gap + travel;
+  return dealTiming(playerCount * holeCount).total; // shared with the client animation so actionReadyAt matches it
 }
 
 // ---------- validation ----------

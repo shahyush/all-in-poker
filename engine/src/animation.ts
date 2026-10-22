@@ -3,20 +3,32 @@
 export interface DealStep { key: string; eventId: string; handId: string; type: 'card-back'; from: 'deck'; to: number; slot: number; delayMs: number; durationMs: number }
 export interface DealPlan { eventId: string; handId: string; steps: DealStep[]; durationMs: number }
 
+// Single source of deal pacing, shared by the server (which sets the deal-presentation window before betting opens, so
+// a longer deal never eats a player's decision time) and the client animation. Deliberate by design: each card has a
+// clear travel and a readable gap after it, capped so a full table still deals in a composed couple of seconds.
+export const DEAL_TRAVEL_MS = 320;
+export const DEAL_GAP_MS = 210;
+export const DEAL_MAX_TOTAL_MS = 3600;
+export function dealTiming(total: number, reducedMotion = false): { travel: number; gap: number; total: number } {
+  if (reducedMotion || total <= 0) return { travel: 0, gap: 0, total: 0 };
+  const travel = DEAL_TRAVEL_MS;
+  const gap = total > 1 ? Math.min(DEAL_GAP_MS, Math.floor((DEAL_MAX_TOTAL_MS - travel) / (total - 1))) : 0;
+  return { travel, gap, total: (total - 1) * gap + travel };
+}
+
 export function planDeal(opts: { eventId: string; handId: string; seatIds: number[]; buttonSeatId: number; holeCount: number; reducedMotion?: boolean }): DealPlan {
   const { eventId, handId, seatIds, buttonSeatId, holeCount, reducedMotion = false } = opts;
   if (!eventId || !handId || !Array.isArray(seatIds) || seatIds.length < 2 || seatIds.length > 9 || new Set(seatIds).size !== seatIds.length || ![2, 4, 5, 6].includes(holeCount) || seatIds.length * holeCount + 5 > 52) throw new Error('Invalid deal presentation');
   const button = seatIds.indexOf(buttonSeatId);
   if (button < 0) throw new Error('Button must be in the frozen dealt-seat order');
   const total = seatIds.length * holeCount;
-  const travel = reducedMotion ? 0 : 180;
-  const gap = reducedMotion ? 0 : Math.min(55, Math.floor((1500 - travel) / (total - 1)));
+  const { travel, gap } = dealTiming(total, reducedMotion);
   const steps: DealStep[] = [];
   for (let round = 0; round < holeCount; round++) for (let k = 1; k <= seatIds.length; k++) {
     const index = steps.length;
     steps.push({ key: eventId + ':' + index, eventId, handId, type: 'card-back', from: 'deck', to: seatIds[(button + k) % seatIds.length], slot: round, delayMs: index * gap, durationMs: travel });
   }
-  return { eventId, handId, steps, durationMs: (total - 1) * gap + travel };
+  return { eventId, handId, steps, durationMs: dealTiming(total, reducedMotion).total };
 }
 
 export interface BoardStep { key: string; type: 'board-reveal'; board: 'A' | 'B'; slot: number; delayMs: number; durationMs: number }

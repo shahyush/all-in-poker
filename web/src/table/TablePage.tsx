@@ -67,7 +67,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
       if (ev.type === 'board') {
         const keys = (ev as Extract<PublicEvent, { type: 'board' }>).cards.map((c) => `${(ev as { board: number }).board}:${c}`);
         setNewBoardKeys(new Set(keys));
-        setTimeout(() => setNewBoardKeys(new Set()), 600);
+        setTimeout(() => setNewBoardKeys(new Set()), 1400); // cover the staggered one-by-one flop (3 × ~300ms + flip)
         // the previous street's bets have just collected into the pot: sweep a chip in from each contesting seat
         if (!reduced && hand) {
           const pos = seatPositions(t.seats.length, mySeat, landscape);

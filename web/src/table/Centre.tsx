@@ -58,7 +58,7 @@ export function Centre({ t, hand, now, mySeat, busy, chosen, submitting, onChoos
         <div key={bi} className="stack" style={{ gap: 2, alignItems: 'center' }}>
           {b.label && <div className="board-label">{b.label}</div>}
           <div className="board" aria-label={b.label ?? 'Community cards'}>
-            {Array.from({ length: 5 }).map((_, i) => { if (b.cards[i] === undefined) return <SlotCard key={'s' + i} />; const fresh = newBoardKeys.has(`${bi}:${b.cards[i]}`); return <PlayingCard key={b.cards[i]} card={b.cards[i]} win={res ? winCards.has(b.cards[i]) : false} dim={res ? winCards.size > 0 && !winCards.has(b.cards[i]) : false} hi={!res && !!madeBoard?.has(b.cards[i])} flip={fresh} delayMs={fresh ? freshOrder.indexOf(i) * 90 : undefined} />; })}
+            {Array.from({ length: 5 }).map((_, i) => { if (b.cards[i] === undefined) return <SlotCard key={'s' + i} />; const fresh = newBoardKeys.has(`${bi}:${b.cards[i]}`); return <PlayingCard key={b.cards[i]} card={b.cards[i]} win={res ? winCards.has(b.cards[i]) : false} dim={res ? winCards.size > 0 && !winCards.has(b.cards[i]) : false} hi={!res && !!madeBoard?.has(b.cards[i])} flip={fresh} delayMs={fresh ? freshOrder.indexOf(i) * 300 : undefined} />; })}
           </div>
         </div>
         );
