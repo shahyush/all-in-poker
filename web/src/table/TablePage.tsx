@@ -84,6 +84,22 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
       void silent('choice_ready');
     }
   }, [hand, hand?.id, hand?.phase, hand?.chooserSeat, mySeat, silent]);
+  // Once we have asked to leave, drive the transition to the session summary ourselves. The exit commits at the next hand
+  // boundary; rather than depend on the table-state poll noticing our seat vanish (which can lag on a cold/idle transport),
+  // poll our own participant row for `left_at` and navigate as soon as it is recorded.
+  useEffect(() => {
+    if (!meSeat?.leaving || row.mode !== 'cash') return;
+    let stop = false; let timer: ReturnType<typeof setTimeout>;
+    const check = async (): Promise<void> => {
+      try {
+        const parts = await s.transport.query<{ left_at: string | null }>('session_participants', { table_id: row.id, user_id: me.id });
+        if (!stop && parts[0]?.left_at) { go('/session/' + row.id); return; }
+      } catch { /* ignore and retry */ }
+      if (!stop) timer = setTimeout(() => void check(), 2500);
+    };
+    timer = setTimeout(() => void check(), 2500);
+    return () => { stop = true; clearTimeout(timer); };
+  }, [meSeat?.leaving, row.mode, row.id, me.id, s.transport, go]);
 
   const names = useMemo(() => { const m = new Map<string, string>(); for (const x of t.seats) if (x) m.set(x.playerId, x.name); for (const p of view.participants) if (!m.has(p.user_id)) m.set(p.user_id, p.name); return m; }, [t.seats, view.participants]);
   const presence = useMemo(() => { const m = new Map<string, boolean>(); for (const mm of view.members) m.set(mm.user_id, !!mm.last_seen && now - new Date(mm.last_seen).getTime() < 30000); return m; }, [view.members, now]);
