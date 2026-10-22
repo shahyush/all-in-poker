@@ -37,13 +37,12 @@ test('three friends: invite → entry → buy-in → start → dealer choice →
     guests.push({ page });
   }
   await expect(host.page.getByText('Everyone here is ready when you are.')).toBeVisible();
-  // let realtime finish warming before the first deal (in real use this is covered by the wait for friends to arrive;
-  // without it the 4 s dealer's-choice window can race the realtime/edge cold start on the very first hand)
-  await host.page.waitForTimeout(4000);
+  // Start immediately — no artificial warm-up. The 15 s dealer's-choice window (RULES.timers.choiceMs) comfortably covers
+  // a cold realtime/edge start, and the adaptive poll (700 ms during the choice phase) surfaces the window either way.
   await host.page.getByRole('button', { name: 'Start the game' }).click();
 
-  // dealer's choice: whoever is chooser picks Omaha 4 (others see "is choosing"). The 4 s window is best-effort under
-  // live latency; if it lapses the server deals the Hold'em default (per spec), so we branch on the variant actually dealt.
+  // dealer's choice: whoever is chooser picks Omaha 4 (others see "is choosing"). With the 15 s window a deliberate
+  // selection reliably registers; we still branch on the variant actually dealt so a defaulted hand can't wedge the run.
   const pages = [host.page, guests[0].page, guests[1].page];
   for (const p of pages) await expect(p.locator('.game')).toBeVisible();
   const chooser = await Promise.any(pages.map(async (p) => { await p.getByRole('button', { name: /Omaha 4/ }).waitFor({ state: 'visible', timeout: 12_000 }); return p; })).catch(() => null);

@@ -25,14 +25,20 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    outputs:
+      creds: ${{ steps.creds.outputs.present }}
+      e2e_password: ${{ steps.creds.outputs.e2e }}
     steps:
       - uses: actions/checkout@v4
-      - name: Check for Cloudflare credentials
+      - name: Check for Cloudflare credentials and the hosted-e2e password
         id: creds
         run: |
           if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
             echo "present=false" >> "$GITHUB_OUTPUT"; echo "::warning::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets are not set; build only, no deploy"
           else echo "present=true" >> "$GITHUB_OUTPUT"; fi
+          if [ -z "${{ secrets.E2E_GROUP_PASSWORD }}" ]; then
+            echo "e2e=false" >> "$GITHUB_OUTPUT"; echo "::notice::E2E_GROUP_PASSWORD secret is NOT set — hosted multiplayer journeys will be skipped"
+          else echo "e2e=true" >> "$GITHUB_OUTPUT"; echo "::notice::E2E_GROUP_PASSWORD secret detected — hosted multiplayer journeys will run after deploy"; fi
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci --no-audit --no-fund
@@ -81,7 +87,11 @@ jobs:
         with: { name: live-smoke-results, path: web/test-results, retention-days: 7 }
   hosted-e2e:
     needs: deploy
-    if: github.event.inputs.run_hosted_e2e == 'yes'
+    # Runs when explicitly dispatched (run_hosted_e2e: yes), or automatically after any deploying push once the
+    # E2E_GROUP_PASSWORD and Cloudflare secrets are present. A saved password is detected and used — no manual input needed.
+    if: >-
+      needs.deploy.outputs.creds == 'true' && needs.deploy.outputs.e2e_password == 'true' &&
+      (github.event.inputs.run_hosted_e2e == 'yes' || github.event_name == 'push')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

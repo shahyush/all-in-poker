@@ -23,6 +23,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const isHost = t.hostPlayerId === me.id;
   const now = useNow(true, s.clockOffset);
   const [pending, setPending] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<VariantId | null>(null);
   const [sheet, setSheet] = useState<null | 'menu' | 'chat' | 'accounts' | 'pots' | 'rules' | 'reload'>(null);
   const [draft, setDraft] = useState('');
   const [seenChat, setSeenChat] = useState(-1);
@@ -62,6 +63,8 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   useEffect(() => { const h = () => { if (cancelAnim.current) { cancelAnim.current(); cancelAnim.current = null; setDealt(true); } }; window.addEventListener('orientationchange', h); return () => window.removeEventListener('orientationchange', h); }, []);
   // hand changed without an animation (reconnect/mid-hand): show settled cards
   useEffect(() => { if (!hand || hand.phase !== 'betting' || (hand.actionReadyAt && now >= hand.actionReadyAt + 2000)) setDealt(true); }, [hand?.id, hand?.phase, hand?.actionReadyAt, now, hand]);
+  // clear the local dealer's-choice lock once the hand moves on or a new hand begins
+  useEffect(() => { if (hand?.phase !== 'choice') setChosen(null); }, [hand?.phase, hand?.id]);
 
   const run = useCallback(async (type: string, payload: Record<string, unknown> = {}) => {
     setPending(type); setErr(null);
@@ -118,7 +121,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
           const shown: Card[] | null = shows ? shows : revealed && revealed.length ? Array.from({ length: hand!.players.find((p) => p.seat === i)?.holeCount ?? 0 }, (_, k) => revealed.find((r) => r.index === k)?.card ?? null).filter((c): c is Card => c !== null) : null;
           return <SeatView key={i} index={i} seat={seat} hand={hand} pos={positions[i]} betPos={betPosition(positions[i], landscape)} isHost={seat.playerId === t.hostPlayerId} present={presence.get(seat.playerId) ?? false} now={now} isMe={false} shownCards={shown} winCards={winCardsBySeat.get(i) ?? null} won={winTotals[i] ?? null} />;
         })}
-        <Centre t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} onChoose={(v: VariantId) => void quiet('choose', { variant: v })} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} />
+        <Centre t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} chosen={chosen} onChoose={(v: VariantId) => { setChosen(v); void quiet('choose', { variant: v }); }} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} />
       </div>
       <Hero seatNames={t.seats.map((x) => x?.name ?? null)} hand={hand} mySeat={mySeat} me={meSeat} own={view.own?.cards ?? null} ownHandId={view.own?.handId ?? null} now={now} busy={pending !== null} pending={pending} legal={legal} dealt={dealt} connected={view.connected} isCash={row.mode === 'cash'}
         onAct={(a, to) => void quiet('act', a === 'raise' ? { action: 'raise', raiseTo: String(to) } : { action: a })}

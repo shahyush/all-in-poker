@@ -14,7 +14,7 @@ describe('allin_dispatch_due', () => {
     await guest.cmd('join', { code: inviteCode, amount: 1000 });
     await host.cmd('start', {}, tableId);
     await W.db.sql`insert into public.app_settings (key, value) values ('function_url', 'https://example.test/functions/v1/api'), ('anon_key', 'anon'), ('job_key', 'k-123') on conflict (key) do update set value = excluded.value`;
-    await W.advanceClock(5_000); // the 4 s dealer's-choice deadline is now due
+    await W.advanceClock(16_000); // past the dealer's-choice deadline (RULES.timers.choiceMs); the table is now due
     const before = await W.db.sql`select count(*)::int as n from net.local_calls`;
     const [{ allin_dispatch_due: ran }] = await W.db.sql`select public.allin_dispatch_due()`;
     expect(ran).toBe(1);

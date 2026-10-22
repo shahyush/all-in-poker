@@ -11,7 +11,7 @@ export const RULES = {
   } as Record<VariantId, { id: VariantId; label: string; short: string; holeCards: number; limit: 'NL' | 'PL'; maxDealt: number }>,
   defaultVariant: 'holdem' as VariantId,
   timers: {
-    choiceMs: 4000,
+    choiceMs: 15000,
     bettingMs: 30000,
     voluntaryVoteMs: 8000,
     forcedOfferMs: 5000,

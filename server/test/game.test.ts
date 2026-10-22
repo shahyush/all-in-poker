@@ -127,8 +127,8 @@ describe('full cash session through the API', () => {
     expect(st.handNo).toBe(2);
     expect(st.hand.phase).toBe('choice');
     expect((await W.db.select('hand_history', { table_id: tableId })).length).toBe(1);
-    // nobody chooses: four seconds later the default is Hold'em
-    await W.advanceClock(4100);
+    // nobody chooses: once the 15 s window (RULES.timers.choiceMs) lapses the default is Hold'em
+    await W.advanceClock(15100);
     await W.runJobs();
     st = await W.publicState(tableId);
     expect(st.hand.variant).toBe('holdem'); expect(st.hand.phase).toBe('betting');

@@ -43,7 +43,7 @@ test('reconnect, rotation, uncontested reveal, reload approval, leave, history a
   const g = await player(browser, 'Aayush');
   const url = await hostTable(h.page, { name: 'Two of us' });
   await joinVia(g.page, url);
-  await h.page.waitForTimeout(4000); // let realtime warm before the first deal (natural in real use)
+  // Start immediately, no artificial warm-up: the 15 s dealer's-choice window covers a cold realtime/edge start.
   await h.page.getByRole('button', { name: 'Start the game' }).click();
   const pages = [h.page, g.page];
   for (const p of pages) await expect(p.locator('.game')).toBeVisible();
@@ -111,9 +111,9 @@ test('reconnect, rotation, uncontested reveal, reload approval, leave, history a
   await g.page.getByRole('button', { name: 'Table menu' }).click();
   await g.page.getByRole('button', { name: 'Leave after this hand' }).click();
   await g.page.getByRole('button', { name: 'Confirm' }).click();
-  // CRITICAL: the leave command is a POST in flight; do not reload until it has reached the server, or the reload aborts
-  // it (net::ERR_ABORTED) and the guest never actually leaves. Wait for proof it landed: the menu now offers to undo the
-  // queued leave, or the boundary has already committed and the guest is on the session summary. Either way it is safe.
+  // Confirm the leave command reached the server before doing anything else: the menu now offers to undo the queued
+  // leave, or the boundary has already committed and the guest is on the summary. (A premature reload here would abort
+  // the in-flight POST and the guest would never actually leave.)
   await expect
     .poll(async () =>
       (await g.page.getByRole('button', { name: 'Stay after all' }).isVisible().catch(() => false)) ||
@@ -121,14 +121,10 @@ test('reconnect, rotation, uncontested reveal, reload approval, leave, history a
     { timeout: 25_000 })
     .toBe(true);
   await g.page.keyboard.press('Escape');
-  // the exit (chips taken off) commits at the next hand boundary. Time only advances server-side on a command or the 1 s
-  // cron dispatcher, so once the leave has landed the boundary follows within a few seconds and the guest's view rolls to
-  // the session summary. Poll for it; reload only as a fallback, now that the command cannot be aborted.
-  await expect(async () => {
-    if (!(await g.page.getByRole('heading', { name: 'Two of us' }).isVisible().catch(() => false))) await g.page.reload();
-    await expect(g.page.getByRole('heading', { name: 'Two of us' })).toBeVisible({ timeout: 12_000 });
-    await expect(g.page.getByText('Chips taken off').first()).toBeVisible({ timeout: 8_000 });
-  }).toPass({ timeout: 70_000, intervals: [3_000, 5_000, 5_000] });
+  // No manual reload: the exit commits at the next hand boundary (server dispatcher, ~seconds) and the app transitions the
+  // leaving player to the session summary and fetches the accounting on its own. We only wait and assert.
+  await expect(g.page.getByRole('heading', { name: 'Two of us' })).toBeVisible({ timeout: 45_000 });
+  await expect(g.page.getByText('Chips taken off').first()).toBeVisible({ timeout: 10_000 });
   await g.page.screenshot({ path: 'test-results/shots/13-session-summary.png' });
   // host sees the waiting state, lobby for guest
   await g.page.getByRole('button', { name: 'History' }).click();

@@ -49,12 +49,26 @@ export function SessionPage({ tableId, go }: { tableId: string; go: (to: string)
   const [hands, setHands] = useState<{ hand_no: number; results: { variant: string; players: { name: string; won: number; folded: boolean; shown: number[] | null; revealed: number[] }[]; board: number[]; boards: number[][] | null; result: { uncontested: boolean } } }[]>([]);
   const [showHands, setShowHands] = useState(false);
   useEffect(() => {
-    (async () => {
+    let stop = false;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const load = async (): Promise<void> => {
+      tries += 1;
       const t = await s.transport.query<Row>('tables', { id: tableId });
+      if (stop) return;
       setRow(t[0] ?? null);
-      setParts(await s.transport.query<ParticipantRow>('session_participants', { table_id: tableId }));
+      const p = await s.transport.query<ParticipantRow>('session_participants', { table_id: tableId });
+      if (stop) return;
+      setParts(p);
       setHands(await s.transport.query('hand_history', { table_id: tableId }, { order: 'hand_no', asc: false, limit: 100 }) as never);
-    })().catch(() => setRow(null));
+      // Wait for the confirmed exit: a player who just left reaches this summary a beat before the boundary writes their
+      // taken-off figure. Keep re-fetching (briefly) until this viewer's own row shows left_at, or the table is archived.
+      const mine = p.find((x) => x.user_id === s.player!.id);
+      const settled = !!(t[0]?.archived_at) || !!mine?.left_at;
+      if (!settled && !stop && tries < 10) timer = setTimeout(() => void load().catch(() => undefined), 2000);
+    };
+    void load().catch(() => setRow(null));
+    return () => { stop = true; if (timer) clearTimeout(timer); };
   }, [s.transport, tableId]);
   if (!row) return <Page back="History" onBack={() => go('/history')}><Spinner /></Page>;
   const me = parts.find((p) => p.user_id === s.player!.id);
