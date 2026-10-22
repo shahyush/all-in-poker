@@ -96,6 +96,18 @@ export function SessionPage({ tableId, go }: { tableId: string; go: (to: string)
     const status: Status = p.left_at ? 'finished' : seated && seats[i]!.leaving ? 'leaving' : seated ? 'playing' : 'finished';
     return { userId: p.user_id, name: p.name, isMe: p.user_id === s.player!.id, buyin, rebuys, added, takenOff, stack, committed, inPlay, net: takenOff + inPlay - added, status, leftAt: p.left_at, place: p.place };
   };
+  // Visits: a rejoin is its own visit, not a rebuy. Walk the ledger chronologically — each buy-in after an exit opens a
+  // new visit; buy-ins within a visit are rebuys; an exit closes it. Preserves earlier visits and totals them accurately.
+  const visitsOf = (pid: string) => {
+    const evs = ledger.filter((l) => l.user_id === pid).sort((a, b) => a.id - b.id);
+    const visits: { buyin: number; rebuys: number; takenOff: number; closed: boolean }[] = [];
+    let cur: { buyin: number; rebuys: number; takenOff: number; closed: boolean } | null = null;
+    for (const e of evs) {
+      if (e.kind === 'buyin') { if (!cur || cur.closed) { cur = { buyin: Number(e.amount), rebuys: 0, takenOff: 0, closed: false }; visits.push(cur); } else cur.rebuys += Number(e.amount); }
+      else if (e.kind === 'exit' && cur) { cur.takenOff += Number(e.amount); cur.closed = true; }
+    }
+    return visits;
+  };
   const accounts = parts.map(account);
   const mine = accounts.find((a) => a.isMe) ?? null;
   const others = accounts.filter((a) => !a.isMe);
@@ -126,6 +138,12 @@ export function SessionPage({ tableId, go }: { tableId: string; go: (to: string)
             [mine.status === 'finished' ? 'Net' : 'Net so far', sign(mine.net)],
             ...(mine.leftAt ? [['Left at', when(mine.leftAt)] as [string, string]] : []),
           ]} />
+          {(() => { const vs = visitsOf(mine.userId); return vs.length > 1 ? (
+            <div className="stack" style={{ gap: 2 }}>
+              <div className="fine" style={{ fontWeight: 600 }}>This table across {vs.length} visits</div>
+              {vs.map((v, i) => <div className="kv" key={i} style={{ padding: '4px 0' }}><span className="fine">Visit {i + 1}{i === vs.length - 1 && !v.closed ? ' · current' : ''}</span><span className="fine">in {fmt(v.buyin + v.rebuys)}{v.closed ? ` · out ${fmt(v.takenOff)}` : ''}</span></div>)}
+            </div>
+          ) : null; })()}
           {mine.status === 'leaving' && <p className="fine">You are leaving after this hand — your result becomes final once it settles.</p>}
           {mine.status === 'playing' && <p className="fine">Provisional: chips still in front of you are counted, not lost.</p>}
         </div>
