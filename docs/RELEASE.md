@@ -64,9 +64,10 @@ Legend: ✅ verified by automated test or production check · 🟡 implemented, 
 
 | Suite | Result |
 | --- | --- |
-| `npm run test -w engine` | 53 passed (incl. 4 new tournament cases: forced short-stack all-in + elimination after settlement, timeout-only progression, simulated-shove completion, all-absent hold/abandon) |
-| `npm run test -w server` (real Postgres 16, RLS as `authenticated`) | 15 passed |
-| `npm run test:e2e -w web` (Playwright, iPhone 13 emulation, 3–4 independent browser contexts, local dev API) | 4 passed in 1.3 min — `docs/evidence/e2e-results.json`, screenshots `docs/evidence/*.png` |
+| `npm run test -w engine` | 59 passed (2026-10-23; incl. per-orbit dealer's choice, two burn tests, BUG01 capacity with burns, 4 tournament cases, chip conservation) |
+| `npm run test -w server` (real Postgres 16, RLS as `authenticated`) | 22 passed (2026-10-23; incl. direct-chat exactly-once/replay, Friday-table accounting regression, retry safety) |
+| `npm run test:e2e:hosted -w web` (Playwright, iPhone 13 emulation, separate browser contexts, **deployed** Worker + Supabase) | last green: CI run 39944449726 on `62d3420` — 7 passed, 1 skipped (local-only timer test). Every hosted run now publishes its per-step screenshots, `.webm` recordings and error context to the `e2e-artifacts` branch (`RUN.txt` names the run and commit) as well as the `hosted-e2e-results` Actions artifact — that branch is the reviewable evidence for pacing and layout |
+| `npm run test:e2e -w web` (local dev API) | not re-run in the cloud review environment (needs the local dev server); the hosted suite above covers the same journeys against the live stack |
 | Supplied reproductions (handoff `tests/`) | candidate audit A01–A24 pass; 28/13/15 supplied checks pass; `reproduce-live.mjs` confirmed BUG01–05 on the old engine, all five fixed |
 | Production smoke (pg_net) | `code` bundle sha matches; `api` 403/401/200 as expected; cron 590/0 |
 
