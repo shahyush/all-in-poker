@@ -35,7 +35,7 @@ reinstall to pick it up; from then on the "Update ready · tap to refresh" pill 
   `hosted-e2e-results` artifact **and** force-publishes screenshots, `.webm` recordings and error context to the
   `e2e-artifacts` branch (`RUN.txt` = run id + commit). The review environment cannot download Actions artifacts, so the
   branch is what gets reviewed frame by frame.
-- Last fully green hosted run: 39944449726 on `62d3420` (7 passed, 1 skipped).
+- Last fully green hosted run: 39993649847 on `9f81fd1` against api v18 (8 passed, 1 skipped); 39990559616 on `1f2432b` also green.
 
 ## Actual test results (2026-10-23)
 
@@ -47,7 +47,7 @@ reinstall to pick it up; from then on the "Update ready · tap to refresh" pill 
 
 ## Remaining
 
-1. **Latency.** Edge logs on 2026-10-23 showed p50 2.7 s / p90 4.8 s per command (6–7 sequential DB calls + ~0.5 s isolate boot); this made a serialized chat burst miss its budget, a reveal land after the 6 s window and a cold admit take 10 s (run 39987883777, 3 failures). api v18 cuts round trips to 3–4 (p50 2.0 s / p90 2.8 s in the first 40 commands; 1.0–1.5 s inside the function). The remaining boot cost goes away with the static-entry CLI deploy (`deploy-functions.yml`), dormant until `SUPABASE_ACCESS_TOKEN` exists as a GitHub secret. Chat sheet focus fix `73b4002` verified in run 39990559616.
+1. **Latency.** Edge logs on 2026-10-23 showed p50 2.7 s / p90 4.8 s per command (6–7 sequential DB calls + ~0.5 s isolate boot); this made a serialized chat burst miss its budget, a reveal land after the 6 s window and a cold admit take 10 s (run 39987883777, 3 failures). api v18 cuts round trips to 3–4 (full run 39993649847, 223 commands: p50 1.9 s / p90 3.3 s edge-measured; 1.0–1.5 s inside the function; all 8 hosted journeys green). The remaining boot cost goes away with the static-entry CLI deploy (`deploy-functions.yml`), dormant until `SUPABASE_ACCESS_TOKEN` exists as a GitHub secret. Chat sheet focus fix `73b4002` verified in run 39990559616.
 2. Review the recordings on `e2e-artifacts` (Hold'em default hand; 3-player Omaha 4) and refine pacing from what is seen.
 3. Real-device pass on actual phones (installed PWA, Safari keyboard) — the one reliability item still NOT VERIFIED.
 4. Standard CLI deploy route (`deploy-functions.yml`) stays dormant until `SUPABASE_ACCESS_TOKEN` exists as a GitHub secret.
