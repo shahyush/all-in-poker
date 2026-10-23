@@ -69,7 +69,7 @@ export interface Vote {
   remainingMs: number;
 }
 
-export interface RunoutStage { board: 0 | 1; cards: Card[]; street: Street; at: number }
+export interface RunoutStage { board: 0 | 1; cards: Card[]; street: Street; at: number; burn?: boolean } // burn: a card was burned ahead of this stage (announced card-free when applied)
 
 export interface HandResult {
   uncontested: boolean;
@@ -122,6 +122,7 @@ export interface HandState {
   deck: Card[];
   cursor: number;
   hole: Record<number, Card[]>;
+  burned: Card[];                    // cards burned ahead of community streets; never leaves the server (stripped from publicView)
   log: PublicLogEntry[];
 }
 
@@ -130,6 +131,7 @@ export type PublicLogEntry =
   | { t: 'fold' | 'check'; seat: number; timeout?: boolean }
   | { t: 'call' | 'bet' | 'raise'; seat: number; to: number; amount: number; allIn: boolean; timeout?: boolean }
   | { t: 'street'; street: Street; cards: Card[]; board: 0 | 1 }
+  | { t: 'burn'; street: Street; board: 0 | 1 }   // a card was burned ahead of this street — recorded without the card
   | { t: 'vote'; kind: 'proposal' | 'offer'; outcome: 'agreed' | 'declined' | 'expired' | 'once' | 'twice'; runs: 1 | 2 }
   | { t: 'award'; seat: number; amount: number; board: 0 | 1; potIndex: number; name: string }
   | { t: 'refund'; seat: number; amount: number }
@@ -177,6 +179,7 @@ export interface TableState {
 export type PublicEvent = { seq: number; handId: string | null; at: number } & (
   | { type: 'deal'; order: number[]; holeCount: number; button: number; variant: VariantId; durationMs: number }
   | { type: 'board'; board: 0 | 1; street: Street; cards: Card[] }
+  | { type: 'burn'; board: 0 | 1; street: Street }   // a card was burned ahead of this street; the card itself is never sent
   | { type: 'action'; seat: number; action: string; amount: number; to: number }
   | { type: 'award'; awards: { seat: number; amount: number }[] }
   | { type: 'showdown' }

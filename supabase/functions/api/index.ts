@@ -7,7 +7,7 @@ import { serve } from './serve.ts';
 
 const url = Deno.env.get('SUPABASE_URL')!;
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const BUNDLE_SHA = '03e891cc91bf7a9eac9db8373d9bc97a5ca5fcba1fc3f091374043423c65ca57';
+const BUNDLE_SHA = '65c7c9e9177d283634c3d79cbe00d7910f3df0f55b0284cbd9defe3e5203be6d';
 const BUNDLE_URL = `${url}/functions/v1/code/server.js?sha=${BUNDLE_SHA}`;
 
 async function sha256(text: string) {

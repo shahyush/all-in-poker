@@ -132,7 +132,7 @@ describe('full cash session through the API', () => {
     expect(st.hand.variant).not.toBeNull();
     expect((await W.db.select('hand_history', { table_id: tableId })).length).toBe(1);
     // nobody acts: the actor times out and folds (it owes a call). Wait out the deal presentation and the betting window.
-    await W.advanceClock(RULES.timers.dealPresentationMaxMs + RULES.timers.bettingMs + 2000);
+    await W.advanceClock(4000 + RULES.timers.bettingMs + 2000); // 4 s comfortably covers a three-handed Hold'em deal (~1.4 s)
     await W.runJobs();
     st = await W.publicState(tableId);
     const folded = st.hand.players.filter((p: { folded: boolean }) => p.folded).length;

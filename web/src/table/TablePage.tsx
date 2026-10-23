@@ -9,7 +9,7 @@ import { Centre } from './Centre.tsx';
 import { Hero } from './Hero.tsx';
 import { AccountsSheet, ChatSheet, MenuSheet, PotSheet, ReloadSheet, RulesSheet } from './Sheets.tsx';
 import { betPosition, seatPositions } from './geometry.ts';
-import { reducedMotionPreferred, runDealAnimation } from './animator.ts';
+import { reducedMotionPreferred, runBurnAnimation, runDealAnimation } from './animator.ts';
 import { limitLabel, variantLabel } from '../lib/format.ts';
 import { playCue } from '../lib/sound.ts';
 import { fmt } from '../components/ui.tsx';
@@ -46,6 +46,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const lastSeq = useRef<number>(-1);
   const [dealt, setDealt] = useState(true);           // false while the deal animation is in flight
   const [newBoardKeys, setNewBoardKeys] = useState<Set<string>>(new Set());
+  const [boardLead, setBoardLead] = useState(0);        // ms the current board reveal waits for a preceding burn to show
   const [sweeps, setSweeps] = useState<{ id: number; left: number; top: number }[]>([]);
   const sweepId = useRef(0);
   const cancelAnim = useRef<(() => void) | null>(null);
@@ -58,16 +59,24 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
     lastSeq.current = t.seq;
     if (gap) { setDealt(true); return; }                                      // missed too much: jump to settled view
     const reduced = reducedMotionPreferred();
+    let lead = 0; // a burn announced just before a street: the street's reveal waits this long so the burn is seen first
     for (const ev of fresh) {
       if (ev.type === 'deal' && hand && ev.handId === hand.id && rootRef.current) {
         cancelAnim.current?.();
         setDealt(false);
         cancelAnim.current = runDealAnimation(rootRef.current, ev as Extract<PublicEvent, { type: 'deal' }>, hand.id, reduced, () => { setDealt(true); cancelAnim.current = null; });
       }
+      if (ev.type === 'burn' && rootRef.current) {
+        // the server burned a hidden card ahead of a street: one face-down card leaves the deck. The event carries no
+        // card, so nothing can be exposed here.
+        lead = runBurnAnimation(rootRef.current, reduced);
+      }
       if (ev.type === 'board') {
         const keys = (ev as Extract<PublicEvent, { type: 'board' }>).cards.map((c) => `${(ev as { board: number }).board}:${c}`);
+        setBoardLead(lead);
         setNewBoardKeys(new Set(keys));
-        setTimeout(() => setNewBoardKeys(new Set()), 1400); // cover the staggered one-by-one flop (3 × ~300ms + flip)
+        setTimeout(() => setNewBoardKeys(new Set()), 1400 + lead); // burn lead + the staggered one-by-one flop (3 × ~300ms + flip)
+        lead = 0;
         // the previous street's bets have just collected into the pot: sweep a chip in from each contesting seat
         if (!reduced && hand) {
           const pos = seatPositions(t.seats.length, mySeat, landscape);
@@ -228,7 +237,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
         {hand && hand.street === 'preflop' && hand.sbSeat !== null && positions[hand.sbSeat] && <span className="blind-chip" style={marker(positions[hand.sbSeat], 0.26)} aria-label={`Small blind ${fmt(hand.sb)}`}>SB</span>}
         {hand && hand.street === 'preflop' && hand.bbSeat !== null && positions[hand.bbSeat] && <span className="blind-chip bb" style={marker(positions[hand.bbSeat], 0.26)} aria-label={`Big blind ${fmt(hand.bb)}`}>BB</span>}
         {hand && hand.street === 'preflop' && hand.straddleSeat !== null && positions[hand.straddleSeat] && <span className="blind-chip str" style={marker(positions[hand.straddleSeat], 0.26)} aria-label={`Straddle ${fmt(hand.bb * 2)}`}>STR</span>}
-        <Centre t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} chosen={chosen} submitting={submitting} onChoose={(v: VariantId) => void choose(v)} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} madeBoard={madeSet} />
+        <Centre t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} chosen={chosen} submitting={submitting} onChoose={(v: VariantId) => void choose(v)} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} boardLeadMs={boardLead} madeBoard={madeSet} />
       </div>
       <Hero seatNames={t.seats.map((x) => x?.name ?? null)} hand={hand} mySeat={mySeat} me={meSeat} own={view.own?.cards ?? null} ownHandId={view.own?.handId ?? null} now={now} busy={pending !== null} pending={pending} legal={legal} dealt={dealt} connected={view.connected} isCash={row.mode === 'cash'}
         onAct={(a, to) => void quiet('act', a === 'raise' ? { action: 'raise', raiseTo: String(to) } : { action: a })}

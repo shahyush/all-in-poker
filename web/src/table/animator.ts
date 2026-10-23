@@ -36,6 +36,27 @@ export function runDealAnimation(root: HTMLElement, ev: Extract<PublicEvent, { t
   return () => { cancelled = true; clearTimeout(t); for (const a of anims) a.cancel(); for (const el of flyers) el.remove(); };
 }
 
+/** A discreet burn: one card back slides a short way off the deck and fades, face-down throughout. The burned card is
+ *  never in the event, so there is nothing that could be exposed. Returns the lead time (ms) a following board reveal
+ *  should wait so the burn visibly happens first; 0 under reduced motion. */
+export function runBurnAnimation(root: HTMLElement, reducedMotion: boolean): number {
+  const deck = root.querySelector<HTMLElement>('[data-deck]');
+  if (!deck || reducedMotion) return 0;
+  const from = deck.getBoundingClientRect();
+  const el = document.createElement('span');
+  el.className = 'pc back fly';
+  el.setAttribute('aria-hidden', 'true');
+  el.style.left = from.left + 'px'; el.style.top = from.top + 'px'; el.style.width = from.width + 'px'; el.style.height = from.height + 'px';
+  document.body.appendChild(el);
+  const a = el.animate([
+    { transform: 'translate(0,0) rotate(0deg)', opacity: 1 },
+    { transform: `translate(${-from.width * 1.4}px, ${from.height * 0.35}px) rotate(-14deg)`, opacity: 0.9, offset: 0.7 },
+    { transform: `translate(${-from.width * 1.6}px, ${from.height * 0.5}px) rotate(-18deg)`, opacity: 0 },
+  ], { duration: 380, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'forwards' });
+  a.onfinish = () => el.remove();
+  return 380;
+}
+
 export function reducedMotionPreferred(): boolean {
   try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches || localStorage.getItem('allin.reducedMotion') === '1'; } catch { return false; }
 }

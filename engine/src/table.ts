@@ -2,7 +2,7 @@ import { assertUniqueCards, type Card } from './cards.ts';
 import type { VariantId } from './evaluator.ts';
 import { awardPots, buildPots, uncalledExcess } from './pots.ts';
 import { secureHex, secureInt, shuffledDeck, type Rng } from './random.ts';
-import { RULES, VARIANT_IDS, variantAllowed } from './rules.ts';
+import { RULES, VARIANT_IDS, variantAllowed, streetsLeft } from './rules.ts';
 import { dealTiming } from './animation.ts';
 import { isChipInt, MAX_CHIPS } from './amounts.ts';
 import {
@@ -371,7 +371,7 @@ function startNextHand(t: TableState, now: number, ctx: TickContext, effects: Ef
     // several seconds to receive and render the choice. The client re-anchors a full `choiceMs` the moment it displays the
     // choice (chooseReady); if no client ever confirms, the hand still defaults to Hold'em at the cap.
     choiceDeadline: choosing ? now + T.choiceWarmupCapMs : null, choiceArmed: false, straddleOffer: null, vote: null, proposedStreets: [], bettingLocked: false, runs: 1,
-    runoutQueue: [], result: null, revealDeadline: null, nextAt: null, startedAt: now, deck: [], cursor: 0, hole: {}, log: [],
+    runoutQueue: [], result: null, revealDeadline: null, nextAt: null, startedAt: now, deck: [], cursor: 0, hole: {}, burned: [], log: [],
   };
   if (cash && t.rules.straddle && dealt.length >= 3 && bbSeat !== null) {
     const utg = nextPlayer(t, h, bbSeat, () => true)!;
@@ -627,9 +627,11 @@ function closeStreet(t: TableState, h: HandState, now: number): void {
   }
   if (h.street === 'river') return settle(t, h, now, false);
   const next = STREETS[STREETS.indexOf(h.street) + 1];
+  const burned = burnCard(h, 0, next);
   const cards = h.deck.slice(h.cursor, h.cursor + (next === 'flop' ? 3 : 1)); h.cursor += cards.length;
   h.board.push(...cards); h.street = next;
   h.log.push({ t: 'street', street: next, cards, board: 0 });
+  if (burned) event(t, h, now, { type: 'burn', board: 0, street: next });
   event(t, h, now, { type: 'board', board: 0, street: next, cards });
   const first = nextPlayer(t, h, h.button, active)!;
   h.actor = first; h.deadline = now + 400 + T.bettingMs;
@@ -637,8 +639,19 @@ function closeStreet(t: TableState, h: HandState, now: number): void {
 
 // ---------- runouts ----------
 function remainingDeck(h: HandState): number { return 52 - h.cursor; }
+/** Cards still needed to finish one board holding `len` community cards — burns included when they are on. */
+function cardsToFinish(len: number): number { return (5 - len) + (RULES.burnCards ? streetsLeft(len) : 0); }
 export function canRunTwice(h: HandState): boolean {
-  return 2 * (5 - h.board.length) <= remainingDeck(h);
+  return 2 * cardsToFinish(h.board.length) <= remainingDeck(h);
+}
+/** Burn one hidden card ahead of a community street. It is consumed from the deck at the cursor — so it can never
+ *  reappear as a board or hole card — and kept only in h.burned, which the public view strips. Only a card-free
+ *  record is logged and announced, so a client can show a face-down burn without ever learning the card. */
+function burnCard(h: HandState, board: 0 | 1, street: Street): boolean {
+  if (!RULES.burnCards) return false;
+  h.burned.push(h.deck[h.cursor++]);
+  h.log.push({ t: 'burn', board, street });
+  return true;
 }
 
 function queueStages(t: TableState, h: HandState, now: number, runs: 1 | 2): void {
@@ -654,9 +667,12 @@ function queueStages(t: TableState, h: HandState, now: number, runs: 1 | 2): voi
     let len = start;
     while (len < 5) {
       const count = len === 0 ? 3 : 1;
-      const cards = h.deck.slice(h.cursor, h.cursor + count); h.cursor += count;
       const street: Street = len + count === 3 ? 'flop' : len + count === 4 ? 'turn' : 'river';
-      h.runoutQueue.push({ board, cards, street, at });
+      // each board burns ahead of each of its own remaining streets; cards are consumed now in true deck order and the
+      // card-free burn is announced when the stage is applied, just before its board event
+      const burn = burnCard(h, board, street);
+      const cards = h.deck.slice(h.cursor, h.cursor + count); h.cursor += count;
+      h.runoutQueue.push({ board, cards, street, at, burn });
       at += T.boardStageMs; len += count;
     }
   };
@@ -671,8 +687,9 @@ function beginRunout(t: TableState, h: HandState, now: number): void {
   if (h.bettingLocked || !cash) { queueStages(t, h, now, h.bettingLocked ? h.runs : 1); return; }
   if (h.board.length < 3) {
     // shared flop first, then the tail offer
+    const burn = burnCard(h, 0, 'flop');
     const cards = h.deck.slice(h.cursor, h.cursor + 3); h.cursor += 3;
-    h.runoutQueue.push({ board: 0, cards, street: 'flop', at: now });
+    h.runoutQueue.push({ board: 0, cards, street: 'flop', at: now, burn });
     h.phase = 'runout';
     return;
   }
@@ -692,6 +709,7 @@ function applyStage(t: TableState, h: HandState, now: number): void {
   else h.board.push(...st.cards);
   h.street = st.street;
   h.log.push({ t: 'street', street: st.street, cards: st.cards, board: st.board });
+  if (st.burn) event(t, h, now, { type: 'burn', board: st.board, street: st.street });
   event(t, h, now, { type: 'board', board: st.board, street: st.street, cards: st.cards });
   if (h.runoutQueue.length > 0) return;
   const boardLen = h.boards ? h.boards[0].length : h.board.length;
@@ -992,7 +1010,7 @@ function historyRecord(t: TableState, h: HandState): unknown {
   };
 }
 
-export interface PublicHand extends Omit<HandState, 'deck' | 'cursor' | 'hole' | 'vote' | 'runoutQueue'> {
+export interface PublicHand extends Omit<HandState, 'deck' | 'cursor' | 'hole' | 'burned' | 'vote' | 'runoutQueue'> {
   actorLegal: LegalActions | null;
   canRunTwice: boolean;
   vote: null | { kind: Vote['kind']; runs: 1 | 2; proposer: number | null; electorate: number[]; answered: number[]; deadline: number; remainingMs: number };
@@ -1004,7 +1022,7 @@ export interface PublicTable extends Omit<TableState, 'hand'> { hand: PublicHand
 export function publicView(t: TableState): PublicTable {
   const h = t.hand;
   const ph: PublicHand | null = h && {
-    ...(() => { const { deck, cursor, hole, vote, runoutQueue, ...rest } = h; void deck; void cursor; void hole; void vote; void runoutQueue; return rest; })(),
+    ...(() => { const { deck, cursor, hole, burned, vote, runoutQueue, ...rest } = h; void deck; void cursor; void hole; void burned; void vote; void runoutQueue; return rest; })(),
     vote: h.vote ? { kind: h.vote.kind, runs: h.vote.runs, proposer: h.vote.proposer, electorate: h.vote.electorate, answered: Object.keys(h.vote.votes).map(Number), deadline: h.vote.deadline, remainingMs: h.vote.remainingMs } : null,
     revealedCards: Object.fromEntries(h.players.filter((p) => p.revealed.length).map((p) => [p.seat, p.revealed.map((i) => ({ index: i, card: h.hole[p.seat][i] }))])),
     stagesPending: h.runoutQueue.length,

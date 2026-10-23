@@ -7,22 +7,48 @@ import type { TableState } from '../src/types.ts';
 const T = RULES.timers;
 
 describe('dealing and capacity', () => {
-  it('BUG01: nine-player Omaha 6 is rejected before any mutation; Omaha 5 at nine deals 45 cards', () => {
-    const { t, now, ctx } = makeTable(Array(9).fill(1000));
+  it('BUG01: an over-capacity variant is rejected before any mutation; with burns Omaha 5 fits eight, not nine', () => {
+    const { t, now, ctx } = makeTable(Array(8).fill(1000));
     startTable(t, now, ctx);
     const h = t.hand!;
     const snapshot = JSON.stringify(t);
-    expect(() => chooseVariant(t, h.chooserSeat, 'omaha6', now, ctx)).toThrow(EngineError);
+    expect(() => chooseVariant(t, h.chooserSeat, 'omaha6', now, ctx)).toThrow(EngineError); // 8 × 6 + 5 + 3 = 56
     expect(JSON.stringify(t)).toBe(snapshot);
-    expect(variantAllowed(9, 'omaha6')).toBe(false);
-    expect(variantAllowed(7, 'omaha6')).toBe(true);
+    // deck sufficiency counts the three burns per board: n × hole + 5 + 3 ≤ 52
+    expect(variantAllowed(9, 'omaha5')).toBe(false); // 45 + 8 = 53
+    expect(variantAllowed(8, 'omaha5')).toBe(true);  // 40 + 8 = 48
+    expect(variantAllowed(7, 'omaha6')).toBe(true);  // 42 + 8 = 50
     expect(variantAllowed(8, 'omaha6')).toBe(false);
+    expect(variantAllowed(9, 'omaha4')).toBe(true);  // 36 + 8 = 44
     chooseVariant(t, h.chooserSeat, 'omaha5', now, ctx);
-    expect(t.hand!.cursor).toBe(45);
-    expect(canRunTwice(t.hand!)).toBe(false); // 45 + 10 > 52 preflop; flop double (52) checked once flop is out
+    expect(t.hand!.cursor).toBe(40);
+    expect(canRunTwice(t.hand!)).toBe(false); // 40 + 2 × (5 cards + 3 burns) = 56 > 52 preflop
     const all = Object.values(t.hand!.hole).flat();
-    expect(new Set(all).size).toBe(45);
+    expect(new Set(all).size).toBe(40);
     expect(t.hand!.players.every((p) => p.holeCount === 5)).toBe(true);
+  });
+  it('burns: one hidden card is consumed before each community street, never shown, and announced card-free', () => {
+    const { t, now, ctx } = makeTable([1000, 1000, 1000]);
+    let n = start(t, now, ctx);                                   // Hold'em, three players: 6 hole cards, cursor 6
+    const h = t.hand!;
+    expect(h.cursor).toBe(6); expect(h.burned.length).toBe(0);
+    // to the flop: one burn (cursor +1) then three cards (+3); the burned card is deck[6], the flop deck[7..9]
+    n = autoplay(t, n, ctx, (x) => !!x.hand && x.hand.street === 'flop');
+    expect(h.burned).toEqual([h.deck[6]]); expect(h.cursor).toBe(10);
+    expect(h.board).toEqual(h.deck.slice(7, 10));
+    n = autoplay(t, n, ctx, (x) => !!x.hand && x.hand.street === 'turn');
+    expect(h.burned.length).toBe(2); expect(h.cursor).toBe(12); expect(h.board[3]).toBe(h.deck[11]);
+    n = autoplay(t, n, ctx, (x) => !!x.hand && x.hand.street === 'river');
+    expect(h.burned.length).toBe(3); expect(h.cursor).toBe(14); expect(h.board[4]).toBe(h.deck[13]);
+    // a burned card is never a board or hole card, and the public view never carries the burned pile
+    const seen = new Set([...h.board, ...Object.values(h.hole).flat()]);
+    for (const b of h.burned) expect(seen.has(b)).toBe(false);
+    expect('burned' in publicView(t).hand!).toBe(false);
+    // each burn is announced without any card, immediately before its street
+    const evs = t.events.filter((e) => e.type === 'burn' || e.type === 'board');
+    expect(evs.map((e) => e.type)).toEqual(['burn', 'board', 'burn', 'board', 'burn', 'board']);
+    for (const e of evs) if (e.type === 'burn') expect(Object.keys(e).some((k) => /card/i.test(k))).toBe(false);
+    void n;
   });
   it('dealer\'s choice runs once per orbit: one pick covers a full lap, then the next player clockwise chooses', () => {
     const { t, now, ctx } = makeTable([1000, 1000, 1000]);
@@ -446,6 +472,21 @@ describe('runouts', () => {
     const n2 = autoplay(t, n, ctx, (x) => x.handNo === 2 && !!x.hand);
     expect(t.hand!.runs).toBe(1); expect(t.hand!.bettingLocked).toBe(false); expect(t.hand!.boards).toBeNull(); expect(t.hand!.proposedStreets).toEqual([]);
     void n2;
+  });
+  it('burns when run twice: the shared flop burned once, then each board burns ahead of its own turn and river', () => {
+    const { t, n, ctx, h } = toFlopNoBet();
+    const holes = Object.values(h.hole).flat().length;
+    expect(h.burned.length).toBe(1);                              // one burn ahead of the shared flop
+    propose(t, h.actor!, 2, n, ctx);
+    for (const s of [...h.vote!.electorate]) { if (!h.vote) break; if (!h.vote.votes[s]) respondVote(t, s, 'agree', n, ctx); }
+    autoplay(t, n, ctx, (x) => x.hand!.phase === 'result');
+    expect(h.burned.length).toBe(5);                              // + a turn and a river burn on each of the two boards
+    expect(h.cursor).toBe(holes + 3 + 5 + 2 * 2);                 // holes, flop, five burns, two two-card tails
+    const visible = [...h.boards![0], ...h.boards![1].slice(3), ...Object.values(h.hole).flat()];
+    expect(new Set([...visible, ...h.burned]).size).toBe(visible.length + h.burned.length); // a burned card never reappears
+    const evs = t.events.filter((e) => e.type === 'burn' || e.type === 'board');
+    for (let i = 0; i < evs.length; i++) if (evs[i].type === 'board') expect(evs[i - 1]?.type).toBe('burn'); // every street is announced after its burn
+    expect(totalChips(t)).toBe(3000);
   });
   it('run twice: both tails share the flop, draw distinct cards from one deck, and settle each pot per board', () => {
     const { t, n, ctx, h } = toFlopNoBet();
