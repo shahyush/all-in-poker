@@ -59,13 +59,14 @@ export function SessionPage({ tableId, go }: { tableId: string; go: (to: string)
     const load = async (): Promise<void> => {
       tries += 1;
       const t = await s.transport.query<Row>('tables', { id: tableId });
-      if (stop) return; setRow(t[0] ?? null);
       const p = await s.transport.query<ParticipantRow>('session_participants', { table_id: tableId });
-      if (stop) return; setParts(p);
       let ledgerRows: LedgerRow[] = [];
-      try { ledgerRows = await s.transport.query<LedgerRow>('ledger', { table_id: tableId }, { order: 'id' }); setLedger(ledgerRows); } catch { /* keep */ }
+      try { ledgerRows = await s.transport.query<LedgerRow>('ledger', { table_id: tableId }, { order: 'id' }); } catch { /* keep */ }
       const handRows = await s.transport.query('hand_history', { table_id: tableId }, { order: 'hand_no', asc: false, limit: 100 });
-      setHands(handRows as never);
+      if (stop) return;
+      // paint once, with everything: the exit, the ledger and the hands are committed together, so showing the result
+      // before the hands have been fetched flashed "Hands (0)" beside a finished result
+      setRow(t[0] ?? null); setParts(p); setLedger(ledgerRows); setHands(handRows as never);
       // keep re-fetching briefly until this viewer's own exit is written (it lands a beat after they leave) or all settled
       const mine = p.find((x) => x.user_id === s.player!.id);
       // settled for this viewer only once their exit is written AND the ledger/history that explain it have arrived
