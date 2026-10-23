@@ -54,11 +54,14 @@ reinstall to pick it up; from then on the "Update ready · tap to refresh" pill 
 5. Remove the chunk rows `edge/server.js.p00…p10` from `app_assets` (keep `edge/server.js`).
 
 ## Incidents (this session)
-- **2026-10-23 12:10–12:46 UTC — live API down (~35 min), self-inflicted.** The burns bundle was published to `app_assets`
-  (publish-bundle.yml) but the review environment restarted before the matching `api` redeploy, so `api` v15 kept its
-  old sha pin, failed the boot check and answered 503 "game server is restarting" until v16 was deployed at 12:46. Nothing
-  was lost (no state is held in the function), and the hosted-e2e run that overlapped the window failed for that reason,
-  not the code. Rule now followed: publish and redeploy happen in the same step, back to back, never across a pause.
+- **2026-10-23 12:10–12:46 UTC — a publish without its redeploy; no outage resulted (verified in logs, corrected).** The
+  burns bundle was published to `app_assets` at 12:10, but the review environment restarted before the matching `api`
+  redeploy, which only happened at 12:46 (v16). I first reported this as a ~35-minute outage; the edge logs say otherwise:
+  `/api` answered 200/204 continuously through the window (only isolated cold-edge 5xx, including before the publish),
+  998 bundle fetches for the pinned old sha all returned 200, and not one `[allin boot]` error was logged — the `code`
+  function kept serving the pinned version, so v15 never failed to boot. v16 began serving with the next traffic
+  (~13:20 UTC; the dispatcher only calls the API when a table is due, so there was no traffic between). The window is
+  still real in principle, so publish and redeploy are done back to back in one step from now on.
 
 ## Ownership reservation
 Admission bootstraps the owner only while `group_settings` is empty: the first player admitted with the bootstrap
