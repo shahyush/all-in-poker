@@ -15,10 +15,13 @@ let reloading = false;
 /** Register a callback fired when a new build is installed and ready to take over. Fires immediately if already waiting. */
 export function onUpdateReady(cb: () => void): void { listener = cb; if (waiting) cb(); }
 
-/** Apply the waiting update: ask the new worker to take over; controllerchange then reloads once into the fresh shell. */
+/** Apply the waiting update: ask the new worker to take over, then reload once into the fresh shell when it does. The
+ *  reload is wired up ONLY here (on an explicit apply), never globally — a global controllerchange handler would also
+ *  fire on the service worker's first claim on a fresh load and reload the page unexpectedly. */
 export function applyUpdate(): void {
-  if (waiting) waiting.postMessage('skipWaiting');
-  else location.reload();
+  if (!waiting) { location.reload(); return; }
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloading) { reloading = true; location.reload(); } }, { once: true });
+  waiting.postMessage('skipWaiting');
 }
 
 export function initPwa(): void {
@@ -32,8 +35,6 @@ export function initPwa(): void {
     };
     if (reg.waiting && navigator.serviceWorker.controller) { waiting = reg.waiting; listener?.(); }
     reg.addEventListener('updatefound', () => announce(reg.installing));
-    // the new worker took control: reload exactly once so the fresh shell is in effect
-    navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading) return; reloading = true; location.reload(); });
     const poll = () => { reg.update().catch(() => undefined); };
     setInterval(poll, 60 * 60 * 1000);
     window.addEventListener('focus', poll);
