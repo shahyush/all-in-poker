@@ -30,6 +30,7 @@ export function SeatView({ index, seat, hand, pos, betPos, isHost, present, now,
           : Array.from({ length: Math.min(backs, 6) }).map((_, i) => <span key={i} className="pc back sm" data-slot={i} style={{ marginLeft: i ? -8 : 0, opacity: 0.95 }} />)}
       </div>
       <div className="seat-core">
+        <span className="seat-avatar" aria-hidden="true">{initialOf(seat.name)}</span>
         <span className="seat-name">{isHost ? '★ ' : ''}{seat.name}</span>
         <span className="seat-stack">{fmt(seat.stack)}{won ? <span style={{ color: 'var(--accent-table)' }}> +{fmt(won)}</span> : null}</span>
         <span className="seat-status">{actor ? 'To act' : chooser ? 'Choosing' : status[0] ?? (hand && !inHand ? '' : ' ')}</span>
@@ -40,3 +41,5 @@ export function SeatView({ index, seat, hand, pos, betPos, isHost, present, now,
   );
 }
 export function ordinal(n: number): string { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+/** First letter of a name for the avatar disc; emoji-safe (takes the first grapheme-ish code point). */
+function initialOf(name: string): string { const t = name.trim(); return t ? [...t][0]!.toUpperCase() : '?'; }

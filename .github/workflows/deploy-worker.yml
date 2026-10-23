@@ -87,6 +87,9 @@ jobs:
         with: { name: live-smoke-results, path: web/test-results, retention-days: 7 }
   hosted-e2e:
     needs: deploy
+    # contents: write only here, to publish the run's screenshots/recordings to the e2e-artifacts branch (see last step)
+    permissions:
+      contents: write
     # Runs when explicitly dispatched (run_hosted_e2e: yes), or automatically after any deploying push once the
     # E2E_GROUP_PASSWORD and Cloudflare secrets are present. A saved password is detected and used — no manual input needed.
     if: >-
@@ -108,3 +111,24 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: hosted-e2e-results, path: web/test-results, retention-days: 7 }
+      # Also publish the reviewable files (per-step screenshots, motion recordings, error context — not trace zips) to
+      # an orphan `e2e-artifacts` branch, force-updated per run. Actions artifact downloads are blocked from the cloud
+      # review environment, but a git branch is reachable, so the recordings can actually be reviewed frame by frame.
+      # Uses the job's GITHUB_TOKEN only; no extra secrets. Each run replaces the branch, so history never grows.
+      - name: Publish screenshots and recordings to the e2e-artifacts branch
+        if: always()
+        run: |
+          set -euo pipefail
+          out=$(mktemp -d)
+          if [ -d web/test-results ]; then
+            rsync -a --include='*/' --include='*.png' --include='*.webm' --include='*.md' --include='*.txt' --exclude='*' web/test-results/ "$out/"
+          fi
+          cd "$out"
+          printf 'run %s\ncommit %s\nat %s\n' "${{ github.run_id }}" "${{ github.sha }}" "$(date -u +%FT%TZ)" > RUN.txt
+          git init -q -b e2e-artifacts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Hosted e2e artifacts for ${{ github.sha }} (run ${{ github.run_id }})"
+          git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:e2e-artifacts
+          echo "published $(find . -type f | wc -l) files to branch e2e-artifacts"
