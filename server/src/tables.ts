@@ -6,7 +6,7 @@ import { ApiError } from './errors.ts';
 
 export interface MemberRow { user_id: string; role: string; seat: number | null; status: string; last_seen: number | null; joined_at: number; name: string; avatar: string | null }
 export interface TableRow { id: string; name: string; host_id: string; invite_code: string; config: Record<string, unknown>; status: string; version: number; mode: string; seats: number; host_epoch: number; due_at: number | null; archived_at: string | null; summary: unknown; seq: number; created_at: number }
-export interface Loaded { row: TableRow; t: TableState; members: MemberRow[]; now: number }
+export interface Loaded { row: TableRow; t: TableState; members: MemberRow[]; now: number; approved: { id: string; user_id: string; amount: number }[] }
 
 export interface CommitExtras {
   receipt?: { user_id: string; action_id: string; request_hash: string; status: number; result: unknown };
@@ -20,10 +20,11 @@ export interface CommitExtras {
 }
 
 export async function loadTable(db: Db, tableId: string): Promise<Loaded> {
-  const r = await db.rpc<{ found: boolean; now: number; table: TableRow; secret: TableState | null; members: MemberRow[] }>('allin_load', { table_id: tableId });
+  const r = await db.rpc<{ found: boolean; now: number; table: TableRow; secret: TableState | null; members: MemberRow[]; approved?: { id: string; user_id: string; amount: number }[] }>('allin_load', { table_id: tableId });
   if (!r.found) throw new ApiError(404, 'not_found', 'That table no longer exists');
   if (!r.secret) throw new ApiError(410, 'archived', 'This table has ended');
-  return { row: r.table, t: r.secret, members: r.members, now: Number(r.now) };
+  // approved reload requests ride along in the same call (they used to be a second query per command)
+  return { row: r.table, t: r.secret, members: r.members, now: Number(r.now), approved: (r.approved ?? []).map((a) => ({ id: a.id, user_id: a.user_id, amount: Number(a.amount) })) };
 }
 
 export function presenceOf(members: MemberRow[]): Record<string, number> {

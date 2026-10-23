@@ -73,7 +73,7 @@ test('reconnect, rotation, uncontested reveal, reload approval and run it twice'
   // shown card reaches every client before the next hand. This is a hard assertion now, not a best-effort race:
   // the winner taps the first card, then the folded opponent must see a face-up card in the winner's seat.
   const revealBtn = winner.getByRole('button', { name: /Tap to show: card 1/ });
-  await revealBtn.click({ timeout: 6000 });
+  await revealBtn.click({ timeout: 9000 });
   await expect(first.locator('.seat .pc:not(.back)').first()).toBeVisible({ timeout: 8000 });
   await winner.screenshot({ path: 'test-results/shots/11-reveal.png' });
   await expect(h.page.locator('.g-stakes')).toContainText('Hand 2', { timeout: 20_000 });

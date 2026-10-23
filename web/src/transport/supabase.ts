@@ -72,8 +72,11 @@ export class SupabaseTransport implements Transport {
     const token = await this.token();
     let r: Response;
     try {
-      r = await fetch(this.fnUrl + '/cmd', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token, apikey: this.key }, body: JSON.stringify({ actionId, type, tableId, payload }) });
-    } catch { throw new TransportError('network', 'No connection. Check your network and try again.', 0); }
+      r = await fetch(this.fnUrl + '/cmd', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token, apikey: this.key }, body: JSON.stringify({ actionId, type, tableId, payload }), signal: AbortSignal.timeout(20_000) });
+    } catch (e) {
+      if ((e as Error)?.name === 'TimeoutError') throw new TransportError('timeout', 'The server did not answer. Check your connection and try again.', 0);
+      throw new TransportError('network', 'No connection. Check your network and try again.', 0);
+    }
     let j: { ok: boolean; result?: T; error?: { code: string; message: string }; correlationId?: string };
     try { j = await r.json(); } catch { throw new TransportError('bad_response', 'Unexpected reply from the server', r.status); }
     if (!j.ok) throw new TransportError(j.error?.code ?? 'error', j.error?.message ?? 'Request failed', r.status, j.correlationId);

@@ -54,7 +54,7 @@ export async function player(browser: Browser, name: string, opts: { landscape?:
   await page.getByLabel('Your nickname').fill(name);
   await page.getByLabel('Group password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByText('Shall we deal you in?')).toBeVisible();
+  await expect(page.getByText('Shall we deal you in?')).toBeVisible({ timeout: HOSTED ? 40_000 : 15_000 }); // a cold edge admit has taken 10 s live
   return { ctx, page };
 }
 

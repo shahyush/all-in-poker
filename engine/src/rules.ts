@@ -18,7 +18,7 @@ export const RULES = {
     bettingMs: 30000,
     voluntaryVoteMs: 8000,
     forcedOfferMs: 5000,
-    revealMs: 6000,
+    revealMs: 10000,
     showdownMs: 7000,
     awardToNextChoiceMs: 3000,
     // There is deliberately no cap on the deal presentation: actionReadyAt waits the full dealTiming() for the cards

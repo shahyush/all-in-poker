@@ -28,6 +28,12 @@ export class Handlers {
   constructor(private db: Db, private env: Env) {}
 
   // ---------- identity ----------
+  /** One call: the caller's active player plus any prior receipt for this action id (replay protection). */
+  async begin(authUid: string, actionId: string | null): Promise<{ player: Player | null; receipt: { request_hash: string; status: number; result: unknown } | null }> {
+    const r = await this.db.rpc<{ player: { id: string; display_name: string; avatar: string | null; is_owner: boolean } | null; receipt: { request_hash: string; status: number; result: unknown } | null }>('allin_begin', { auth_uid: authUid, action_id: actionId });
+    const p = r.player;
+    return { player: p ? { id: p.id, name: p.display_name, avatar: p.avatar, isOwner: p.is_owner } : null, receipt: r.receipt ?? null };
+  }
   async playerFor(authUid: string): Promise<Player | null> {
     const rows = await this.db.select<ProfileRow>('profiles', { auth_user_id: authUid, status: 'active' }, { limit: 1 });
     if (!rows.length) return null;
@@ -134,7 +140,7 @@ export class Handlers {
     if (!isUuid(tableId)) bad(400, 'bad_table', 'Unknown table');
     for (let attempt = 0; attempt < 4; attempt++) {
       const L = await loadTable(this.db, tableId);
-      const approved = await this.db.select<{ id: string; user_id: string; amount: number }>('reload_requests', { table_id: tableId, status: 'approved' }, { order: 'requested_at' });
+      const approved = L.approved;
       const ctx: TickContext = { presence: presenceOf(L.members), credits: approved.map((r) => ({ playerId: r.user_id, amount: Number(r.amount), id: r.id })) };
       const before = structuredClone(L.t);
       // prepare runs AFTER the compare-and-set base is captured but BEFORE deadlines are resolved, so an intent such as
@@ -336,18 +342,19 @@ export class Handlers {
     if (!body) bad(400, 'empty', 'Write something first');
     if ([...body].length > RULES.chatMax) bad(400, 'too_long', 'Keep it under 500 characters');
     if (!isUuid(tableId)) bad(400, 'bad_table', 'Unknown table');
-    await this.rateLimit(authUid, 'chat', 20, 30, 'Slow down a little');
     // A chat message changes no game state, so it must NOT fight the table-version CAS (withTable): under a burst, the
     // retries there could all lose to a concurrent action and the message was dropped with 409 'busy' — reactions never
     // had this because allin_react writes directly. Write chat the same way, keyed on the command's action_id so a
     // retry after a lost response re-sends the same id and the insert no-ops (exactly-once, no double-post).
-    const member = await this.db.select('table_members', { table_id: tableId, user_id: player.id, status: 'active' }, { limit: 1 });
-    if (!member.length) bad(403, 'not_member', 'Join the table first');
-    await this.db.rpc('allin_chat', { table_id: tableId, user_id: player.id, body, action_id: receipt.action_id });
-    // chat no longer passes through allin_commit, and table commands do not get a receipt recorded by the dispatcher
-    // (it returns early), so record it here for replay protection — exactly as react does.
+    // Membership, the rate limit (20 per 30 s) and the command receipt are all handled inside allin_chat: one round
+    // trip instead of four, which is what made a burst of sends crawl on the hosted stack.
     const result = { ok: true };
-    await this.db.rpc('allin_receipt', { ...receipt, result });
+    const r = await this.db.rpc<{ ok: boolean; error?: string }>('allin_chat', { table_id: tableId, user_id: player.id, body, action_id: receipt.action_id, auth_uid: authUid, receipt: { ...receipt, result } });
+    if (!r.ok) {
+      if (r.error === 'not_member') bad(403, 'not_member', 'Join the table first');
+      if (r.error === 'rate_limited') bad(429, 'rate_limited', 'Slow down a little');
+      bad(500, 'chat_failed', 'Could not send that, please try again');
+    }
     return { result };
   }
 

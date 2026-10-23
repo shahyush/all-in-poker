@@ -74,7 +74,19 @@ export class App {
   }
 
   private async cmd(req: ApiRequest): Promise<unknown> {
+    const t0 = Date.now(); const mark: Record<string, number> = {}; let last = t0;
+    const lap = (k: string) => { const n = Date.now(); mark[k] = n - last; last = n; };
+    try { return await this.cmdTimed(req, lap); }
+    finally {
+      // one diagnostic line per command: phase durations in ms, no payloads. This is how latency is judged from the logs.
+      const type = req.body && typeof req.body === 'object' ? String((req.body as Record<string, unknown>).type ?? '') : '';
+      console.log('[allin t]', type, Object.entries(mark).map(([k, v]) => `${k}=${v}`).join(' '), `total=${Date.now() - t0}`);
+    }
+  }
+
+  private async cmdTimed(req: ApiRequest, lap: (k: string) => void): Promise<unknown> {
     const { authUid } = await this.auth.verify(req.headers['authorization'] ?? null);
+    lap('auth');
     const body = (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>;
     const type = String(body.type ?? '');
     const actionId = body.actionId;
@@ -91,15 +103,15 @@ export class App {
     if (type === 'admit') return this.finish(await H.admit(authUid, payload));
     if (type === 'recover') return this.finish(await H.recover(authUid, payload));
 
-    const player = await H.playerFor(authUid);
+    // player + replay protection in one call (was two sequential queries)
+    const begun = await H.begin(authUid, actionId);
+    lap('begin');
+    const player = begun.player;
     if (!player) throw new ApiError(403, 'not_admitted', 'Enter your nickname and the group password first');
     const receipt: Receipt = { user_id: player.id, action_id: actionId, request_hash: requestHash, status: 200, result: null };
-
-    // replay protection for every admitted command
-    const prior = await this.db.select<{ request_hash: string; status: number; result: unknown }>('command_receipts', { user_id: player.id, action_id: actionId }, { limit: 1 });
-    if (prior.length) {
-      if (prior[0].request_hash !== requestHash) throw new ApiError(409, 'action_conflict', 'That action id was already used for a different command');
-      return { ok: true, result: prior[0].result, replayed: true };
+    if (begun.receipt) {
+      if (begun.receipt.request_hash !== requestHash) throw new ApiError(409, 'action_conflict', 'That action id was already used for a different command');
+      return { ok: true, result: begun.receipt.result, replayed: true };
     }
 
     let out: { result: unknown } | null = null;
@@ -111,6 +123,7 @@ export class App {
       else if (type === 'react') out = await H.react(player, receipt, tableId, payload, authUid);
       else if (type === 'transfer_host') out = await H.transferHost(player, receipt, tableId, payload);
       else out = await H.game(player, receipt, tableId, type, payload);
+      lap('handler');
       return { ok: true, result: out.result };
     }
     switch (type) {
@@ -123,7 +136,9 @@ export class App {
       case 'forget': out = await H.forget(player); break;
       default: throw new ApiError(400, 'bad_type', 'Unknown command');
     }
+    lap('handler');
     if (!['preview'].includes(type)) await this.db.rpc('allin_receipt', { ...receipt, result: out.result });
+    lap('receipt');
     return { ok: true, result: out.result };
   }
 
