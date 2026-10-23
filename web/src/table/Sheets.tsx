@@ -34,13 +34,18 @@ export function ChatSheet({ chat, reactions, names, myId, onSend, onReact, onClo
     let e = g.get(r.emoji); if (!e) { e = { count: 0, mine: false, names: [] }; g.set(r.emoji, e); }
     e.count++; e.names.push(who(r.user_id)); if (r.user_id === myId) e.mine = true;
   }
+  const sendChain = useRef<Promise<unknown>>(Promise.resolve());
   async function send(e: React.FormEvent) {
     e.preventDefault();
     const body = draftRef.current.trim(); if (!body) return; // read the synchronous mirror, not the lagging React state
     // clear optimistically so the input is free for the next message the instant this one is sent; a rapid second
     // message (or fast typing during the round-trip) is never wiped.
     setErr(null); write(''); setPicker(false); setBusy(true);
-    try { await onSend(body); }
+    // sends are serialised through one chain so messages reach the server — and every other screen — in the order they
+    // were typed; overlapping requests could land out of order. The box still clears immediately for the next message.
+    const turn = sendChain.current.then(() => onSend(body));
+    sendChain.current = turn.catch(() => undefined);
+    try { await turn; }
     catch (x) {
       setErr((x as Error).message);
       // the send failed: put the failed message back, keeping anything the player typed in the meantime (both survive)

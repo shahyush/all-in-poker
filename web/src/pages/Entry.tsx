@@ -20,6 +20,9 @@ export function EntryPage({ destination }: { destination: string | null }) {
         localStorage.setItem('allin.lastName', name.trim());
         s.setPlayer(r.player);
       } else {
+        // after "forget" there is no auth session on this device; the command path never mints one on its own (that
+        // could silently detach an admitted player), so establish the session explicitly before restoring by code
+        await s.transport.ensureSession();
         const r = await s.transport.cmd<{ player: Player }>('recover', { code });
         s.setPlayer(r.player);
       }

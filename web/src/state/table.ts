@@ -46,8 +46,14 @@ export function useTable(tableId: string): TableView {
 
   const loadTable = useCallback(async () => {
     try {
-      const rows = await t.query<TableRow>('tables', { id: tableId });
-      if (!rows.length) { setError('gone'); setLoaded(true); return; }
+      let rows = await t.query<TableRow>('tables', { id: tableId });
+      if (!rows.length) {
+        // An empty read can be transient (a token refresh mid-flight, a cold read). "gone" navigates away and resets
+        // everything on screen — an open sheet, a half-typed chat message — so confirm it with a second read first.
+        await new Promise((res) => setTimeout(res, 900));
+        rows = await t.query<TableRow>('tables', { id: tableId });
+        if (!rows.length) { setError('gone'); setLoaded(true); return; }
+      }
       const r = rows[0];
       // never regress to an older version (out-of-order delivery)
       if (r.version < versionRef.current) return;
