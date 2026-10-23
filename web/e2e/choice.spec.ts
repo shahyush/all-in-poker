@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { HOSTED, player, PASSWORD, actCurrentTurn, shiftClock , closePlayers } from './helpers.ts';
+import { HOSTED, player, PASSWORD, actCurrentTurn, shiftClock, closePlayers } from './helpers.ts';
 
 // Dedicated dealer's-choice coverage, kept separate from the general journey (which tolerates either variant). These
 // tests FAIL if a deliberate selection is dropped or silently defaulted — a missed choice is never accepted here.

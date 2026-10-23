@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { player , closePlayers } from './helpers.ts';
+import { player, closePlayers } from './helpers.ts';
 
 test.afterEach(async ({ browser }, testInfo) => { await closePlayers(browser, testInfo.outputDir); }); // saves each player's recording on hosted runs
 

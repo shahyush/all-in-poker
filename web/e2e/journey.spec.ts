@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // every test opens several phone contexts; close them so later tests do not inherit their polling load
 test.afterEach(async ({ browser }, testInfo) => { await closePlayers(browser, testInfo.outputDir); }); // saves each player's recording on hosted runs
-import { player, actWhenMyTurn, PASSWORD, attachDiagnostics, expectVisibleOrDump, actCurrentTurn , closePlayers } from './helpers.ts';
+import { player, actWhenMyTurn, PASSWORD, attachDiagnostics, expectVisibleOrDump, actCurrentTurn, closePlayers, contextOptions } from './helpers.ts';
 
 test('three friends: invite → entry → buy-in → start → dealer choice → a full hand → next hand', async ({ browser }) => {
   test.setTimeout(180_000);

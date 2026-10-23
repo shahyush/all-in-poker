@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 // every test opens several phone contexts; close them so later tests do not inherit their polling load
 test.afterEach(async ({ browser }, testInfo) => { await closePlayers(browser, testInfo.outputDir); }); // saves each player's recording on hosted runs
-import { HOSTED, player, actWhenMyTurn, shiftClock, actCurrentTurn , closePlayers } from './helpers.ts';
+import { HOSTED, player, actWhenMyTurn, shiftClock, actCurrentTurn, closePlayers } from './helpers.ts';
 
 async function hostTable(page: Page, opts: { name: string; units?: string; straddle?: boolean }): Promise<string> {
   await page.getByRole('button', { name: 'Host a table' }).click();
