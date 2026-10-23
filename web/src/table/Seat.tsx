@@ -3,11 +3,11 @@ import { PlayingCard } from './Card.tsx';
 import { fmt } from '../components/ui.tsx';
 
 export interface SeatProps {
-  index: number; seat: SeatState; hand: PublicHand | null; pos: { left: number; top: number }; betPos: { left: number; top: number };
+  index: number; seat: SeatState; hand: PublicHand | null; pos: { left: number; top: number };
   isHost: boolean; present: boolean; now: number; isMe: boolean; shownCards: Card[] | null; winCards: Card[] | null; won: number | null; revealDelayMs?: number;
 }
 
-export function SeatView({ index, seat, hand, pos, betPos, isHost, present, now, isMe, shownCards, winCards, won, revealDelayMs }: SeatProps) {
+export function SeatView({ index, seat, hand, pos, isHost, present, now, isMe, shownCards, winCards, won, revealDelayMs }: SeatProps) {
   const hp = hand?.players.find((p) => p.seat === index) ?? null;
   const inHand = !!hp;
   const actor = hand?.phase === 'betting' && hand.actor === index;
@@ -20,6 +20,12 @@ export function SeatView({ index, seat, hand, pos, betPos, isHost, present, now,
   if (!present && !seat.eliminatedPlace) status.push('Away');
   if (seat.leaving) status.push('Leaving');
   const chooser = hand?.phase === 'choice' && hand.chooserSeat === index;
+  // the blind badge sits on the plaque's corner (opposite the dealer button), so it never covers a name or stack
+  const blind = hand && hand.street === 'preflop'
+    ? hand.sbSeat === index ? { cls: 'sb', text: 'SB', label: `Small blind ${fmt(hand.sb)}` }
+      : hand.bbSeat === index ? { cls: 'bb', text: 'BB', label: `Big blind ${fmt(hand.bb)}` }
+        : hand.straddleSeat === index ? { cls: 'str', text: 'STR', label: `Straddle ${fmt(hand.bb * 2)}` } : null
+    : null;
   const label = `Seat ${index + 1}, ${seat.name}${isMe ? ' (you)' : ''}, ${fmt(seat.stack)} chips${status.length ? ', ' + status.join(', ') : ''}${actor ? ', to act' : ''}${hand?.button === index ? ', dealer' : ''}`;
   const remaining = actor && hand?.deadline ? Math.max(0, hand.deadline - now) / 30000 : 0;
   const backs = hp && !hp.folded && !shownCards ? hp.holeCount : 0;
@@ -35,8 +41,8 @@ export function SeatView({ index, seat, hand, pos, betPos, isHost, present, now,
         <span className="seat-stack">{fmt(seat.stack)}{won ? <span style={{ color: 'var(--accent-table)' }}> +{fmt(won)}</span> : null}</span>
         <span className="seat-status">{actor ? 'To act' : chooser ? 'Choosing' : status[0] ?? (hand && !inHand ? '' : ' ')}</span>
         {actor && <span className="timer-ring" aria-hidden="true"><i style={{ width: Math.round(remaining * 100) + '%' }} /></span>}
+        {blind && <span className={`blind-chip ${blind.cls}`} aria-label={blind.label}>{blind.text}</span>}
       </div>
-      {hp && hp.bet > 0 && <span className="seat-bet" style={{ left: `calc(${betPos.left - pos.left}% * 1)`, top: 0, transform: 'translate(-50%, -24px)' }} aria-label={`Bet ${fmt(hp.bet)}`}>{fmt(hp.bet)}</span>}
     </div>
   );
 }

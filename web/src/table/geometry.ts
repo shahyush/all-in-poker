@@ -13,5 +13,7 @@ export function seatPositions(seatCount: number, mySeat: number, landscape: bool
 /** Position for a bet marker: a point between the seat and the centre. */
 export function betPosition(p: { left: number; top: number }, landscape: boolean): { left: number; top: number } {
   const cx = 50, cy = 50;
-  return { left: p.left + (cx - p.left) * 0.42, top: p.top + (cy - p.top) * 0.42 };
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+  // rail seats sit at ~7% / 93%; the chip pill is ~60px wide, so keep its centre at least 10% in from either edge
+  return { left: clamp(p.left + (cx - p.left) * 0.42, 10, 90), top: p.top + (cy - p.top) * 0.42 };
 }
