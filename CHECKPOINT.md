@@ -9,8 +9,8 @@ This file separates **implemented** (code merged, local tests green), **deployed
 | Layer | Version | How to check |
 | --- | --- | --- |
 | Frontend (Cloudflare Worker, free plan) | build = commit sha, shown as **Build …** at the foot of the table menu | https://all-in-poker.aayush9shah.workers.dev → table → ☰ |
-| Edge `api` | **v17**, bundle `3fd50706…` (chat direct write, per-orbit choice, server-side burns, balanced seating). v16 = burns bundle `65c7c9e9…` | Supabase MCP `list_edge_functions`; the pin is `BUNDLE_SHA` in `supabase/functions/api/index.ts` |
-| Database | migrations 1–5 applied (5 = `chat_messages.action_id` + `allin_chat`) | `supabase/migrations/` |
+| Edge `api` | **v18**, bundle `773965be…` (v17 + fewer round trips per command, token cache, phase timings `[allin t]`). v17 = `3fd50706…` | Supabase MCP `list_edge_functions`; the pin is `BUNDLE_SHA` in `supabase/functions/api/index.ts` |
+| Database | migrations 1–6 applied (6 = `allin_begin`, `allin_load` with approved reloads, `allin_chat` with membership/rate limit/receipt) | `supabase/migrations/` |
 
 Installed PWAs that predate build `62d3420` do not yet have the update prompt, so each phone needs **one** manual refresh /
 reinstall to pick it up; from then on the "Update ready · tap to refresh" pill handles new builds.
@@ -47,7 +47,7 @@ reinstall to pick it up; from then on the "Update ready · tap to refresh" pill 
 
 ## Remaining
 
-1. Chat offline-draft defect: the host's chat sheet closed when a send failed offline (`chat.spec` rapid test, offline step). Cause: `Sheet`'s focus effect depended on an inline `onClose` and re-focused the close button on every re-render, so the Enter keystroke landed on it. Fixed in `73b4002` (effect runs once per open); hosted verification pending.
+1. **Latency.** Edge logs on 2026-10-23 showed p50 2.7 s / p90 4.8 s per command (6–7 sequential DB calls + ~0.5 s isolate boot); this made a serialized chat burst miss its budget, a reveal land after the 6 s window and a cold admit take 10 s (run 39987883777, 3 failures). api v18 cuts round trips to 3–4 (p50 2.0 s / p90 2.8 s in the first 40 commands; 1.0–1.5 s inside the function). The remaining boot cost goes away with the static-entry CLI deploy (`deploy-functions.yml`), dormant until `SUPABASE_ACCESS_TOKEN` exists as a GitHub secret. Chat sheet focus fix `73b4002` verified in run 39990559616.
 2. Review the recordings on `e2e-artifacts` (Hold'em default hand; 3-player Omaha 4) and refine pacing from what is seen.
 3. Real-device pass on actual phones (installed PWA, Safari keyboard) — the one reliability item still NOT VERIFIED.
 4. Standard CLI deploy route (`deploy-functions.yml`) stays dormant until `SUPABASE_ACCESS_TOKEN` exists as a GitHub secret.
