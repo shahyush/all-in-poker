@@ -53,6 +53,13 @@ reinstall to pick it up; from then on the "Update ready · tap to refresh" pill 
 4. Standard CLI deploy route (`deploy-functions.yml`) stays dormant until `SUPABASE_ACCESS_TOKEN` exists as a GitHub secret.
 5. Remove the chunk rows `edge/server.js.p00…p10` from `app_assets` (keep `edge/server.js`).
 
+## Incidents (this session)
+- **2026-10-23 12:10–12:46 UTC — live API down (~35 min), self-inflicted.** The burns bundle was published to `app_assets`
+  (publish-bundle.yml) but the review environment restarted before the matching `api` redeploy, so `api` v15 kept its
+  old sha pin, failed the boot check and answered 503 "game server is restarting" until v16 was deployed at 12:46. Nothing
+  was lost (no state is held in the function), and the hosted-e2e run that overlapped the window failed for that reason,
+  not the code. Rule now followed: publish and redeploy happen in the same step, back to back, never across a pause.
+
 ## Ownership reservation
 Admission bootstraps the owner only while `group_settings` is empty: the first player admitted with the bootstrap
 `GROUP_PASSWORD` becomes `is_owner`, the password hash moves into the database and the env value is never consulted again.
