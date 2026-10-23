@@ -19,12 +19,16 @@ export function Page({ children, back, onBack, wide }: { children: ReactNode; ba
 
 export function Sheet({ title, onClose, children, turnCue, onReturn }: { title: string; onClose: () => void; children: ReactNode; turnCue?: string | null; onReturn?: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Read the latest onClose through a ref so the focus/keyboard effect runs ONCE per open. Depending on an inline
+  // onClose re-ran it on every parent re-render, which re-focused the sheet's first control (the close button); a
+  // failed send re-rendered within the same Enter keystroke, the key landed on that button and closed the chat.
+  const onCloseRef = useRef(onClose); onCloseRef.current = onClose;
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
-    const first = ref.current?.querySelector<HTMLElement>('button, input, textarea, [tabindex]');
+    const first = ref.current?.querySelector<HTMLElement>('input, textarea, button, [tabindex]');
     first?.focus();
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+      if (e.key === 'Escape') { e.preventDefault(); onCloseRef.current(); }
       if (e.key === 'Tab' && ref.current) {
         const f = Array.from(ref.current.querySelectorAll<HTMLElement>('button:not(:disabled), input, textarea, [tabindex]:not([tabindex="-1"])'));
         if (!f.length) return;
@@ -41,7 +45,7 @@ export function Sheet({ title, onClose, children, turnCue, onReturn }: { title: 
     const onVV = () => { const kb = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0; ref.current?.style.setProperty('--kb', kb + 'px'); };
     if (vv) { vv.addEventListener('resize', onVV); vv.addEventListener('scroll', onVV); onVV(); }
     return () => { document.removeEventListener('keydown', key); if (vv) { vv.removeEventListener('resize', onVV); vv.removeEventListener('scroll', onVV); } prev?.focus?.(); };
-  }, [onClose]);
+  }, []);
   return (
     <>
       <div className="sheet-backdrop" onClick={onClose} aria-hidden="true" />
