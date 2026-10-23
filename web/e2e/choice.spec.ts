@@ -30,11 +30,12 @@ async function pickAndExpect(pages: Page[], label: string): Promise<void> {
   }
   expect(chooser, `a player is offered the dealer's choice for ${label}`).not.toBeNull();
   await chooser!.getByRole('button', { name: label }).click();
-  // immediate feedback ("Submitting…"), then confirmed ("Locked in") once the server accepts — no optimistic lock
+  // immediate feedback the tap registered ("Submitting…", or the brief "Locked in — dealing…" if the deal is slower than
+  // the click round-trip). We do NOT wait on "Locked in" as a stable state: on a fast accept the server deals at once and
+  // the choice overlay is replaced by the dealt hand, so that label is transient. The real confirmation is below — every
+  // client ends up on the chosen variant; a dropped or defaulted choice would read "Hold'em" and fail there.
   await expect(chooser!.getByText(/Submitting|Locked in/).first()).toBeVisible({ timeout: 4_000 });
-  await expect(chooser!.getByText(/Locked in/).first()).toBeVisible({ timeout: 15_000 });
-  // every client ends up on the chosen variant — a dropped/defaulted choice would read "Hold'em" and fail here
-  for (const p of pages) await expect(p.locator('.g-stakes')).toContainText(label, { timeout: 15_000 });
+  for (const p of pages) await expect(p.locator('.g-stakes')).toContainText(label, { timeout: 20_000 });
 }
 
 test('a deliberate dealer\'s choice registers after an idle lobby and on consecutive hands', async ({ browser }) => {

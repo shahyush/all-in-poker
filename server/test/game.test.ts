@@ -200,6 +200,29 @@ describe('full cash session through the API', () => {
     expect((await host.see('chat_reactions', { table_id: tableId })).length).toBeGreaterThan(0);
   });
 
+  it('chat writes directly: a rapid concurrent burst never drops a message, and a lost-response retry cannot double-post', async () => {
+    const before = (await W.db.select('chat_messages', { table_id: tableId })).length;
+    // fire a burst from both players at once. Chat no longer rides the table-version CAS, so overlapping sends (and any
+    // concurrent game action) cannot knock one out with 409 'busy' — every one lands exactly once.
+    const burst = ['a1', 'a2', 'a3', 'h1', 'h2', 'h3'];
+    const sends = [host.cmd('chat', { body: 'h1' }, tableId), a.cmd('chat', { body: 'a1' }, tableId),
+      host.cmd('chat', { body: 'h2' }, tableId), a.cmd('chat', { body: 'a2' }, tableId),
+      host.cmd('chat', { body: 'h3' }, tableId), a.cmd('chat', { body: 'a3' }, tableId)];
+    await Promise.all(sends);
+    const after = await W.db.select<{ body: string }>('chat_messages', { table_id: tableId }, { order: 'id' });
+    expect(after.length).toBe(before + burst.length);
+    for (const m of burst) expect(after.filter((r) => r.body === m).length).toBe(1);
+
+    // a lost response: the client retries the SAME actionId. The message is posted once and the retry replays the
+    // receipt — no second row, even though the first HTTP response never came back.
+    const aid = crypto.randomUUID();
+    const first = await host.raw('chat', { body: 'once only' }, tableId, aid);
+    expect(first.body.ok).toBe(true);
+    const replay = await host.raw('chat', { body: 'once only' }, tableId, aid);
+    expect(replay.body.replayed ?? false).toBe(true);
+    expect((await W.db.select('chat_messages', { table_id: tableId })).filter((r: { body: string }) => r.body === 'once only').length).toBe(1);
+  });
+
   it('leave after the hand records the exit, frees the seat, keeps history for the departed player', async () => {
     await a.cmd('leave', {}, tableId);
     for (let i = 0; i < 12; i++) { const s = await W.publicState(tableId); if (!s.seats.some((x: { playerId: string } | null) => x && x.playerId === a.player!.id)) break; await W.advanceClock(31000); await W.runJobs(); }

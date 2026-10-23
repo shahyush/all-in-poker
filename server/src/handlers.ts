@@ -335,12 +335,20 @@ export class Handlers {
     const body = String(p.body ?? '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').trim();
     if (!body) bad(400, 'empty', 'Write something first');
     if ([...body].length > RULES.chatMax) bad(400, 'too_long', 'Keep it under 500 characters');
+    if (!isUuid(tableId)) bad(400, 'bad_table', 'Unknown table');
     await this.rateLimit(authUid, 'chat', 20, 30, 'Slow down a little');
-    const r = await this.withTable(tableId, receipt, (L) => {
-      this.seatFor(L, player);
-      return { effects: [], result: { ok: true }, extras: { chat: [{ user_id: player.id, body }], touch: player.id } };
-    });
-    return { result: r.result };
+    // A chat message changes no game state, so it must NOT fight the table-version CAS (withTable): under a burst, the
+    // retries there could all lose to a concurrent action and the message was dropped with 409 'busy' — reactions never
+    // had this because allin_react writes directly. Write chat the same way, keyed on the command's action_id so a
+    // retry after a lost response re-sends the same id and the insert no-ops (exactly-once, no double-post).
+    const member = await this.db.select('table_members', { table_id: tableId, user_id: player.id, status: 'active' }, { limit: 1 });
+    if (!member.length) bad(403, 'not_member', 'Join the table first');
+    await this.db.rpc('allin_chat', { table_id: tableId, user_id: player.id, body, action_id: receipt.action_id });
+    // chat no longer passes through allin_commit, and table commands do not get a receipt recorded by the dispatcher
+    // (it returns early), so record it here for replay protection — exactly as react does.
+    const result = { ok: true };
+    await this.db.rpc('allin_receipt', { ...receipt, result });
+    return { result };
   }
 
   async react(player: Player, receipt: Receipt, tableId: string, p: { messageId?: unknown; emoji?: unknown; op?: unknown }, authUid: string): Promise<HandlerResult> {
