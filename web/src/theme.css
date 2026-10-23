@@ -120,3 +120,9 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; 
 /* in-app "Reduce motion" preference (overrides even when the OS setting is off): kill transitions and keyframes */
 :root[data-reduce-motion] * { animation: none !important; transition: none !important; }
 :root[data-reduce-motion] .chip-sweep { display: none; }
+
+/* PWA update prompt: an unobtrusive pill above the bottom safe area; tapping applies the waiting build and reloads. */
+.update-pill { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(12px + var(--safe-b)); z-index: 60;
+  background: var(--accent); color: var(--on-accent); border: 1px solid color-mix(in srgb, var(--on-accent) 30%, var(--accent));
+  font-size: 13px; font-weight: 700; padding: 10px 16px; border-radius: 999px; box-shadow: 0 6px 20px rgba(0,0,0,.35); max-width: calc(100% - 32px); }
+.build-id { margin-top: 10px; text-align: center; opacity: .6; letter-spacing: .04em; }

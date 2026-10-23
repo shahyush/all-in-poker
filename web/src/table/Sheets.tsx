@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PublicHand, PublicTable, TableRules } from '@allin/engine/public';
 import { REACTIONS } from '@allin/engine/public';
 import { soundEnabled, setSoundEnabled, playCue } from '../lib/sound.ts';
+import { BUILD_ID } from '../lib/pwa.ts';
 import { Sheet, KV, fmt } from '../components/ui.tsx';
 import type { ChatRow, LedgerRow, MemberRow, ParticipantRow, ReactionRow, ReloadRow } from '../state/table.ts';
 
@@ -196,6 +197,7 @@ export function MenuSheet(p: { t: PublicTable; rules: TableRules; myId: string; 
       )}
       {me && (me.leaving && me.leaveReason === 'leave' ? <button type="button" className="btn btn-secondary" onClick={() => void p.run('cancel_leave')}>Stay after all</button> : <button type="button" className="btn btn-danger" onClick={() => setConfirm('leave')}>{cash ? 'Leave after this hand' : 'Leave the tournament'}</button>)}
       {!me && <button type="button" className="btn btn-secondary" onClick={() => p.go('/')}>Back to the lobby</button>}
+      <div className="fine build-id">Build {BUILD_ID}</div>
       {confirm && (
         <div className="card-box">
           <b>{confirm === 'leave' ? (cash ? 'Leave after this hand? Your chips are taken off and recorded.' : 'Leave the tournament? Your stack stays in play and keeps posting blinds until it is gone.') : `Remove ${p.names.get(confirm) ?? 'this player'} after the hand?`}</b>
