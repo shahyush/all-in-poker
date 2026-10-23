@@ -1,8 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 
 // every test opens several phone contexts; close them so later tests do not inherit their polling load
-test.afterEach(async ({ browser }) => { for (const c of browser.contexts()) await c.close().catch(() => undefined); });
-import { HOSTED, player, actWhenMyTurn, shiftClock, actCurrentTurn } from './helpers.ts';
+test.afterEach(async ({ browser }, testInfo) => { await closePlayers(browser, testInfo.outputDir); }); // saves each player's recording on hosted runs
+import { HOSTED, player, actWhenMyTurn, shiftClock, actCurrentTurn , closePlayers } from './helpers.ts';
 
 async function hostTable(page: Page, opts: { name: string; units?: string; straddle?: boolean }): Promise<string> {
   await page.getByRole('button', { name: 'Host a table' }).click();

@@ -1,9 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
-import { HOSTED, player, PASSWORD, actCurrentTurn, shiftClock } from './helpers.ts';
+import { HOSTED, player, PASSWORD, actCurrentTurn, shiftClock , closePlayers } from './helpers.ts';
 
 // Dedicated dealer's-choice coverage, kept separate from the general journey (which tolerates either variant). These
 // tests FAIL if a deliberate selection is dropped or silently defaulted — a missed choice is never accepted here.
-test.afterEach(async ({ browser }) => { for (const c of browser.contexts()) await c.close().catch(() => undefined); });
+test.afterEach(async ({ browser }, testInfo) => { await closePlayers(browser, testInfo.outputDir); }); // saves each player's recording on hosted runs
 
 async function hostAndJoin(browser: import('@playwright/test').Browser, name: string): Promise<{ h: { page: Page }; g: { page: Page }; pages: Page[] }> {
   const h = await player(browser, 'Tanisha');

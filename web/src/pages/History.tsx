@@ -62,11 +62,16 @@ export function SessionPage({ tableId, go }: { tableId: string; go: (to: string)
       if (stop) return; setRow(t[0] ?? null);
       const p = await s.transport.query<ParticipantRow>('session_participants', { table_id: tableId });
       if (stop) return; setParts(p);
-      try { setLedger(await s.transport.query<LedgerRow>('ledger', { table_id: tableId }, { order: 'id' })); } catch { /* keep */ }
-      setHands(await s.transport.query('hand_history', { table_id: tableId }, { order: 'hand_no', asc: false, limit: 100 }) as never);
+      let ledgerRows: LedgerRow[] = [];
+      try { ledgerRows = await s.transport.query<LedgerRow>('ledger', { table_id: tableId }, { order: 'id' }); setLedger(ledgerRows); } catch { /* keep */ }
+      const handRows = await s.transport.query('hand_history', { table_id: tableId }, { order: 'hand_no', asc: false, limit: 100 });
+      setHands(handRows as never);
       // keep re-fetching briefly until this viewer's own exit is written (it lands a beat after they leave) or all settled
       const mine = p.find((x) => x.user_id === s.player!.id);
-      const done = !!t[0]?.archived_at || !!mine?.left_at;
+      // settled for this viewer only once their exit is written AND the ledger/history that explain it have arrived
+      // (they are committed together but can be read a beat apart); otherwise poll a little longer
+      const explained = !mine || ((ledgerRows.length > 0 || Number(mine.added) === 0) && (handRows.length > 0 || !((t[0]?.state as { handNo?: number } | null)?.handNo)));
+      const done = !!t[0]?.archived_at || (!!mine?.left_at && explained);
       if (!done && !stop && tries < 10) timer = setTimeout(() => void load().catch(() => undefined), 2000);
     };
     void load().catch(() => setRow(null));
@@ -84,7 +89,9 @@ export function SessionPage({ tableId, go }: { tableId: string; go: (to: string)
   const account = (p: ParticipantRow): Account => {
     const mine = ledger.filter((l) => l.user_id === p.user_id);
     const bs = mine.filter((l) => l.kind === 'buyin').sort((a, b) => a.id - b.id);
-    const buyin = Number(bs[0]?.amount ?? 0);
+    // ledger rows can lag the participant row by a beat after a cash-out; until they land, show the recorded total as the
+    // buy-in rather than a contradictory "Buy-in 0" beside "Total added"
+    const buyin = Number(bs[0]?.amount ?? (bs.length ? 0 : p.added));
     const rebuys = bs.slice(1).reduce((a, l) => a + Number(l.amount), 0);
     const added = bs.reduce((a, l) => a + Number(l.amount), 0) || Number(p.added);
     const takenOff = mine.filter((l) => l.kind === 'exit').reduce((a, l) => a + Number(l.amount), 0) || Number(p.taken_off);

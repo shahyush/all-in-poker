@@ -14,7 +14,11 @@ export function InvitePage({ code, go }: { code: string; go: (to: string, replac
   const [mult, setMult] = useState('1');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    s.transport.cmd<Preview>('preview', { code }).then((r) => { setP(r); if (r.isMember) go('/table/' + r.tableId, true); }).catch((e) => setErr(e instanceof TransportError ? e.message : 'Could not load this invite'));
+    // A cold edge boot can fail the first preview with a transient server error; retry once before showing a dead end.
+    const load = () => s.transport.cmd<Preview>('preview', { code });
+    load().catch(() => new Promise((res) => setTimeout(res, 1500)).then(load))
+      .then((r) => { setP(r); if (r.isMember) go('/table/' + r.tableId, true); })
+      .catch((e) => setErr(e instanceof TransportError ? e.message : 'Could not load this invite'));
   }, [code, s.transport, go]);
   const unit = p?.rules.unit ?? 0;
   const m = parseChipAmount(mult);

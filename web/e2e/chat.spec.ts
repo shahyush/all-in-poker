@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
-import { player } from './helpers.ts';
+import { player , closePlayers } from './helpers.ts';
 
-test.afterEach(async ({ browser }) => { for (const c of browser.contexts()) await c.close().catch(() => undefined); });
+test.afterEach(async ({ browser }, testInfo) => { await closePlayers(browser, testInfo.outputDir); }); // saves each player's recording on hosted runs
 
 async function hostTable(page: Page, name: string): Promise<string> {
   await page.getByRole('button', { name: 'Host a table' }).click();

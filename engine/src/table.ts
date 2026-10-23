@@ -141,6 +141,20 @@ export function seatOf(t: TableState, playerId: string): number {
   return t.seats.findIndex((s) => s && s.playerId === playerId);
 }
 
+/** The free seat farthest (around the table) from every occupied seat, lowest index on ties: an empty table seats 0,
+ *  heads-up sits across the table, three players spread out. Players who ask for a specific seat still get it. */
+function balancedFreeSeat(seats: (SeatState | null)[]): number {
+  const n = seats.length;
+  const taken = seats.map((s, i) => (s ? i : -1)).filter((i) => i >= 0);
+  if (!taken.length) return seats.findIndex((s) => !s);
+  let best = -1, bestGap = -1;
+  for (let i = 0; i < n; i++) {
+    if (seats[i]) continue;
+    const gap = Math.min(...taken.map((j) => { const d = Math.abs(i - j); return Math.min(d, n - d); }));
+    if (gap > bestGap) { bestGap = gap; best = i; }
+  }
+  return best;
+}
 export function seatPlayer(t: TableState, player: { playerId: string; name: string }, stack: number, now: number, preferred?: number | null): number {
   if (t.status !== 'waiting' && t.status !== 'running') fail('closed', 'This table has closed');
   if (t.rules.mode === 'tournament' && t.status !== 'waiting') fail('locked', 'Registration closed when the tournament started');
@@ -151,7 +165,7 @@ export function seatPlayer(t: TableState, player: { playerId: string; name: stri
   if (totalChips(t) + stack > MAX_CHIPS) fail('invalid_amount', 'Table chip limit reached');
   let seat = -1;
   if (preferred != null && Number.isInteger(preferred) && preferred >= 0 && preferred < t.seats.length && !t.seats[preferred]) seat = preferred;
-  else seat = t.seats.findIndex((s) => !s);
+  else seat = balancedFreeSeat(t.seats);
   if (seat === -1) fail('full', 'The table is full');
   const inProgress = t.status === 'running';
   t.seats[seat] = {

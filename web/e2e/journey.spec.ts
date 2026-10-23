@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 // every test opens several phone contexts; close them so later tests do not inherit their polling load
-test.afterEach(async ({ browser }) => { for (const c of browser.contexts()) await c.close().catch(() => undefined); });
-import { player, actWhenMyTurn, PASSWORD, attachDiagnostics, expectVisibleOrDump, actCurrentTurn } from './helpers.ts';
+test.afterEach(async ({ browser }, testInfo) => { await closePlayers(browser, testInfo.outputDir); }); // saves each player's recording on hosted runs
+import { player, actWhenMyTurn, PASSWORD, attachDiagnostics, expectVisibleOrDump, actCurrentTurn , closePlayers } from './helpers.ts';
 
 test('three friends: invite → entry → buy-in → start → dealer choice → a full hand → next hand', async ({ browser }) => {
   test.setTimeout(180_000);
@@ -22,7 +22,7 @@ test('three friends: invite → entry → buy-in → start → dealer choice →
   // guests open the invite link before entering: destination is preserved through entry
   const guests = [] as { page: import('@playwright/test').Page }[];
   for (const [i, name] of ['Aayush', 'Sam'].entries()) {
-    const ctx = await browser.newContext({ viewport: i === 1 ? { width: 844, height: 390 } : { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: i === 1 ? 'reduce' : 'no-preference' });
+    const ctx = await browser.newContext(contextOptions({ landscape: i === 1, reducedMotion: i === 1 })); // recorded on hosted runs too
     const page = await ctx.newPage();
     attachDiagnostics(page, name);
     await page.goto(inviteUrl);
