@@ -38,7 +38,12 @@ async function pickAndExpect(pages: Page[], label: string): Promise<void> {
   for (const p of pages) await expect(p.locator('.g-stakes')).toContainText(label, { timeout: 20_000 });
 }
 
-test('a deliberate dealer\'s choice registers after an idle lobby and on consecutive hands', async ({ browser }) => {
+const reachHand = async (pages: Page[], label: string) => {
+  for (let i = 0; i < 60; i++) { if (await pages[0].locator('.g-stakes').getByText(label, { exact: false }).isVisible().catch(() => false)) break; if (!(await actCurrentTurn(pages))) break; }
+  await expect(pages[0].locator('.g-stakes')).toContainText(label, { timeout: 25_000 });
+};
+
+test('a deliberate dealer\'s choice covers the whole orbit, then the next orbit lets the next player pick', async ({ browser }) => {
   test.setTimeout(180_000);
   const { h, pages } = await hostAndJoin(browser, 'Choosers');
   // sit idle in the lobby so realtime/edge can spin down, then start with no warm-up — the 15 s window must still let a
@@ -46,13 +51,18 @@ test('a deliberate dealer\'s choice registers after an idle lobby and on consecu
   await h.page.waitForTimeout(HOSTED ? 30_000 : 1_000);
   await h.page.getByRole('button', { name: 'Start the game' }).click();
   for (const p of pages) await expect(p.locator('.game')).toBeVisible();
-  // hand 1: deliberately pick Omaha 4 (2 players: 2*4+5=13 cards) — must be dealt, not defaulted
+  // hand 1 (orbit start): deliberately pick Omaha 4 (2 players: 2*4+5=13 cards) — must be dealt, not defaulted
   await pickAndExpect(pages, 'Omaha 4');
   for (const p of pages) await expect(p.locator('.own-cards .pc:not(.back)')).toHaveCount(4, { timeout: 15_000 });
-  // check the hand down to reach hand 2
-  for (let i = 0; i < 40; i++) { if (await pages[0].getByText('Showdown').first().isVisible().catch(() => false)) break; if (!(await actCurrentTurn(pages))) break; }
-  await expect(pages[0].locator('.g-stakes')).toContainText('Hand 2', { timeout: 25_000 });
-  // hand 2 (consecutive): a different deliberate pick — Omaha 5 (2*5+5=15 cards) — must also register
+  // hand 2 is mid-orbit: the same variant continues with NO choice offered to anyone (one pick covers the whole orbit)
+  await reachHand(pages, 'Hand 2');
+  for (const p of pages) {
+    await expect(p.locator('.g-stakes')).toContainText('Omaha 4');
+    await expect(p.getByRole('button', { name: /Omaha 5/ })).toHaveCount(0); // no choice buttons mid-orbit
+    await expect(p.locator('.own-cards .pc:not(.back)')).toHaveCount(4, { timeout: 15_000 });
+  }
+  // hand 3 opens the next orbit (2 players → 2-hand orbits): a fresh choice is offered, now a different deliberate pick
+  await reachHand(pages, 'Hand 3');
   await pickAndExpect(pages, 'Omaha 5');
   for (const p of pages) await expect(p.locator('.own-cards .pc:not(.back)')).toHaveCount(5, { timeout: 15_000 });
 });

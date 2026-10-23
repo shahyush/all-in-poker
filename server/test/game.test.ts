@@ -121,21 +121,18 @@ describe('full cash session through the API', () => {
     expect(hist.length).toBe(0); // history is written at the boundary
   });
 
-  it('server timers advance the hand with no client involved: next hand starts, late choice defaults, timeouts fold', async () => {
+  it('server timers advance the hand with no client involved: next hand starts mid-orbit and timeouts fold', async () => {
     await W.advanceClock(RULES.timers.showdownMs + 100);  // the contested showdown holds longer so the result is readable
     await W.runJobs();
     let st = await W.publicState(tableId);
     expect(st.handNo).toBe(2);
-    expect(st.hand.phase).toBe('choice');
+    // dealer's choice runs once per orbit, so hand 2 is mid-orbit: the server deals it straight into betting at the
+    // orbit's variant with no choice window (the unattended-choice default is exercised at an orbit boundary elsewhere)
+    expect(st.hand.phase).toBe('betting');
+    expect(st.hand.variant).not.toBeNull();
     expect((await W.db.select('hand_history', { table_id: tableId })).length).toBe(1);
-    // no client ever confirms it is viewing the choice, so the window never re-anchors: the hand defaults to Hold'em once
-    // the warm-up cap (RULES.timers.choiceWarmupCapMs) lapses
-    await W.advanceClock(RULES.timers.choiceWarmupCapMs + 1000);
-    await W.runJobs();
-    st = await W.publicState(tableId);
-    expect(st.hand.variant).toBe('holdem'); expect(st.hand.phase).toBe('betting');
-    // the actor times out: folds (owes a call)
-    await W.advanceClock(31700);
+    // nobody acts: the actor times out and folds (it owes a call). Wait out the deal presentation and the betting window.
+    await W.advanceClock(RULES.timers.dealPresentationMaxMs + RULES.timers.bettingMs + 2000);
     await W.runJobs();
     st = await W.publicState(tableId);
     const folded = st.hand.players.filter((p: { folded: boolean }) => p.folded).length;

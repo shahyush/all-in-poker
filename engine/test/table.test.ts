@@ -24,6 +24,34 @@ describe('dealing and capacity', () => {
     expect(new Set(all).size).toBe(45);
     expect(t.hand!.players.every((p) => p.holeCount === 5)).toBe(true);
   });
+  it('dealer\'s choice runs once per orbit: one pick covers a full lap, then the next player clockwise chooses', () => {
+    const { t, now, ctx } = makeTable([1000, 1000, 1000]);
+    let n = start(t, now, ctx, 'omaha4');            // hand 1: the chooser picks Omaha 4 for the whole orbit
+    const firstChooser = t.orbit!.chooserSeat;
+    const buttons = [t.hand!.button];
+    expect(t.hand!.variant).toBe('omaha4');
+    expect(t.orbit!.handsTotal).toBe(3);             // fixed at orbit start from the three players dealt
+    expect(t.orbit!.handsPlayed).toBe(1);
+    // hands 2 and 3 are mid-orbit: dealt straight into betting at the same variant, no choice phase, same chooser governs
+    for (const hn of [2, 3]) {
+      n = autoplay(t, n, ctx, (x) => x.handNo === hn && !!x.hand);
+      expect(t.hand!.phase).toBe('betting');
+      expect(t.hand!.variant).toBe('omaha4');
+      expect(t.orbit!.chooserSeat).toBe(firstChooser);
+      expect(t.orbit!.handsPlayed).toBe(hn);
+      buttons.push(t.hand!.button);
+    }
+    expect(new Set(buttons).size).toBe(3);           // the button moved every hand while the chooser stayed fixed
+    // hand 4 opens a new orbit: a choice is offered again, to the next eligible player clockwise (tracked apart from the button)
+    n = autoplay(t, n, ctx, (x) => x.handNo === 4 && !!x.hand && x.hand.phase === 'choice');
+    expect(t.hand!.phase).toBe('choice');
+    expect(t.orbit!.chooserSeat).not.toBe(firstChooser);
+    expect(t.orbit!.handsPlayed).toBe(0);
+    chooseVariant(t, t.hand!.chooserSeat, 'holdem', n, ctx);  // the new chooser may pick a different variant
+    expect(t.hand!.variant).toBe('holdem');
+    expect(t.orbit!.variant).toBe('holdem');
+    void n;
+  });
   it('deals one card per seat clockwise from the left of the button', () => {
     const { t, now, ctx } = makeTable([1000, 1000, 1000]);
     startTable(t, now, ctx);
@@ -72,7 +100,7 @@ describe('blinds, button and positions', () => {
     const oldBB = t.hand!.bbSeat!;
     const leaver = t.hand!.players.find((p) => p.seat !== oldBB)!.playerId;
     requestLeave(t, leaver, 'leave', n, ctx);
-    n = autoplay(t, n, ctx, (x) => x.handNo === 2 && !!x.hand && x.hand.phase === 'choice');
+    n = autoplay(t, n, ctx, (x) => x.handNo === 2 && !!x.hand);
     expect(t.hand!.players.length).toBe(2);
     expect(t.hand!.bbSeat).not.toBe(oldBB);
     expect(t.hand!.button).toBe(oldBB);
@@ -84,7 +112,7 @@ describe('blinds, button and positions', () => {
     const bb1 = h1.bbSeat!, sb1 = h1.sbSeat!;
     // knock out the small blind's player: make them lose everything by setting stack tiny and shoving
     t.seats[sb1]!.stack = 1; // simulate a short stack (test-only mutation before action)
-    n = autoplay(t, n, ctx, (x) => x.handNo === 2 && !!x.hand && x.hand.phase === 'choice');
+    n = autoplay(t, n, ctx, (x) => x.handNo === 2 && !!x.hand);
     const h2 = t.hand!;
     const nextBB = [1, 2, 3, 4].map((k) => (bb1 + k) % 4).find((s) => t.seats[s] && t.seats[s]!.stack > 0 && t.seats[s]!.eliminatedPlace === null);
     expect(h2.bbSeat).toBe(nextBB);
@@ -495,7 +523,8 @@ describe('result, reveal and next hand', () => {
     expect(t.dueAt).toBe(n + T.revealMs);
     tick(t, n + T.revealMs, ctx);
     expect(t.handNo).toBe(2);
-    expect(t.hand!.phase).toBe('choice');
+    // dealer's choice runs once per orbit, so hand 2 is mid-orbit and deals straight into betting (no choice phase)
+    expect(t.hand!.phase).toBe('betting');
   });
   it('holds new hands while nobody is present and resumes when someone returns', () => {
     const { t, now, ctx } = makeTable([1000, 1000, 1000]);
@@ -519,15 +548,15 @@ describe('sessions: sit out, missed blinds, leave', () => {
     const target = (h1.button + 2) % 4; // BB seat this hand -> will be skipped as SB? choose seat that would be next BB
     const nextBB = (h1.bbSeat! + 1) % 4;
     requestSitOut(t, 'p' + nextBB, n);
-    n = autoplay(t, n, ctx, (x) => x.handNo === 2 && !!x.hand && x.hand.phase === 'choice');
+    n = autoplay(t, n, ctx, (x) => x.handNo === 2 && !!x.hand);
     expect(t.hand!.players.some((p) => p.seat === nextBB)).toBe(false);
-    n = autoplay(t, n, ctx, (x) => x.handNo === 3 && !!x.hand && x.hand.phase === 'choice');
+    n = autoplay(t, n, ctx, (x) => x.handNo === 3 && !!x.hand);
     expect(t.seats[nextBB]!.owesBB).toBe(true);
     requestReturn(t, 'p' + nextBB, false, n);
     // returning player waits until the natural BB reaches them
     let dealtIn = t.hand!.players.some((p) => p.seat === nextBB);
     for (let k = 0; k < 4 && !dealtIn; k++) {
-      n = autoplay(t, n, ctx, (x) => x.handNo === 3 + k + 1 && !!x.hand && x.hand.phase === 'choice');
+      n = autoplay(t, n, ctx, (x) => x.handNo === 3 + k + 1 && !!x.hand);
       dealtIn = t.hand!.players.some((p) => p.seat === nextBB);
       if (dealtIn) expect(t.hand!.bbSeat).toBe(nextBB);
     }
@@ -567,7 +596,8 @@ describe('tournament levels and eliminations', () => {
     n = now + 150_000;
     tick(t, n, ctxAll(t, n, ctx.rng));
     expect(t.hand!.level).toBe(1); expect(t.hand!.bb).toBe(20);
-    chooseVariant(t, t.hand!.chooserSeat, 'holdem', n, ctx); n = t.hand!.actionReadyAt!;
+    // hand 2 is mid-orbit, already dealt at the orbit's variant — no choice to make, just play it
+    n = t.hand!.actionReadyAt!;
     act(t, t.hand!.actor!, { type: 'fold' }, n, ctx); act(t, t.hand!.actor!, { type: 'fold' }, n, ctx);
     n = now + 10_000_000; // long after the schedule ends
     tick(t, n, ctxAll(t, n, ctx.rng));
@@ -615,7 +645,10 @@ describe('tournament levels and eliminations', () => {
         expect(t.hand!.players.length).toBe(2); // play continues heads-up, the busted seat is never dealt in
         expect(t.hand!.players.some((p) => p.seat === bb)).toBe(false);
       } else {
-        expect(t.seats[bb]!.stack).toBeGreaterThan(15); // won the main pot or a share of it
+        // the next hand is dealt immediately now (mid-orbit), so the survivor may already have posted a blind into it;
+        // add that back to read the stack as settled by the hand we just played
+        const settled = t.seats[bb]!.stack + (t.hand!.players.find((p) => p.seat === bb)?.bet ?? 0);
+        expect(settled).toBeGreaterThan(15); // won the main pot or a share of it
         expect(t.seats[bb]!.eliminatedPlace).toBeNull();
         expect(t.hand!.players.length).toBe(3);
       }
@@ -659,13 +692,16 @@ describe('tournament levels and eliminations', () => {
     const effects: ReturnType<typeof tick> = [];
     let n = now;
     let hands = 0;
+    let lastHand = 0;
     const bbs: number[] = [];
     effects.push(...startTable(t, now, ctx));
     for (let g = 0; g < 5000 && t.status === 'running'; g++) {
       const h = t.hand;
       if (!h) { n = Math.max(n, t.dueAt ?? n) + 1; effects.push(...tick(t, n, ctxAll(t, n, ctx.rng))); continue; }
-      if (h.phase === 'choice') { chooseVariant(t, h.chooserSeat, 'holdem', n, ctx); n = h.actionReadyAt!; hands++; bbs.push(h.bb); continue; }
+      if (h.phase === 'choice') { chooseVariant(t, h.chooserSeat, 'holdem', n, ctx); n = h.actionReadyAt!; continue; }
       if (h.phase === 'betting' && h.actor !== null) {
+        if (h.actionReadyAt && n < h.actionReadyAt) n = h.actionReadyAt; // mid-orbit hands deal immediately; wait out the deal
+        if (h.handNo !== lastHand) { lastHand = h.handNo; hands++; bbs.push(h.bb); } // count every hand, not only orbit starts
         // one designated seat shoves each hand (rotating); everyone else calls, so every hand is contested by all
         const alive = t.seats.map((s, i) => (s && s.stack > 0 && s.eliminatedPlace === null ? i : -1)).filter((i) => i >= 0);
         const shover = alive[(h.handNo - 1) % alive.length];

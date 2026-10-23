@@ -79,7 +79,7 @@ test('reconnect, rotation, uncontested reveal, reload approval and run it twice'
   await expect(h.page.locator('.g-stakes')).toContainText('Hand 2', { timeout: 20_000 });
   // the compact last-hand recap names the previous hand's winner and award (uncontested here) without exposing mucked cards
   await expect(h.page.locator('.g-recap')).toContainText(/won/, { timeout: 10_000 });
-  await chooseIfAsked(pages, /Omaha 5/);
+  // hand 2 is mid-orbit (dealer's choice runs once per orbit), so no new variant is offered here — it continues the orbit
   // reload: guest requests, host approves; credited at the next boundary only
   await g.page.getByRole('button', { name: 'Table menu' }).click();
   await g.page.getByRole('button', { name: 'Reload chips' }).click();

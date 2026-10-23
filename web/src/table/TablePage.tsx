@@ -203,7 +203,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
         </div>
-        <div className="g-stakes">{stakes.map((x, i) => <span key={i}>{i === 0 ? <b>{x}</b> : x}</span>)}{hand && <span>Hand {hand.handNo}</span>}</div>
+        <div className="g-stakes">{stakes.map((x, i) => <span key={i}>{i === 0 ? <b>{x}</b> : x}</span>)}{hand && <span>Hand {hand.handNo}</span>}{t.orbit && t.orbit.variant && t.orbit.handsTotal > 1 && <span>Choice {Math.min(t.orbit.handsPlayed, t.orbit.handsTotal)}/{t.orbit.handsTotal}</span>}</div>
         {recap && (!hand?.result || hand.handNo !== recap.handNo) && (
           <div className="g-recap" role="status" aria-label="Last hand result">
             <span className="g-recap-tag">Last hand</span>

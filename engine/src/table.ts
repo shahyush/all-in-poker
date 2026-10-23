@@ -131,7 +131,7 @@ export function createTable(id: string, rules: TableRules, hostPlayerId: string,
   const r = validateRules(rules);
   return {
     id, rules: r, status: 'waiting', version: 0, seq: 0,
-    seats: Array(r.seats).fill(null), button: null, prevBB: null, prevSB: null, handNo: 0, hand: null,
+    seats: Array(r.seats).fill(null), button: null, prevBB: null, prevSB: null, handNo: 0, hand: null, orbit: null,
     hostPlayerId, hostEpoch: 1, createdAt: now, startedAt: null, nextSeq: 0,
     tournament: null, waitingReason: 'Waiting for players', dueAt: null, idleCheckAt: null, events: [], error: null, lastActivityAt: now,
   };
@@ -344,7 +344,19 @@ function startNextHand(t: TableState, now: number, ctx: TickContext, effects: Ef
   dealt.sort((a, b) => a - b);
 
   const { sb, bb, ante, level } = blindsFor(t, now);
-  const chooser = dealt.includes(button) ? button : nextSeat(t, button, (_, i) => dealt.includes(i))!;
+  // Dealer's choice runs once per orbit. A new orbit begins only when the previous one has played its full count of
+  // hands; its chooser is the first eligible seat clockwise from the previous orbit's chooser (or, for the very first
+  // orbit, the button). While an orbit is in progress we skip the choice phase and deal its variant straight away.
+  const inHand = (_: SeatState, i: number) => dealt.includes(i);
+  const orbitDone = !t.orbit || t.orbit.handsPlayed >= t.orbit.handsTotal;
+  if (orbitDone) {
+    const prev = t.orbit?.chooserSeat ?? null;
+    const chooserSeat = prev !== null ? nextSeat(t, prev, inHand)! : (dealt.includes(button) ? button : nextSeat(t, button, inHand)!);
+    t.orbit = { chooserSeat, variant: null, handsTotal: dealt.length, handsPlayed: 0 };
+  }
+  const orbit = t.orbit!;
+  const choosing = orbit.variant === null;          // first hand of an orbit: the chooser still has to pick
+  const chooser = orbit.chooserSeat;
   t.handNo += 1;
   const players: HandPlayer[] = dealt.map((seat) => ({
     seat, playerId: t.seats[seat]!.playerId, holeCount: 0, folded: false, allIn: false, left: false,
@@ -358,7 +370,7 @@ function startNextHand(t: TableState, now: number, ctx: TickContext, effects: Ef
     // Start with a generous warm-up cap, not the usable window: after an idle/cold start the chooser's client can take
     // several seconds to receive and render the choice. The client re-anchors a full `choiceMs` the moment it displays the
     // choice (chooseReady); if no client ever confirms, the hand still defaults to Hold'em at the cap.
-    choiceDeadline: now + T.choiceWarmupCapMs, choiceArmed: false, straddleOffer: null, vote: null, proposedStreets: [], bettingLocked: false, runs: 1,
+    choiceDeadline: choosing ? now + T.choiceWarmupCapMs : null, choiceArmed: false, straddleOffer: null, vote: null, proposedStreets: [], bettingLocked: false, runs: 1,
     runoutQueue: [], result: null, revealDeadline: null, nextAt: null, startedAt: now, deck: [], cursor: 0, hole: {}, log: [],
   };
   if (cash && t.rules.straddle && dealt.length >= 3 && bbSeat !== null) {
@@ -367,6 +379,9 @@ function startNextHand(t: TableState, now: number, ctx: TickContext, effects: Ef
     if (s.stack - Math.min(ante, s.stack) >= 2 * bb) h.straddleOffer = { seat: utg, decided: s.straddlePref, accepted: s.straddlePref };
   }
   t.button = button; t.prevBB = bbSeat; t.prevSB = sbSeat ?? sbPos ?? sbSeat; t.hand = h; t.waitingReason = null; t.idleCheckAt = null;
+  // Mid-orbit: the variant is already set, so deal immediately without a choice phase. If players joined and the orbit's
+  // variant no longer fits the deck for this many hands, fall back to Hold'em for this hand only (the orbit choice stands).
+  if (!choosing) dealHand(t, h, variantAllowed(dealt.length, orbit.variant!) ? orbit.variant! : RULES.defaultVariant, now, ctx, false);
 }
 
 // ---------- dealer's choice & straddle ----------
@@ -417,6 +432,9 @@ function dealHand(t: TableState, h: HandState, variant: VariantId, now: number, 
   const deck = shuffledDeck(ctx.rng ?? secureInt);
   assertUniqueCards(deck);
   h.variant = variant; h.deck = deck; h.cursor = 0;
+  // record the orbit's variant on its first hand only (a later capacity fallback must not rewrite the orbit choice) and
+  // count this hand toward the orbit
+  if (t.orbit) { if (t.orbit.variant === null) t.orbit.variant = variant; t.orbit.handsPlayed += 1; }
   const order: number[] = [];
   let s = h.button;
   for (let k = 0; k < n; k++) { s = nextPlayer(t, h, s, () => true)!; order.push(s); }

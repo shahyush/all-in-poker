@@ -156,6 +156,10 @@ export interface TableState {
   prevSB: number | null;               // previous small-blind position (dead-button rule)
   handNo: number;
   hand: HandState | null;
+  // Dealer's choice runs once per orbit: one chooser's pick stands for a whole lap of the button. handsTotal is fixed
+  // when the orbit starts (from the players dealt that hand) so joins/leaves/sit-outs can't reshape the orbit; variant
+  // is null until the chooser picks (or the window defaults it). Persisted in state, so it survives reload/reconnect.
+  orbit: { chooserSeat: number; variant: VariantId | null; handsTotal: number; handsPlayed: number } | null;
   hostPlayerId: string;
   hostEpoch: number;
   createdAt: number;
