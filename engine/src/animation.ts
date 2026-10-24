@@ -8,8 +8,8 @@ export interface DealPlan { eventId: string; handId: string; steps: DealStep[]; 
 // Deliberate by design: every card has the same clear travel and a constant readable gap after it, so the total
 // duration SCALES with the number of cards dealt. A full table or an Omaha game simply takes longer to deal rather
 // than compressing back into a blur; it is never capped, because the deal happens before anyone has to act.
-export const DEAL_TRAVEL_MS = 320;
-export const DEAL_GAP_MS = 210;
+export const DEAL_TRAVEL_MS = 420;
+export const DEAL_GAP_MS = 320;
 export function dealTiming(total: number, reducedMotion = false): { travel: number; gap: number; total: number } {
   if (reducedMotion || total <= 0) return { travel: 0, gap: 0, total: 0 };
   const gap = total > 1 ? DEAL_GAP_MS : 0;
