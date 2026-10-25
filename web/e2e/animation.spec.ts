@@ -57,3 +57,36 @@ test('showdown presents large winning cards, both board winners and a visible re
   await expect(result.locator('.winner-sparks')).toBeHidden();
   await expect(result.locator('.pc')).toHaveCount(5);
 });
+
+test('folded own cards stay readable and last-player-standing exposes both run choices', async ({page}) => {
+  await page.setViewportSize({width:390,height:700});
+  await page.route('http://127.0.0.1:5173/', route => route.fulfill({contentType:'text/html',body:'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div></body></html>'}));
+  await page.goto('/');
+  await page.evaluate(async () => {
+    const refresh=await import(/* @vite-ignore */ '/@react-refresh');refresh.default.injectIntoGlobalHook(window);
+    (window as any).$RefreshReg$=()=>{};(window as any).$RefreshSig$=()=>(type:unknown)=>type;(window as any).__vite_plugin_react_preamble_installed__=true;
+    (await import(/* @vite-ignore */ '/e2e/layout-fixture.tsx')).renderLayout(5,4,false,false,false,false,true,false);
+  });
+  await expect(page.locator('.own-cards .pc:not(.back)')).toHaveCount(4);
+  await expect(page.locator('.hero-meta')).toContainText('Folded');
+  await expect(page.locator('.seat-cards .pc:not(.back)')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Fold',exact:true})).toBeDisabled();
+  await page.evaluate(async()=>{(await import(/* @vite-ignore */ '/e2e/layout-fixture.tsx')).renderLayout(5,4,false,false,false,true,false,false);});
+  await expect(page.getByRole('button',{name:'Run once',exact:true})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Two boards · keep betting',exact:true})).toBeEnabled();
+});
+
+test('folded player can inspect private cards during showdown', async ({page}) => {
+  await page.route('http://127.0.0.1:5173/', route => route.fulfill({contentType:'text/html',body:'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div></body></html>'}));
+  await page.goto('/');
+  await page.evaluate(async () => {
+    const refresh=await import(/* @vite-ignore */ '/@react-refresh');refresh.default.injectIntoGlobalHook(window);
+    (window as any).$RefreshReg$=()=>{};(window as any).$RefreshSig$=()=>(type:unknown)=>type;(window as any).__vite_plugin_react_preamble_installed__=true;
+    (await import(/* @vite-ignore */ '/e2e/layout-fixture.tsx')).renderLayout(5,4,false,false,true,false,true,false);
+  });
+  const result=page.getByRole('region',{name:'Winning hand'});
+  await expect(result.locator('.pc')).toHaveCount(5);
+  await result.getByRole('button',{name:'My folded hand'}).click();
+  await expect(result.locator('.pc')).toHaveCount(4);
+  await expect(result.locator('.showdown-hand-name')).toHaveText('Only visible to you');
+ });

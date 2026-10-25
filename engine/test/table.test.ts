@@ -959,3 +959,40 @@ describe('stress: random play conserves chips and never deals duplicates', () =>
     expect(hands).toBeGreaterThan(100);
   });
 });
+
+describe('last player standing run choices', () => {
+  const rules = {mode:'tournament' as const, unit:1000, orbitBlindStep:5 as const, levels:[{sb:5,bb:10,ante:0,minutes:15}]};
+  for (const runs of [1,2] as const) it(`accepts a voluntary ${runs}-board choice with conserved chips`, () => {
+    const {t,now,ctx}=makeTable([1000,1000,1000],rules);
+    let n=start(t,now,ctx);
+    n=autoplay(t,n,ctx,x=>x.hand!.street==='flop');
+    const h=t.hand!, actor=h.actor!;
+    propose(t,actor,runs,n,ctx);
+    for(const seat of [...h.vote!.electorate]) if(seat!==actor) respondVote(t,seat,'agree',n,ctx);
+    if(runs===2) { expect(h.phase).toBe('betting'); expect(h.actor).toBe(actor); }
+    else expect(h.phase).toBe('runout');
+    autoplay(t,n,ctx,x=>x.hand!.phase==='result');
+    expect(h.boards?.length ?? 1).toBe(runs);
+    expect(totalChips(t)).toBe(3000);
+    expect(h.nextAt! - t.events.findLast(e=>e.type==='award')!.at).toBe(8000);
+  });
+  it('offers once/twice after an all-in in last player standing',()=>{
+    const {t,now,ctx}=makeTable([1000,1000],rules);
+    let n=start(t,now,ctx);const h=t.hand!;
+    act(t,h.actor!,{type:'raise',raiseTo:1000},n,ctx);
+    act(t,h.actor!,{type:'call'},n,ctx);
+    n=autoplay(t,n,ctx,x=>x.hand!.phase==='offer');
+    for(const seat of [...h.vote!.electorate]) respondVote(t,seat,'twice',n,ctx);
+    autoplay(t,n,ctx,x=>x.hand!.phase==='result');
+    expect(h.boards?.map(b=>b.length)).toEqual([5,5]);expect(totalChips(t)).toBe(2000);
+  });
+});
+
+it('folded cards remain available only in the player private view',()=>{
+  const {t,now,ctx}=makeTable([1000,1000,1000]);const n=start(t,now,ctx), h=t.hand!, seat=h.actor!;
+  const player=t.seats[seat]!.playerId, cards=privateCards(t,player);
+  act(t,seat,{type:'fold'},n,ctx);
+  expect(privateCards(t,player)).toEqual(cards);
+  expect(publicView(t).hand!.players.find(p=>p.seat===seat)!.revealed).toEqual([]);
+  expect('hole' in publicView(t).hand!).toBe(false);
+});

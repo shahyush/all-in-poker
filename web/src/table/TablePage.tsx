@@ -189,7 +189,9 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const madeSet = useMemo(() => (madeShown && made ? new Set<Card>(made.cards) : null), [madeShown, made]);
 
   const resultAge = hand?.result && hand.nextAt ? now - (hand.nextAt - (hand.result.uncontested ? RULES.timers.revealMs : RULES.timers.showdownMs)) : 0;
-  const awardDelay = hand?.result?.uncontested ? 0 : 1300 + Object.keys(hand?.result?.shows ?? {}).length * 850;
+  const revealCount = Object.keys(hand?.result?.shows ?? {}).length;
+  const revealStep = Math.min(650, Math.floor((RULES.timers.showdownMs - 3500) / Math.max(1, revealCount)));
+  const awardDelay = hand?.result?.uncontested ? 0 : 700 + revealCount * revealStep;
   const awardReady = !!hand?.result && resultAge >= awardDelay;
   // Keep the mount eligible throughout the result: slow delivery must not miss a 2.2s server-time window.
   const winnerBurst = awardReady;
@@ -201,7 +203,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   if (hand?.result && !hand.result.uncontested && hand.result.shows && hand.button !== null) {
     const shown = new Set(Object.keys(hand.result.shows).map(Number));
     const n = t.seats.length;
-    showdownOrder(hand.log, hand.button, n, [...shown]).forEach((seat, index) => revealDelay.set(seat, 700 + index * 850));
+    showdownOrder(hand.log, hand.button, n, [...shown]).forEach((seat, index) => revealDelay.set(seat, 500 + index * revealStep));
   }
 
   // Compact last-hand recap: captured when a hand settles, shown through the next hand. Winner, amount and the made-hand
