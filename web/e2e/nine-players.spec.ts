@@ -87,16 +87,19 @@ for (const variant of ["Hold'em", 'Omaha 4']) test(`nine separate players: ${var
   await landscapeActor.setViewportSize({width:390,height:844});
   if(variant === 'Omaha 4') {
     const p = await actor(pages);
-    await p.getByRole('button',{name:'Run twice',exact:true}).click();
+    await p.getByRole('button',{name:'Two boards · keep betting',exact:true}).click();
     await Promise.all(pages.filter(q=>q!==p).map(async q=>{
       const agree=q.getByRole('button',{name:'Agree',exact:true});
       await expect(agree).toBeVisible();
       await agree.click();
     }));
     await expect(h.page.locator('.board')).toHaveCount(2);
-  } else {
-    for(let i=0;i<26;i++) await checkCall(pages);
+    await expect(h.page.locator('.board .pc:not(.slot)')).toHaveCount(6);
+    await expect(p.getByRole('group', {name:'Actions'})).toBeVisible();
   }
+  // One flop check was already made. Agreement preserves that action;
+  // both variants still need eight flop, nine turn and nine river actions.
+  for(let i=0;i<26;i++) await checkCall(pages);
   await expect(h.page.locator('.result-strip')).toBeVisible({timeout:20000});
   await expect(h.page.getByRole('group', {name:'Actions'})).toHaveCount(0);
   await h.page.waitForTimeout(1000);
