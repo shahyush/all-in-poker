@@ -12,7 +12,11 @@ Voluntary two-board agreement now resumes the exact actor/remaining clock and ke
 
 Showdowns hold 12 seconds; ordered reveals are spaced 850ms, followed by winner highlights and a brief gold spark burst. Action keys have tactile depth, seat plaques are compact, and house-rule text now matches the implementation. Reduced motion is respected.
 
-Validation: 71 engine tests, 13 Chromium layout/interaction tests and production build passed. Local server integration is blocked because the local Postgres reset cannot run; GitHub's Postgres-backed suite is required before deployment. Hosted multiplayer verification remains separate.
+Deployed: frontend f5ef4ca on Cloudflare (run 40205941837); api v21 with static bundle e8b6f4d3de96acc267837c337481b46e2ab1a9fceb2e2796a26533e3ce3455c4. Deployment, live-site verification and WebKit/Chromium sign-in smoke passed.
+
+Validation: 71 engine tests and 22 server integration tests passed in GitHub CI. Chromium's complete 11-journey suite passed on a58be45, including nine-player Hold'em and Omaha, continued two-board betting, chat and balanced accounts. All 13 layout/interaction checks passed; Firefox layout passed. WebKit's full run remains pending.
+
+Hosted run 40205941837: deploy and live-smoke passed; gameplay 6 passed, 2 failed, 1 skipped. Invite preview stalled at “Opening your invite”; the reconnect/two-board journey hit its 180-second budget with clients on different streets. These failures are NOT declared resolved. A follow-up bounds Supabase auth/REST request headers and bodies to 12 seconds, bounds invite preview requests to 12 seconds, and prevents an unmounted table's in-flight poll from restarting. The stalled-request/recovery/caller-abort browser regression and production build pass locally; deployed verification follows.
 
 ## October 25 update
 
@@ -27,7 +31,7 @@ The previous Chromium functional run passed 10/11 (including both nine-player jo
 | Layer | Version | How to check |
 | --- | --- | --- |
 | Frontend (Cloudflare Worker, free plan) | build = commit sha, shown as **Build …** at the foot of the table menu | https://all-in-poker.aayush9shah.workers.dev → table → ☰ |
-| Edge `api` | **v20**, static bundle `54929c91…`, shared deal/burn timing and final-street-aggressor showdown order | Supabase MCP `list_edge_functions`; the pin is `BUNDLE_SHA` in `supabase/functions/api/index.ts` |
+| Edge `api` | **v21**, static bundle `e8b6f4d3…`, orbit blinds, continued two-board betting and 12-second showdown | Supabase MCP `list_edge_functions`; the pin is `BUNDLE_SHA` in `supabase/functions/api/index.ts` |
 | Database | migrations 1–6 applied (6 = `allin_begin`, `allin_load` with approved reloads, `allin_chat` with membership/rate limit/receipt) | `supabase/migrations/` |
 
 Installed PWAs that predate build `62d3420` do not yet have the update prompt, so each phone needs **one** manual refresh /

@@ -92,6 +92,7 @@ export function useTable(tableId: string): TableView {
     // shorter than any safe fixed poll (4 s dealer's choice, 3 s reveal). Poll fast while a short window or the local
     // player's turn is live, slow when idle. Realtime (above) still delivers instantly when it works; this is the floor.
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    let disposed = false;
     const pollInterval = (): number => {
       const st = stateRef.current;
       if (!st) return 2000;
@@ -107,6 +108,7 @@ export function useTable(tableId: string): TableView {
       return 2000;
     };
     const pollLoop = () => {
+      if (disposed) return;
       pollTimer = setTimeout(async () => { await Promise.all([loadTable(), loadOwn()]); pollLoop(); }, pollInterval());
     };
     pollLoop();
@@ -116,7 +118,7 @@ export function useTable(tableId: string): TableView {
     document.addEventListener('visibilitychange', vis);
     window.addEventListener('online', vis);
     window.addEventListener('focus', vis);
-    return () => { subs.forEach((u) => u()); if (pollTimer) clearTimeout(pollTimer); clearInterval(hb); document.removeEventListener('visibilitychange', vis); window.removeEventListener('online', vis); window.removeEventListener('focus', vis); };
+    return () => { disposed = true; subs.forEach((u) => u()); if (pollTimer) clearTimeout(pollTimer); clearInterval(hb); document.removeEventListener('visibilitychange', vis); window.removeEventListener('online', vis); window.removeEventListener('focus', vis); };
   }, [t, tableId, reload, loadTable, loadOwn, loadChat, loadReactions, loadReloads, loadMembers, loadLedger]);
 
   return { row, members, chat, reactions, reloads, ledger, participants, own, error, loaded, reload, connected };
