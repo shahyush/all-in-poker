@@ -294,3 +294,29 @@
   .board .pc { height: 32px; width: 24px; }
   .result-strip { max-height: 70px; font-size: 11px; }
 }
+
+/* The winning five cards get the full-width footer; seat cards never grow over the board. */
+.showdown-hero { align-items: center; gap: 6px; }
+.showdown-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; width: 100%; font-size: 14px; }
+.showdown-heading span { font-size: 11px; color: var(--game-muted); white-space: nowrap; }
+.showdown-cards { position: relative; display: flex; gap: 6px; justify-content: center; }
+.showdown-cards .pc { width: 44px; height: 62px; padding: 4px; }
+.showdown-cards .pc .r { font-size: 22px; }
+.showdown-cards .pc .s { font-size: 20px; }
+.showdown-hand-name { color: var(--accent-table); font-family: var(--display); font-size: 25px; line-height: 1.1; text-align: center; }
+.showdown-tabs { display: flex; gap: 6px; width: 100%; overflow-x: auto; }
+.showdown-tabs button { flex: none; min-height: 32px; padding: 4px 10px; border-radius: 6px; background: var(--seat); font-size: 12px; }
+.showdown-tabs button[aria-pressed=true] { color: var(--accent-table); box-shadow: inset 0 -2px var(--accent-table); }
+.winner-sparks i::after { content: none; }
+.winner-sparks i > span { display: block; width: 5px; height: 9px; border-radius: 1px; background: #efcf86; box-shadow: 0 0 6px #d9ad54; animation: winner-confetti 2800ms ease-out both; }
+.winner-sparks i:nth-child(even) > span { background: #fff7dc; width: 4px; height: 5px; }
+@keyframes winner-confetti { 0% { opacity: 0; transform: translateY(-8px) rotate(0); } 12% { opacity: 1; } 65% { opacity: 1; } 100% { opacity: 0; transform: translateY(-60px) rotate(180deg); } }
+@container poker-viewport (orientation: landscape) and (max-height: 500px) {
+  .showdown-heading { flex-direction: column; gap: 0; align-items: center; }
+  .showdown-cards .pc { width: 36px; height: 50px; }
+  .showdown-hand-name { font-size: 22px; }
+}
+/* Leave visible air between a full left rail and the first board card on narrow phones. */
+@container poker-viewport (max-width: 350px) {
+  .seat, .seat-core, .seat-cards { width: 68px; }
+}

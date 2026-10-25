@@ -32,15 +32,23 @@ for (const [width, height, layoutHeight, safe] of [[390,700,844,1], [844,290,390
         await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))));
         const problems = await page.evaluate((visibleHeight) => {
           const seats = [...document.querySelectorAll('.seat-core, .seat-cards')];
-          const protectedItems = [...document.querySelectorAll('.board, .pot, .result-strip, .own-cards, .dock')];
+          const protectedItems = [...document.querySelectorAll('.board, .pot, .result-strip, .own-cards, .showdown-cards, .dock')];
           const errors: string[] = [];
           const intersects = (a: DOMRect,b: DOMRect) => a.left < b.right-1 && a.right > b.left+1 && a.top < b.bottom-1 && a.bottom > b.top+1;
           for (const s of seats) for (const b of protectedItems) if (intersects(s.getBoundingClientRect(),b.getBoundingClientRect())) errors.push(`${s.className} overlaps ${b.className}`);
+          for (const seat of document.querySelectorAll('.seat-core, .seat-cards .pc')) for (const board of document.querySelectorAll('.board')) {
+            const s = seat.getBoundingClientRect(), b = board.getBoundingClientRect();
+            if (s.top < b.bottom && s.bottom > b.top) {
+              const gap = s.right <= b.left ? b.left - s.right : s.left - b.right;
+              if (gap < 6) errors.push(`seat leaves less than 6px beside the board: ${gap}`);
+            }
+          }
+
           for (let i = 0; i < seats.length; i++) for (let j = i + 1; j < seats.length; j++) { if (seats[i].parentElement !== seats[j].parentElement && intersects(seats[i].getBoundingClientRect(), seats[j].getBoundingClientRect())) errors.push(`player panels overlap: ${seats[i].parentElement?.getAttribute('data-seat')} ${seats[i].className} ${JSON.stringify(seats[i].getBoundingClientRect())} / ${seats[j].parentElement?.getAttribute('data-seat')} ${seats[j].className} ${JSON.stringify(seats[j].getBoundingClientRect())}`); }
-          for (const el of document.querySelectorAll('.seat, .board, .own-cards, .hero-meta, .dock')) { const r = el.getBoundingClientRect(); if(r.left < -1 || r.right > innerWidth+1) errors.push(`${el.className} overflows horizontally`); }
-          const cards = document.querySelector('.own-cards')!.getBoundingClientRect();
-          const stack = document.querySelector('.hero-meta')!.getBoundingClientRect();
-          if (intersects(cards, stack)) errors.push('own cards cover stack');
+          for (const el of document.querySelectorAll('.seat, .board, .own-cards, .hero-meta, .showdown-cards, .dock')) { const r = el.getBoundingClientRect(); if(r.left < -1 || r.right > innerWidth+1) errors.push(`${el.className} overflows horizontally`); }
+          const cards = document.querySelector('.own-cards')?.getBoundingClientRect();
+          const stack = document.querySelector('.hero-meta')?.getBoundingClientRect();
+          if (cards && stack && intersects(cards, stack)) errors.push('own cards cover stack');
           const dock = document.querySelector('.g-hero')?.getBoundingClientRect();
           if (dock && dock.bottom > visibleHeight + 1) errors.push('betting controls below viewport');
           const dealer = document.querySelector('.dealer-token')?.getBoundingClientRect();

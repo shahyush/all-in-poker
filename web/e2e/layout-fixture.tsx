@@ -16,7 +16,7 @@ export function renderLayout(count: number, holes: number, twice: boolean, shown
     players: seats.map((s, i) => ({ seat: i, playerId: s.playerId, holeCount: holes, bet: 20, paid: 100, revealed: [] })), proposedStreets: [], currentBet: 0, deadline: now + 30000 };
   if (result) {
     hand.phase = 'result';
-    hand.result = { uncontested: false, totals: {1: 300}, awards: [], shows: {}, boards: hand.boards ?? [hand.board] };
+    hand.result = { uncontested: false, totals: twice ? {1:150,0:150} : {1:300}, awards: [{board:0, winners:[{seat:1, name:'Two pair, Kings and Eights', cards:[26,27,2,11,24]}]}, ...(twice ? [{board:1, winners:[{seat:0, name:'Flush, Ace high', cards:[15,16,24,33,45]}]}] : [])], shows: {}, boards: hand.boards ?? [hand.board] };
   }
   const pos = seatPositions(count, 0, innerWidth > parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--vh')));
   const noop = () => {};
@@ -24,7 +24,7 @@ export function renderLayout(count: number, holes: number, twice: boolean, shown
   (window as any).__layoutRoot ??= createRoot(root);
   (window as any).__layoutRoot.render(<div className="game">
     <div className="g-head"><div className="g-head-row"><div className="g-title">Sunday Afternoon</div><button className="g-icon">☰</button></div><div className="g-stakes"><b>Omaha {holes} · Pot limit</b><span>Blinds 10/20</span><span>Hand 1</span></div><div className="g-recap"><span className="g-recap-tag">Last hand</span><span className="g-recap-body">Nine Player 5 won 45 — Three of a kind, Fives · Nine Player 7 won 45 — Flush, King high</span></div></div>
-    <div className="g-surface"><div className="felt"/><DealerButton seat={hand.button} />{seats.slice(1).map((s, j) => <SeatView key={j} index={j + 1} seat={s as any} hand={hand} pos={pos[j + 1]} isHost={false} present now={now} isMe={false} shownCards={shown ? Array.from({length: holes}, (_, i) => i + 26) : null} winCards={null} won={null} />)}<Centre t={{seats, status: 'running'} as any} hand={hand} now={now} mySeat={0} busy={false} onChoose={noop} onStraddle={noop} onVote={noop} onPots={noop} newBoardKeys={new Set()} /></div>
-    <Hero seatNames={seats.map(s => s.name)} hand={hand} mySeat={0} me={seats[0] as any} own={Array.from({length: holes}, (_, i) => i + 15)} ownHandId="layout" now={now} busy={false} pending={null} legal={acting ? {canAct:true, owed:0, call:0, raise:null, raiseClosed:null} as any : null} dealt connected isCash made={{name:'Pair of Aces'} as any} madeShown={false} madeSet={null} onToggleMade={noop} onAct={noop} onPropose={noop} onReveal={noop} onReturn={noop} />
+    <div className="g-surface"><div className="felt"/><DealerButton seat={hand.button} />{seats.slice(1).map((s, j) => <SeatView key={j} index={j + 1} seat={s as any} hand={hand} pos={pos[j + 1]} isHost={false} present now={now} isMe={false} shownCards={shown ? Array.from({length: holes}, (_, i) => i + 26) : null} winCards={null} won={result && j === 0 ? 300 : null} winnerBurst={result && j === 0} />)}<Centre t={{seats, status: 'running'} as any} hand={hand} now={now} mySeat={0} busy={false} onChoose={noop} onStraddle={noop} onVote={noop} onPots={noop} newBoardKeys={new Set()} /></div>
+    <Hero awardReady={result} winnerBurst={result} seatNames={seats.map(s => s.name)} hand={hand} mySeat={0} me={seats[0] as any} own={Array.from({length: holes}, (_, i) => i + 15)} ownHandId="layout" now={now} busy={false} pending={null} legal={acting ? {canAct:true, owed:0, call:0, raise:null, raiseClosed:null} as any : null} dealt connected isCash made={{name:'Pair of Aces'} as any} madeShown={false} madeSet={null} onToggleMade={noop} onAct={noop} onPropose={noop} onReveal={noop} onReturn={noop} />
   </div>);
 }

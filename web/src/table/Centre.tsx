@@ -92,7 +92,7 @@ export function Centre({ awardReady = true, t, hand, now, mySeat, busy, chosen, 
       {res && !awardReady && <div className="showdown-title">Showdown</div>}
       {res && awardReady && (
         <div className="result-strip">
-          {Object.entries(res.totals).map(([seat, amt]) => {
+          {(res.uncontested ? Object.entries(res.totals) : []).map(([seat, amt]) => {
             const names = res.awards.filter((a) => a.winners.some((w) => w.seat === +seat)).map((a) => a.winners.find((w) => w.seat === +seat)!.name).filter(Boolean);
             return <div key={seat} className="centre-title">{seatName(+seat)} wins {fmt(amt)}{names[0] ? <div className="centre-copy">{[...new Set(names)].join(' / ')}</div> : null}</div>;
           })}
