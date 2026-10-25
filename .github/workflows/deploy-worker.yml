@@ -19,11 +19,13 @@ permissions:
   contents: read
 concurrency:
   group: deploy-worker
-  cancel-in-progress: false
+  # A newer approved build supersedes stale live verification; never block deployment for hours.
+  cancel-in-progress: true
 env:
   SITE: https://all-in-poker.aayush9shah.workers.dev
 jobs:
   deploy:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     outputs:
       creds: ${{ steps.creds.outputs.present }}
@@ -70,6 +72,7 @@ jobs:
           curl -fsS -o /dev/null -w 'icon %{http_code} %{content_type}\n' "$SITE/icons/icon-192.png" | grep -q 'image/png'
           echo "live site verified: $SITE"
   live-smoke:
+    timeout-minutes: 8
     needs: deploy
     runs-on: ubuntu-latest
     steps:
@@ -86,6 +89,7 @@ jobs:
         if: failure()
         with: { name: live-smoke-results, path: web/test-results, retention-days: 7 }
   hosted-e2e:
+    timeout-minutes: 25
     needs: deploy
     # contents: write only here, to publish the run's screenshots/recordings to the e2e-artifacts branch (see last step)
     permissions:
