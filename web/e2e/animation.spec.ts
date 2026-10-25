@@ -49,7 +49,7 @@ test('showdown presents large winning cards, both board winners and a visible re
   await expect(result.locator('.showdown-hand-name')).toContainText('Two pair');
   expect(await result.locator('.pc').first().evaluate(el=>el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(60);
   await expect(page.locator('.seat.is-winner .winner-sparks')).toBeVisible();
-  expect(await result.locator('.winner-sparks').evaluate(el=>el.getAnimations({subtree:true}).length)).toBe(18);
+  expect(await page.locator('.seat.is-winner .winner-sparks').evaluate(el=>el.getAnimations({subtree:true}).length)).toBe(18);
   await result.getByRole('button',{name:'B · You'}).click();
   await expect(result.locator('.showdown-hand-name')).toHaveText('Flush, Ace high');
   await expect(result.locator('.pc')).toHaveCount(5);

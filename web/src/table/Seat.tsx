@@ -41,7 +41,7 @@ export function SeatView({ index, seat, hand, pos, isHost, present, now, isMe, s
         {won && winnerBurst ? <WinnerCelebration key={hand?.id} /> : null}
         <span className="seat-avatar" aria-hidden="true">{initialOf(seat.name)}</span>
         <span className={`seat-name${hand?.button === index ? ' has-dealer' : ''}`}>{isHost ? '★ ' : ''}{seat.name}</span>
-        <span className="seat-stack">{fmt(seat.stack)}{won ? <span style={{ color: 'var(--accent-table)' }}> +{fmt(won)}</span> : null}</span>
+        <span className="seat-stack">{fmt(seat.stack)}</span>
         <span className="seat-status">{chooser ? 'Choosing' : status[0] ?? ''}</span>
         {hp && hp.bet > 0 && <span className="seat-wager" aria-label={`Bet ${fmt(hp.bet)}`}>Bet {fmt(hp.bet)}</span>}
         {actor && <span className="timer-ring" aria-hidden="true"><i style={{ width: Math.round(remaining * 100) + '%' }} /></span>}
