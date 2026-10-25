@@ -1,4 +1,5 @@
 import type { Card, PublicHand, SeatState } from '@allin/engine/public';
+import {WinnerCelebration} from './WinnerCelebration';
 import { PlayingCard } from './Card.tsx';
 import { fmt } from '../components/ui.tsx';
 
@@ -37,10 +38,10 @@ export function SeatView({ index, seat, hand, pos, isHost, present, now, isMe, s
           : Array.from({ length: Math.min(backs, 6) }).map((_, i) => <span key={i} className="deal-slot" data-slot={i}><span className="pc back sm" style={{ opacity: 0.95 }} /></span>)}
       </div>
       <div className="seat-core">
-        {won && winnerBurst ? <span className="winner-sparks" aria-hidden="true">{Array.from({length:8},(_,i)=><i key={i} style={{transform:`rotate(${i*45}deg)`}} />)}</span> : null}
+        {won && winnerBurst ? <WinnerCelebration key={hand?.id} /> : null}
         <span className="seat-avatar" aria-hidden="true">{initialOf(seat.name)}</span>
         <span className={`seat-name${hand?.button === index ? ' has-dealer' : ''}`}>{isHost ? '★ ' : ''}{seat.name}</span>
-        <span className="seat-stack">{fmt(seat.stack)}{won ? <span style={{ color: 'var(--accent-table)' }}> +{fmt(won)}</span> : null}</span>
+        <span className="seat-stack">{fmt(seat.stack)}</span>
         <span className="seat-status">{chooser ? 'Choosing' : status[0] ?? ''}</span>
         {hp && hp.bet > 0 && <span className="seat-wager" aria-label={`Bet ${fmt(hp.bet)}`}>Bet {fmt(hp.bet)}</span>}
         {actor && <span className="timer-ring" aria-hidden="true"><i style={{ width: Math.round(remaining * 100) + '%' }} /></span>}

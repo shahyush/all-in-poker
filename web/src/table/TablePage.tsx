@@ -191,7 +191,8 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const resultAge = hand?.result && hand.nextAt ? now - (hand.nextAt - (hand.result.uncontested ? RULES.timers.revealMs : RULES.timers.showdownMs)) : 0;
   const awardDelay = hand?.result?.uncontested ? 0 : 1300 + Object.keys(hand?.result?.shows ?? {}).length * 850;
   const awardReady = !!hand?.result && resultAge >= awardDelay;
-  const winnerBurst = awardReady && resultAge < awardDelay + 2200;
+  // Keep the mount eligible throughout the result: slow delivery must not miss a 2.2s server-time window.
+  const winnerBurst = awardReady;
   const winTotals = awardReady ? hand?.result?.totals ?? {} : {};
   const winCardsBySeat = new Map<number, Card[]>();
   if (awardReady && hand?.result) for (const a of hand.result.awards) for (const w of a.winners) winCardsBySeat.set(w.seat, [...(winCardsBySeat.get(w.seat) ?? []), ...w.cards]);
