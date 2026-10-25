@@ -58,7 +58,7 @@ export function Centre({ awardReady = true, t, hand, now, mySeat, busy, chosen, 
         const freshOrder = b.cards.map((c, i) => (newBoardKeys.has(`${bi}:${c}`) ? i : -1)).filter((i) => i >= 0);
         return (
         <div key={bi} className="stack" style={{ gap: 2, alignItems: 'center' }}>
-          {b.label && <div className="board-label">{b.label}</div>}
+          {(b.label || res) && <div className="board-label">{b.label ?? 'Board · shared cards'}</div>}
           <div className="board" aria-label={b.label ?? 'Community cards'}>
             {Array.from({ length: 5 }).map((_, i) => { if (b.cards[i] === undefined) return <SlotCard key={'s' + i} />; const fresh = newBoardKeys.has(`${bi}:${b.cards[i]}`); return <PlayingCard key={b.cards[i]} card={b.cards[i]} win={res && awardReady ? winCards.has(b.cards[i]) : false} dim={res ? winCards.size > 0 && !winCards.has(b.cards[i]) : false} hi={!res && !!madeBoard?.has(b.cards[i])} flip={fresh} delayMs={fresh ? (boardLeadMs ?? 0) + freshOrder.indexOf(i) * BOARD_GAP_MS + (bi === 1 && newBoardKeys.size > freshOrder.length ? 860 : 0) : undefined} />; })}
           </div>

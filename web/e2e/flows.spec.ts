@@ -62,7 +62,7 @@ for(const [width,height] of [[320,568],[390,844],[667,375]]) test(`host flow use
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
-test('lobby lists all memberships and permits another host or join', async ({page})=>{
+test('lobby lists all memberships and permits another host or join', async ({page},info)=>{
   await page.route('http://127.0.0.1:8787/**',async route=>{
     const url=route.request().url(), headers={'access-control-allow-origin':'*','access-control-allow-headers':'content-type,authorization'};
     if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
@@ -79,5 +79,10 @@ test('lobby lists all memberships and permits another host or join', async ({pag
   await expect(page.getByRole('button',{name:/Table one/})).toBeVisible();
   await expect(page.getByRole('button',{name:/Table two/})).toBeVisible();
   await expect(page.getByRole('button',{name:'Host a table'})).toBeEnabled();
+  await expect(page.locator('.home-art')).toBeVisible();
+  await page.getByRole('button',{name:'Join or watch'}).click();
+  await expect(page.getByLabel('Join with an invite code')).toBeFocused();
+  await page.screenshot({path:info.outputPath('home.png'),fullPage:true});
   await expect(page.getByRole('button',{name:'See the table'})).toBeEnabled();
 });
+

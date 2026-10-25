@@ -46,6 +46,8 @@ test('showdown presents large winning cards, both board winners and a visible re
   });
   const result=page.getByRole('region',{name:'Winning hand'});
   await expect(result.locator('.pc')).toHaveCount(5);
+  await expect(result.locator('.showdown-caption')).toContainText('Best five');
+  await expect(result.locator('.showdown-card-source > span').filter({hasText:'Hole'})).toHaveCount(2);
   await expect(result.locator('.showdown-hand-name')).toContainText('Two pair');
   expect(await result.locator('.pc').first().evaluate(el=>el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(60);
   await expect(page.locator('.seat.is-winner .winner-sparks')).toBeVisible();
@@ -90,3 +92,22 @@ test('folded player can inspect private cards during showdown', async ({page}) =
   await expect(result.locator('.pc')).toHaveCount(4);
   await expect(result.locator('.showdown-hand-name')).toHaveText('Only visible to you');
  });
+
+for(const [width,height] of [[390,700],[320,568],[844,390]]) test(`nine-player spectator view keeps the board clear at ${width}x${height}`,async({page})=>{
+  await page.setViewportSize({width,height});
+  await page.route('http://127.0.0.1:5173/',r=>r.fulfill({contentType:'text/html',body:'<html><body><div id="root"></div></body></html>'}));
+  await page.goto('/');
+  await page.evaluate(async()=>{
+    const refresh=await import(/* @vite-ignore */ '/@react-refresh');refresh.default.injectIntoGlobalHook(window);
+    (window as any).$RefreshReg$=()=>{};(window as any).$RefreshSig$=()=>(t:unknown)=>t;(window as any).__vite_plugin_react_preamble_installed__=true;
+    const fixture=await import(/* @vite-ignore */ '/e2e/layout-fixture.tsx');fixture.renderLayout(9,4,false,false,false,false,false,true,true);
+  });
+  await expect(page.locator('.seat')).toHaveCount(9);
+  await expect(page.locator('.spectator-dock')).toBeVisible();
+  const clashes=await page.evaluate(()=>{
+    const board=document.querySelector('.board')!.getBoundingClientRect();
+    return [...document.querySelectorAll('.seat-core,.seat-cards')].filter(el=>{const b=el.getBoundingClientRect();return b.left<board.right&&b.right>board.left&&b.top<board.bottom&&b.bottom>board.top;}).length;
+  });
+  expect(clashes).toBe(0);
+  await expect(page.locator('.choice-grid')).toHaveCount(0);
+});

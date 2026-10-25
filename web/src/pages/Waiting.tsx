@@ -69,6 +69,7 @@ export function WaitingPage({ view, go }: { view: TableView; go: (to: string) =>
           <button type="button" className="btn btn-secondary" onClick={async () => { try { await navigator.clipboard.writeText(inviteUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* unsupported */ } }}>Copy link</button>
         </div>
       </div>
+      {!st.seats.some(seat => seat?.playerId === me.id) && <button type="button" className="btn btn-primary" onClick={() => go('/seat/' + row.invite_code)}>Take a seat</button>}
       <button type="button" className="btn btn-danger" onClick={() => setConfirmLeave(true)}>Leave table</button>
       {isHost && <button type="button" className="btn btn-danger" onClick={() => setConfirmClose(true)}>Delete table</button>}
       {confirmClose && <Sheet title="Delete table?" onClose={() => setConfirmClose(false)}><p>Closes the table for everyone. Chips and history are saved.</p>{err && <p role="alert">{err}</p>}<button className="btn btn-danger" disabled={busy} onClick={async () => { if (await run('close_table')) go('/'); }}>Delete table</button><button className="btn btn-secondary" onClick={() => setConfirmClose(false)}>Cancel</button></Sheet>}

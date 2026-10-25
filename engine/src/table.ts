@@ -162,7 +162,7 @@ function balancedFreeSeat(seats: (SeatState | null)[]): number {
 }
 export function seatPlayer(t: TableState, player: { playerId: string; name: string }, stack: number, now: number, preferred?: number | null): number {
   if (t.closeRequested || (t.status !== 'waiting' && t.status !== 'running')) fail('closed', 'This table has closed');
-  if (t.rules.mode === 'tournament' && t.status !== 'waiting') fail('locked', 'Registration closed when the tournament started');
+  if (t.tournament?.entrants.some(p => p.playerId === player.playerId)) fail('already_entered', 'One bank per player. You can still watch.');
   if (seatOf(t, player.playerId) !== -1) fail('already_seated', 'Already seated here');
   if (!isChipInt(stack) || stack <= 0) fail('invalid_amount', 'Invalid buy-in');
   if (t.rules.mode === 'tournament' && stack !== t.rules.unit) fail('invalid_amount', 'Tournament stacks are fixed');
@@ -179,6 +179,12 @@ export function seatPlayer(t: TableState, player: { playerId: string; name: stri
     sitOutRequested: false, returnRequested: false, leaving: false, leaveReason: null, consecutiveTimeouts: 0,
     joinedAt: now, joinSeq: t.nextSeq++, straddlePref: false, handStartStack: null, eliminatedPlace: null,
   };
+  if (t.tournament) {
+    t.tournament.entrants.push({ playerId: player.playerId, name: player.name });
+    // Late entries add one remaining competitor; already-eliminated places shift down.
+    for (const e of t.tournament.eliminations) e.place++;
+    for (const s of t.seats) if (s?.eliminatedPlace != null) s.eliminatedPlace++;
+  }
   t.lastPresenceAt = now;
   event(t, null, now, { type: 'seat', seat, change: 'join' });
   computeDue(t);

@@ -28,7 +28,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const row = view.row!; const t = row.state; const hand = t.hand;
   const me = s.player!;
   const mySeatIdx = t.seats.findIndex((x) => x && x.playerId === me.id);
-  const mySeat = mySeatIdx >= 0 ? mySeatIdx : 0;
+  const mySeat = mySeatIdx;
   const meSeat = mySeatIdx >= 0 ? t.seats[mySeatIdx] : null;
   const isHost = t.hostPlayerId === me.id;
   const now = useNow(true, s.clockOffset);
@@ -97,7 +97,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
         lead = 0;
         // the previous street's bets have just collected into the pot: sweep a chip in from each contesting seat
         if (!reduced && hand) {
-          const pos = seatPositions(t.seats.length, mySeat, landscape);
+          const pos = seatPositions(t.seats.length, Math.max(0, mySeat), landscape);
           const spots = hand.players.filter((p) => !p.folded && pos[p.seat]).map((p) => { const bp = betPosition(pos[p.seat], landscape); return { id: sweepId.current++, left: bp.left, top: bp.top }; });
           if (spots.length) { setSweeps((cur) => [...cur, ...spots]); const ids = new Set(spots.map((sp) => sp.id)); setTimeout(() => setSweeps((cur) => cur.filter((sp) => !ids.has(sp.id))), 650); }
         }
@@ -127,7 +127,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
     catch (e) { const msg = e instanceof TransportError ? e.message : 'Could not reach the server'; setErr(msg); s.toast(msg); throw e; }
     finally { setPending(null); }
   }, [s, row.id, view]);
-  const quiet = useCallback(async (type: string, payload: Record<string, unknown> = {}) => { try { await run(type, payload); } catch { /* toast shown */ } }, [run]);
+  const quiet = useCallback(async (type: string, payload: Record<string, unknown> = {}) => { try { await run(type, payload); return true; } catch { return false; /* toast shown */ } }, [run]);
   // fire-and-forget command that does NOT flip `pending` (so it never disables the action/choice controls)
   const silent = useCallback(async (type: string, payload: Record<string, unknown> = {}) => { try { await s.transport.cmd(type, payload, row.id); await view.reload(type === 'chat' ? 'chat' : 'game'); } catch { /* ignore */ } }, [s, row.id, view]);
   // Readiness: the moment the chooser's client actually displays the choice, confirm it to the server so the usable
@@ -158,7 +158,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
 
   const names = useMemo(() => { const m = new Map<string, string>(); for (const x of t.seats) if (x) m.set(x.playerId, x.name); for (const p of view.participants) if (!m.has(p.user_id)) m.set(p.user_id, p.name); return m; }, [t.seats, view.participants]);
   const presence = useMemo(() => { const m = new Map<string, boolean>(); for (const mm of view.members) m.set(mm.user_id, !!mm.last_seen && now - new Date(mm.last_seen).getTime() < 30000); return m; }, [view.members, now]);
-  const positions = useMemo(() => seatPositions(t.seats.length, mySeat, landscape), [t.seats.length, mySeat, landscape]);
+  const positions = useMemo(() => seatPositions(t.seats.length, Math.max(0, mySeat), landscape), [t.seats.length, mySeat, landscape]);
   // place a small table marker (dealer button, blind chip) just inside a seat, toward the felt centre
   const legal = hand?.phase === 'betting' && hand.actor === mySeat ? hand.actorLegal : null;
   const myTurn = !!legal?.canAct && hand?.phase === 'betting';
@@ -261,10 +261,10 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
         {hand && hand.button !== null && positions[hand.button] && <DealerButton seat={hand.button} />}
         <Centre awardReady={awardReady} t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} chosen={chosen} submitting={submitting} onChoose={(v: VariantId) => void choose(v)} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} boardLeadMs={boardLead} madeBoard={madeSet} />
       </div>
-      <Hero awardReady={awardReady} winnerBurst={winnerBurst} seatNames={t.seats.map((x) => x?.name ?? null)} hand={hand} mySeat={mySeat} me={meSeat} own={view.own?.cards ?? null} ownHandId={view.own?.handId ?? null} now={now} busy={pending !== null} pending={pending} legal={legal} presentationUntil={presentationUntil} dealt={dealt} connected={view.connected} isCash={row.mode === 'cash'}
+      {!meSeat && !hand?.result ? <div className="g-hero spectator-dock"><strong>Watching</strong><span className="dock-note">Private cards stay hidden</span><button className="btn-game btn-game-primary" disabled={t.closeRequested || !t.seats.some(seat => !seat)} onClick={() => go('/seat/' + row.invite_code)}>Take a seat</button></div> : <Hero awardReady={awardReady} winnerBurst={winnerBurst} seatNames={t.seats.map((x) => x?.name ?? null)} hand={hand} mySeat={mySeat} me={meSeat} own={view.own?.cards ?? null} ownHandId={view.own?.handId ?? null} now={now} busy={pending !== null} pending={pending} legal={legal} presentationUntil={presentationUntil} dealt={dealt} connected={view.connected} isCash={row.mode === 'cash'}
         onAct={(a, to) => void quiet('act', a === 'raise' ? { action: 'raise', raiseTo: String(to) } : { action: a })}
         onPropose={(runs) => void quiet('propose', { runs })} onReveal={(what) => void quiet('reveal', what === 'all' || what === 'muck' ? { what } : { indices: what })} onReturn={(post) => void quiet('return', { post })}
-        made={made} madeShown={madeShown} madeSet={madeSet} onToggleMade={() => setMadeShown((v) => !v)} />
+        made={made} madeShown={madeShown} madeSet={madeSet} onToggleMade={() => setMadeShown((v) => !v)} />}
       {sheet === 'chat' && <ChatSheet chat={view.chat} reactions={view.reactions} names={names} myId={me.id} onSend={(body) => run('chat', { body })} onReact={async (messageId, emoji, op) => { await s.transport.cmd('react', { messageId, emoji, op }, row.id); await view.reload('chat'); }} onClose={() => setSheet(null)} turnCue={turnCue} onReturn={() => setSheet(null)} draft={draft} setDraft={setDraft} />}
       {sheet === 'menu' && <MenuSheet t={t} rules={row.config} myId={me.id} isHost={isHost} members={view.members} reloads={view.reloads} names={names} onClose={() => setSheet(null)} run={quiet} open={(x) => setSheet(x)} go={go} turnCue={turnCue} onReturn={() => setSheet(null)} />}
       {sheet === 'accounts' && <AccountsSheet t={t} ledger={view.ledger} participants={view.participants} mode={row.mode} onClose={() => setSheet(null)} turnCue={turnCue} onReturn={() => setSheet(null)} />}

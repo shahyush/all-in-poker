@@ -320,3 +320,14 @@
 .showdown-heading { position: relative; }
 .showdown-heading > .winner-sparks { inset: 0 0 auto auto; width: 20px; height: 20px; }
 .own-cards.own-folded .pc { opacity: .72; }
+
+/* Results explain the five-card combination instead of looking like another board. */
+.showdown-caption { color: var(--game-muted); font-size: 11px; text-align: center; }
+.showdown-card-source { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.showdown-card-source > span { font-size: 9px; letter-spacing: .06em; text-transform: uppercase; color: var(--game-muted); }
+.spectator-dock { align-items: center; justify-content: center; gap: 8px; }
+.spectator-dock .btn-game { min-width: 150px; }
+@container table (max-height: 520px) {
+  .showdown-caption { display: none; }
+  .showdown-card-source > span { font-size: 8px; }
+}

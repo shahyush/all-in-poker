@@ -539,3 +539,33 @@ it('only the host can delete a table, with balanced exits and preserved history'
   expect(await W.db.select('session_participants',{table_id:r.tableId})).toHaveLength(2);
   expect((await W.db.select<{archived_at:string|null}>('tables',{id:r.tableId}))[0].archived_at).not.toBeNull();
 });
+
+for (const mode of ['cash','tournament']) it(`${mode}: watch an ongoing table privately, take a seat once, and leave the rail`,async()=>{
+  const people=[new Client(W.app,W.db),new Client(W.app,W.db),new Client(W.app,W.db),new Client(W.app,W.db)];
+  for(const [i,c] of people.entries()){await c.signIn();await c.admit('Watch'+mode+i);}
+  const [host,guest,watcher,rail]=people;
+  const created=await host.cmd<{tableId:string;inviteCode:string}>('create_table',{rules:{...cashRules,mode,seats:'4',unit:'1000',levels:[{sb:'5',bb:'10',ante:'0',minutes:'15'}]},buyIn:'1000'});
+  const tid=created.tableId,code=created.inviteCode;
+  await guest.cmd('join',{code,amount:'1000'});await host.cmd('start',{},tid);
+  const state=await W.publicState(tid);
+  const chooser=people.find(p=>p.player!.id===state.seats[state.hand.chooserSeat].playerId)!;
+  await chooser.cmd('choose',{variant:'holdem'},tid);
+  const before=await W.privateState(tid);
+  await watcher.cmd('join',{code,watch:true});
+  expect(await watcher.see('tables',{id:tid})).toHaveLength(1);
+  expect(await watcher.see('hole_cards',{table_id:tid})).toHaveLength(0);
+  expect(await watcher.see('table_secrets',{table_id:tid}).catch(()=>[])).toHaveLength(0);
+  expect((await watcher.raw('act',{action:'check'},tid)).body.ok).toBe(false);
+  expect((await watcher.raw('vote',{choice:'twice'},tid)).body.ok).toBe(false);
+  expect(await W.db.select('ledger',{table_id:tid,user_id:watcher.player!.id})).toHaveLength(0);
+  const actionId=crypto.randomUUID();
+  expect((await watcher.raw('join',{code,amount:'1000'},undefined,actionId)).body.ok).toBe(true);
+  expect((await watcher.raw('join',{code,amount:'1000'},undefined,actionId)).body.replayed).toBe(true);
+  expect(await W.db.select('ledger',{table_id:tid,user_id:watcher.player!.id,kind:'buyin'})).toHaveLength(1);
+  const after=await W.privateState(tid);
+  expect(after.hand.id).toBe(before.hand.id);expect(after.hand.hole).toEqual(before.hand.hole);
+  expect(after.hand.players).toHaveLength(2);
+  expect(after.seats.filter(Boolean)).toHaveLength(3);
+  await rail.cmd('join',{code,watch:true});await rail.cmd('leave',{},tid);
+  expect(await W.db.select('table_members',{table_id:tid,user_id:rail.player!.id,status:'active'})).toHaveLength(0);
+});

@@ -154,3 +154,9 @@ Removed redundant table/hole-card safety polls because the game loop already pol
 ## October 25 release checkpoint — api v24
 
 The previous deployment pause is superseded by explicit user approval. API v24 is deployed; all four deployed files were read back and match the release exactly. The waiting-table scheduling migration succeeded. Scheduler calls after deployment returned 200 and old inactive waiting rooms were archived. No account/history records were deleted. Latest code commit b1009514 passes 79 engine and 27 server tests plus typechecks in run 40220560530. Browser gameplay verification and frontend deployment are the remaining release steps, tracked in PR #8. Real-device iOS keyboard/toolbar behaviour remains unverified.
+
+## October 26 — live spectators, late seats and clear results
+
+Following explicit user approval, PR #8 merged as ff1dee88 with api v24. Deploy and live smoke passed; hosted journeys were running when this follow-up started. New follow-up permits admitted invite holders to watch an open table without a buy-in or private-card access, then take an available seat without changing the current hand. Cash uses normal buy-ins; Last Player Standing allows one starting bank for each new entrant and retains no-rebuy behaviour. Late entries update prior elimination places consistently. Watching can be stopped without a cash transaction.
+
+Showdown labels the shared board separately and explains each card in the best-five combination as Hole or Board. The home page adds a static, lightweight poker illustration and clear Host / Join or watch actions. Local engine tests: 81 passed; build/typechecks clean; all original 31 browser checks plus three spectator geometry checks pass across targeted runs. Real database and live-browser verification for the follow-up remain required before completion.
