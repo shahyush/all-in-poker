@@ -167,7 +167,7 @@ test('leave after a hand: the session summary, history and player recovery', asy
   await expect(g.page.getByRole('heading', { name: 'Aayush' })).toBeVisible();
   await g.page.goto('/');
   await expect(g.page.getByText('Good to see you, Aayush')).toBeVisible();
-  await g.page.getByRole('button', { name: 'My evenings' }).click();
+  await g.page.getByRole('button', { name: 'History' }).click();
   await expect(g.page.getByRole('button', { name: /Two of us/ })).toBeVisible();
 });
 

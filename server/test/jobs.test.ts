@@ -27,3 +27,10 @@ it('one failed table is reported without preventing other timer updates',async()
   const response=await app.handle({method:'POST',path:'/jobs',headers:{'x-allin-job':'test'},body:{tableIds:ids.slice(0,2)}});
   expect(response.body).toEqual({ok:true,ran:2,results:{[ids[0]]:'temporary failure',[ids[1]]:'ok'}});
 });
+
+it('preflight grants are short-lived and stay scoped to the permitted origin',()=>{
+  const app=new App({} as Db,{verify:async()=>({authUid:'unused'})},{corsOrigin:'https://allowed.example'});
+  expect(app.cors('https://allowed.example')['Access-Control-Max-Age']).toBe('600');
+  expect(app.cors('https://other.example')['Access-Control-Allow-Origin']).toBe('https://allowed.example');
+  expect(app.cors('https://allowed.example').Vary).toBe('Origin');
+});

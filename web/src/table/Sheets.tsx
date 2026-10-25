@@ -229,7 +229,7 @@ export function ReloadSheet({ unit, onClose, run }: { unit: number; onClose: () 
   const reqId = useRef(crypto.randomUUID());
   useEffect(() => { reqId.current = crypto.randomUUID(); }, [mult]);
   return (
-    <Sheet title="Reload chips" onClose={onClose}>
+    <Sheet title="Add chips" onClose={onClose}>
       <div className="chips">{[1, 2, 3, 5].map((k) => <button key={k} type="button" className="chip" aria-pressed={mult === String(k)} onClick={() => setMult(String(k))}>{fmt(k * unit)}</button>)}</div>
       <label className="field"><span>Or a number of {fmt(unit)}-chip units</span><input className="input" inputMode="numeric" value={mult} onChange={(e) => setMult(e.target.value)} aria-invalid={!ok} />{!ok && <span className="error">Whole number of units</span>}</label>
       {err && <div className="error" role="alert">{err}</div>}

@@ -25,6 +25,7 @@ export class App {
       'Access-Control-Allow-Origin': pick,
       'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-allin-job',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Max-Age': '600',
       'Vary': 'Origin',
     };
   }

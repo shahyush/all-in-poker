@@ -25,7 +25,7 @@ export function ProfilePage({ go }: { go: (to: string) => void }) {
   }
   return (
     <Page back="Lobby" onBack={() => go('/')}>
-      <div className="stack" style={{ gap: 8 }}><div className="eyebrow">Your player</div><h1>{me.name}</h1></div>
+      <div className="stack" style={{ gap: 8 }}><div className="eyebrow">Profile</div><h1>{me.name}</h1></div>
       <div className="stack">
         <Field label="Nickname" value={name} onChange={setName} maxLength={24} error={err} />
         <button type="button" className="btn btn-secondary" disabled={busy || name.trim() === me.name} onClick={save}>{saved ? 'Saved' : 'Save nickname'}</button>
