@@ -100,3 +100,30 @@ it('all-in hands remain private until every runout vote resolves',()=>{
   expect(publicHand.revealedCards[folded]).toBeUndefined();
   for(const player of h.players.filter(p=>!p.folded)) expect(publicHand.revealedCards[player.seat].map(x=>x.card)).toEqual(h.hole[player.seat]);
 });
+
+it('late Last Player Standing entry waits for the next hand and keeps one bank per player', async () => {
+  const {seatPlayer} = await import('../src/table.ts');
+  const {t,now,ctx}=makeTable([1000,1000],{mode:'tournament',seats:4,levels:[{sb:5,bb:10,ante:0,minutes:15}]});
+  const clock=start(t,now,ctx);
+  const id=t.hand!.id, deck=t.hand!.deck.slice(), players=t.hand!.players.length;
+  const seat=seatPlayer(t,{playerId:'late',name:'Late'},1000,clock);
+  expect(t.hand!.id).toBe(id); expect(t.hand!.deck).toEqual(deck);
+  expect(t.hand!.players).toHaveLength(players);
+  expect(t.hand!.hole[seat]).toBeUndefined();
+  expect(totalChips(t)).toBe(3000);
+  expect(t.tournament!.entrants.map(p=>p.playerId)).toContain('late');
+  // A prior eliminated entrant cannot receive another bank, even after their seat is cleared.
+  t.seats[seat]=null;
+  expect(()=>seatPlayer(t,{playerId:'late',name:'Late'},1000,clock)).toThrow('One bank');
+});
+
+it('late entrants keep prior elimination places ordered', async () => {
+  const {seatPlayer}=await import('../src/table.ts');
+  const {t,now,ctx}=makeTable([1000,1000,1000],{mode:'tournament',seats:4,levels:[{sb:5,bb:10,ante:0,minutes:15}]});
+  start(t,now,ctx);
+  t.tournament!.eliminations.push({playerId:'p2',name:'P2',place:3,handNo:1});
+  t.seats[2]!.eliminatedPlace=3;
+  seatPlayer(t,{playerId:'late',name:'Late'},1000,now+1);
+  expect(t.tournament!.eliminations[0].place).toBe(4);
+  expect(t.seats[2]!.eliminatedPlace).toBe(4);
+});

@@ -62,7 +62,7 @@ for(const [width,height] of [[320,568],[390,844],[667,375]]) test(`host flow use
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
-test('lobby lists all memberships and permits another host or join', async ({page})=>{
+test('lobby lists all memberships and permits another host or join', async ({page},info)=>{
   await page.route('http://127.0.0.1:8787/**',async route=>{
     const url=route.request().url(), headers={'access-control-allow-origin':'*','access-control-allow-headers':'content-type,authorization'};
     if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
@@ -79,5 +79,34 @@ test('lobby lists all memberships and permits another host or join', async ({pag
   await expect(page.getByRole('button',{name:/Table one/})).toBeVisible();
   await expect(page.getByRole('button',{name:/Table two/})).toBeVisible();
   await expect(page.getByRole('button',{name:'Host a table'})).toBeEnabled();
+  await expect(page.locator('.home-art')).toBeVisible();
+  await page.getByRole('button',{name:'Join or watch'}).click();
+  await expect(page.getByLabel('Join with an invite code')).toBeFocused();
+  await page.screenshot({path:info.outputPath('home.png'),fullPage:true});
   await expect(page.getByRole('button',{name:'See the table'})).toBeEnabled();
+});
+
+
+test('a failed watch request retries watching without buying a seat',async({page})=>{
+  const joins:any[]=[];
+  await page.route('http://127.0.0.1:8787/**',async route=>{
+    const url=route.request().url(),headers={'access-control-allow-origin':'*','access-control-allow-headers':'content-type,authorization'};
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+    let body:any;
+    if(url.endsWith('/dev/signin'))body={token:'dev:watcher',authUid:'watcher'};
+    else if(url.endsWith('/dev/now'))body={now:Date.now()};
+    else if(url.endsWith('/dev/query'))body=[];
+    else {const c=route.request().postDataJSON();
+      if(c.type==='me')body={ok:true,result:{player:{id:'watcher',name:'Rail',isOwner:false}}};
+      else if(c.type==='preview')body={ok:true,result:{tableId:'test',name:'Live table',host:'Host',mode:'cash',status:'running',seats:6,occupied:2,open:4,isMember:false,rules:{mode:'cash',unit:1000,sb:5,bb:10,seats:6}}};
+      else {joins.push(c);body={ok:false,error:{code:'unavailable',message:'Connection interrupted'}};}
+    }
+    await route.fulfill({headers,json:body});
+  });
+  await page.goto('/join/ABCDEFGH');
+  await page.getByRole('button',{name:'Watch table',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('Connection interrupted');
+  await page.getByRole('button',{name:'Try again',exact:true}).click();
+  await expect.poll(()=>joins.length).toBe(2);
+  expect(joins.every(c=>c.type==='join'&&c.payload.watch===true)).toBe(true);
 });

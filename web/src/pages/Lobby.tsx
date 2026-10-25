@@ -3,6 +3,7 @@ import { Page, Field, Spinner } from '../components/ui.tsx';
 import { useSession } from '../state/session.tsx';
 import { rulesSummary } from '../lib/format.ts';
 import type { TableRules } from '@allin/engine/public';
+import { PokerArtwork } from '../components/PokerArtwork.tsx';
 import { TransportError } from '../transport/index.ts';
 
 interface TableRow { id: string; name: string; status: string; mode: string; config: TableRules; archived_at: string | null; state: { seats: unknown[]; hostPlayerId: string } }
@@ -44,6 +45,8 @@ export function LobbyPage({ go }: { go: (to: string) => void }) {
         <div className="eyebrow">Good to see you, {s.player!.name}</div>
         <h1>{active ? 'Your tables.' : 'Shall we deal you in?'}</h1>
       </div>
+      <div className="home-feature"><PokerArtwork /><div className="home-feature-copy"><span className="eyebrow">Good cards. Better company.</span><p>Your friends. Your table.</p></div></div>
+      <div className="grid2 home-actions"><button type="button" className="btn btn-primary" onClick={() => go('/create')} disabled={loadError || tables === null}>Host a table</button><button type="button" className="btn btn-secondary" onClick={() => document.querySelector<HTMLInputElement>('input[name=invite-code]')?.focus()}>Join or watch</button></div>
       {tables === null ? <Spinner /> : tables.map(table => (
         <button key={table.id} type="button" className="btn btn-primary" style={{ flexDirection: 'column', alignItems: 'flex-start', padding: 16, minHeight: 0, gap: 4 }} onClick={() => go('/table/' + table.id)}>
           <span className="eyebrow" style={{ color: 'inherit', opacity: 0.85 }}>{table.status === 'waiting' ? 'Waiting room' : 'In play'}</span>
@@ -52,15 +55,11 @@ export function LobbyPage({ go }: { go: (to: string) => void }) {
         </button>
       ))}
       {loadError && <div className="notice" role="alert">Could not check your current table. <button className="btn btn-quiet" onClick={() => setRetry(n => n + 1)}>Try again</button></div>}
-      <div className="grid2">
-        <button type="button" className="btn btn-secondary" onClick={() => go('/create')} disabled={loadError || tables === null}>Host a table</button>
-        <button type="button" className="btn btn-secondary" onClick={() => go('/history')}>History</button>
-      </div>
       <form className="card-box" onSubmit={joinByCode}>
-        <Field label="Join with an invite code" value={code} onChange={setCode} placeholder="e.g. K7PX2M9Q" autoComplete="off" error={error} />
+        <Field name="invite-code" label="Join with an invite code" value={code} onChange={setCode} placeholder="e.g. K7PX2M9Q" autoComplete="off" error={error} />
         <button className="btn btn-secondary" type="submit" disabled={checking || loadError || tables === null} aria-busy={checking}>{checking ? 'Checking invite…' : 'See the table'}</button>
       </form>
-      <button type="button" className="btn btn-quiet" style={{ alignSelf: 'flex-start' }} onClick={() => go('/profile')}>Profile</button>
+      <div className="grid2"><button type="button" className="btn btn-quiet" onClick={() => go('/history')}>History</button><button type="button" className="btn btn-quiet" onClick={() => go('/profile')}>Profile</button></div>
     </Page>
   );
 }

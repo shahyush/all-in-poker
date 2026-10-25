@@ -22,7 +22,7 @@ function TableRoute({ id, go }: { id: string; go: (to: string, replace?: boolean
   const seated = r.state.seats.some((x) => x && x.playerId === s.player!.id);
   if (r.archived_at || r.status === 'closed' || r.status === 'finished' || r.status === 'abandoned') return <SessionPage tableId={id} go={go} />;
   if (r.status === 'waiting') return <WaitingPage view={view} go={go} />;
-  if (!seated && r.mode === 'cash') return <SessionPage tableId={id} go={go} />;
+  if (!seated && r.mode === 'cash' && view.participants.some(p => p.user_id === s.player!.id && p.left_at) && !view.members.some(m => m.user_id === s.player!.id && m.status === 'active')) return <SessionPage tableId={id} go={go} />;
   return <TablePage view={view} go={go} />;
 }
 
@@ -43,7 +43,7 @@ export default function App() {
     const dest = sessionStorage.getItem('allin.dest');
     if (s.player && dest) { sessionStorage.removeItem('allin.dest'); go(dest, true); }
   }, [s.player, go]);
-  const m = path.match(/^\/(join|table|session)\/([A-Za-z0-9-]+)$/);
+  const m = path.match(/^\/(join|seat|table|session)\/([A-Za-z0-9-]+)$/);
   let page: React.ReactNode;
   if (!s.ready) page = <Page><Spinner /></Page>;
   else if (s.error && !s.player) page = <Page><h1>Can't reach the table.</h1><p className="lead">{s.error}</p><button type="button" className="btn btn-primary" onClick={() => void s.refresh()}>Try again</button></Page>;
@@ -51,7 +51,7 @@ export default function App() {
     if (path !== '/' && !sessionStorage.getItem('allin.dest')) sessionStorage.setItem('allin.dest', path);
     page = <EntryPage destination={path.startsWith('/join/') ? path : null} />;
   }
-  else if (m?.[1] === 'join') page = <InvitePage code={m[2].toUpperCase()} go={go} />;
+  else if (m?.[1] === 'join' || m?.[1] === 'seat') page = <InvitePage code={m[2].toUpperCase()} go={go} takingSeat={m[1] === 'seat'} />;
   else if (m?.[1] === 'table') page = <TableRoute key={m[2]} id={m[2]} go={go} />;
   else if (m?.[1] === 'session') page = <SessionPage tableId={m[2]} go={go} />;
   else if (path === '/create') page = <CreatePage go={go} />;

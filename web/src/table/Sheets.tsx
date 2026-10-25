@@ -176,7 +176,7 @@ export function RulesSheet({ rules, onClose }: { rules: TableRules; onClose: () 
   );
 }
 
-export function MenuSheet(p: { t: PublicTable; rules: TableRules; myId: string; isHost: boolean; members: MemberRow[]; reloads: ReloadRow[]; names: Map<string, string>; onClose: () => void; run: (type: string, payload?: Record<string, unknown>) => Promise<void>; open: (s: 'accounts' | 'rules' | 'reload') => void; go: (to: string) => void; turnCue: string | null; onReturn: () => void }) {
+export function MenuSheet(p: { t: PublicTable; rules: TableRules; myId: string; isHost: boolean; members: MemberRow[]; reloads: ReloadRow[]; names: Map<string, string>; onClose: () => void; run: (type: string, payload?: Record<string, unknown>) => Promise<boolean>; open: (s: 'accounts' | 'rules' | 'reload') => void; go: (to: string) => void; turnCue: string | null; onReturn: () => void }) {
   const me = p.t.seats.find((s) => s && s.playerId === p.myId) ?? null;
   const pendingMine = p.reloads.filter((r) => r.user_id === p.myId && (r.status === 'requested' || r.status === 'approved'));
   const pendingOthers = p.isHost ? p.reloads.filter((r) => r.status === 'requested' && r.user_id !== p.myId) : [];
@@ -206,13 +206,14 @@ export function MenuSheet(p: { t: PublicTable; rules: TableRules; myId: string; 
         </div>
       )}
       {me && (me.leaving && me.leaveReason === 'leave' ? <button type="button" className="btn btn-secondary" onClick={() => void p.run('cancel_leave')}>Stay</button> : <button type="button" className="btn btn-danger" onClick={() => setConfirm('leave')}>Leave table</button>)}
+      {!me && <button type="button" className="btn btn-secondary" onClick={async () => { if (await p.run('leave')) p.go('/'); }}>Stop watching</button>}
       {p.isHost && <button type="button" className="btn btn-danger" disabled={p.t.closeRequested} onClick={() => setConfirm('close_table')}>{p.t.closeRequested ? 'Closing after this hand' : 'Delete table'}</button>}
       <button type="button" className="btn btn-secondary" onClick={() => p.go('/')}>{me ? 'Switch table' : 'Back to the lobby'}</button>
       <div className="fine build-id">Build {BUILD_ID}</div>
       {confirm && (
         <div className="card-box">
           <b>{confirm === 'close_table' ? 'Delete this table for everyone? The current hand finishes first. Chips and history are saved.' : confirm === 'leave' ? (cash ? 'Leave after this hand? Your chips are taken off and recorded.' : 'Leave the game? Your stack stays in play and keeps posting blinds until it is gone.') : `Remove ${p.names.get(confirm) ?? 'this player'} after the hand?`}</b>
-          <div className="grid2"><button type="button" className="btn btn-secondary" onClick={() => setConfirm(null)}>Keep playing</button><button type="button" className="btn btn-danger" onClick={async () => { await p.run(confirm === 'close_table' ? 'close_table' : confirm === 'leave' ? 'leave' : 'remove', confirm === 'leave' || confirm === 'close_table' ? {} : { playerId: confirm }); setConfirm(null); if (confirm === 'leave' && !cash) p.go('/'); }}>Confirm</button></div>
+          <div className="grid2"><button type="button" className="btn btn-secondary" onClick={() => setConfirm(null)}>Keep playing</button><button type="button" className="btn btn-danger" onClick={async () => { const ok = await p.run(confirm === 'close_table' ? 'close_table' : confirm === 'leave' ? 'leave' : 'remove', confirm === 'leave' || confirm === 'close_table' ? {} : { playerId: confirm }); if (!ok) return; setConfirm(null); if (confirm === 'leave' && !cash) p.go('/'); }}>Confirm</button></div>
         </div>
       )}
     </Sheet>

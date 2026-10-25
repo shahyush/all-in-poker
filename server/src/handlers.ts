@@ -210,15 +210,18 @@ export class Handlers {
     return { result: { tableId: r.id, name: r.name, host: host[0]?.display_name ?? 'Host', status: r.archived_at ? 'closed' : r.status, mode: r.mode, rules: r.config, seats: r.seats, occupied, open: r.seats - occupied, isMember: member.length > 0 } };
   }
 
-  async join(player: Player, receipt: Receipt, p: { code?: unknown; amount?: unknown; seat?: unknown }): Promise<HandlerResult> {
+  async join(player: Player, receipt: Receipt, p: { code?: unknown; amount?: unknown; seat?: unknown; watch?: unknown }): Promise<HandlerResult> {
     const code = String(p.code ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     const rows = await this.db.select<{ id: string; archived_at: string | null }>('tables', { invite_code: code }, { limit: 1 });
     if (!rows.length || rows[0].archived_at) bad(404, 'no_table', 'That invite is no longer open');
     const tableId = rows[0].id;
-    const active = await this.db.select<{ table_id: string }>('table_members', { user_id: player.id, status: 'active' });
-    if (active.some((a) => a.table_id === tableId)) return { result: { tableId, already: true } };
     const amount = parseChipAmount(p.amount);
     const r = await this.withTable(tableId, receipt, (L) => {
+      if (L.t.closeRequested || !['waiting', 'running'].includes(L.t.status)) bad(409, 'closed', 'This table has closed');
+      if (seatOf(L.t, player.id) !== -1) return { effects: [], result: { tableId, already: true } };
+      if (p.watch === true) return { effects: [], result: { tableId, watching: true }, extras: {
+        members: [{ user_id: player.id, role: 'player', seat: null, status: 'active' }], touch: player.id,
+      } };
       const unit = L.t.rules.unit;
       const buyIn = L.t.rules.mode === 'tournament' ? unit : amount;
       if (buyIn === null || buyIn <= 0 || buyIn % unit !== 0) bad(400, 'bad_buyin', `Buy-in must be a positive multiple of ${unit}`);
@@ -229,7 +232,7 @@ export class Handlers {
         extras: {
           members: [{ user_id: player.id, role: 'player', seat, status: 'active' }],
           ledger: [{ user_id: player.id, kind: 'buyin', amount: buyIn, source_id: `${tableId}:buyin:${player.id}:${L.t.handNo}:${L.row.version}:${episode}`, hand_no: L.t.handNo }],
-          participants: [{ user_id: player.id, name: player.name, added_delta: buyIn, rejoined: true }],
+          participants: [{ user_id: player.id, name: player.name, added_delta: buyIn, rejoined: true }, ...(L.t.tournament?.eliminations ?? []).map(e => ({ user_id: e.playerId, place: e.place }))],
           touch: player.id,
         },
       };
@@ -268,7 +271,7 @@ export class Handlers {
         const eff = seatOf(t, player.id) !== -1 ? requestLeave(t, player.id, 'leave', now, ctx) : [];
         const extras: CommitExtras = { touch: player.id };
         // Hide a departed player from the active dashboard, retaining their LPS stack in play.
-        if (t.rules.mode === 'tournament' && t.status === 'running') extras.members = [{ user_id: player.id, status: 'left', seat: null }];
+        if (seatOf(t, player.id) === -1 || (t.rules.mode === 'tournament' && t.status === 'running')) extras.members = [{ user_id: player.id, status: 'left', seat: null }];
         return { effects: eff, result: { ok: true, version: t.version + 1 }, extras };
       }
       if (type === 'remove') {
