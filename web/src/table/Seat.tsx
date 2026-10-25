@@ -37,7 +37,7 @@ export function SeatView({ index, seat, hand, pos, isHost, present, now, isMe, s
       </div>
       <div className="seat-core">
         <span className="seat-avatar" aria-hidden="true">{initialOf(seat.name)}</span>
-        <span className="seat-name">{isHost ? '★ ' : ''}{seat.name}</span>
+        <span className={`seat-name${hand?.button === index ? ' has-dealer' : ''}`}>{isHost ? '★ ' : ''}{seat.name}</span>
         <span className="seat-stack">{fmt(seat.stack)}{won ? <span style={{ color: 'var(--accent-table)' }}> +{fmt(won)}</span> : null}</span>
         <span className="seat-status">{actor ? 'To act' : chooser ? 'Choosing' : status[0] ?? ''}</span>
         {hp && hp.bet > 0 && <span className="seat-wager" aria-label={`Bet ${fmt(hp.bet)}`}>Bet {fmt(hp.bet)}</span>}

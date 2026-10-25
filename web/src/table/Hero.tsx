@@ -64,7 +64,7 @@ export function Hero(p: HeroProps) {
           <button type="button" className="btn-game" disabled={busy} onClick={() => p.onReveal('muck')}>Muck</button>
           <button type="button" className="btn-game btn-game-primary" disabled={busy} onClick={() => p.onReveal('all')}>Show all</button>
         </div>
-      ) : (
+      ) : hand?.phase === 'betting' ? (
         <>
           <div className="dock" role="group" aria-label="Actions">
             <button type="button" className="fold" disabled={!myTurn || busy || !ready} onClick={() => p.onAct('fold')}>Fold</button>
@@ -74,7 +74,7 @@ export function Hero(p: HeroProps) {
           <div className="dock-note">{!ready && inHand ? 'Dealing…' : legal?.raiseClosed && myTurn ? legal.raiseClosed : legal?.raise && legal.allInTo === null && legal.raise.maxTo < legal.stack + legal.bet ? `Max ${fmt(legal.raise.maxTo)}` : ''}</div>
           {canPropose && <div className="propose-row"><span className="dock-note">End betting, deal the rest:</span><button type="button" disabled={busy} onClick={() => p.onPropose(1)}>Run once</button><button type="button" disabled={busy || !hand!.canRunTwice} onClick={() => p.onPropose(2)}>Run twice</button></div>}
         </>
-      )}
+      ) : null}
       {composer && legal?.raise && <Composer legal={legal} hand={hand!} onClose={() => setComposer(false)} onSubmit={(to) => { setComposer(false); p.onAct('raise', to); }} />}
     </div>
   );

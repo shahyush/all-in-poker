@@ -35,7 +35,7 @@
 .seat-cards .pc .s { align-self: flex-start; }
 .dealer-btn { position: absolute; width: 20px; height: 20px; border-radius: 50%; background: var(--paper); color: var(--ink); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 /* table-level dealer button: one token that slides between seats at each hand */
-.dealer-token { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: var(--card); color: var(--on-table); font-size: 12px; font-weight: 800; border: 2px solid color-mix(in srgb, var(--on-table) 30%, var(--card)); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 7px rgba(0,0,0,0.5); transform: translate(-50%, -50%); z-index: 3; transition: left 420ms cubic-bezier(.2,.7,.2,1), top 420ms cubic-bezier(.2,.7,.2,1); }
+.dealer-token { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--card); color: var(--on-table); font-size: 10px; font-weight: 800; border: 1px solid color-mix(in srgb, var(--on-table) 30%, var(--card)); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 7px rgba(0,0,0,0.5); transform: translate(-50%, -50%); z-index: 3; transition: left 420ms cubic-bezier(.2,.7,.2,1), top 420ms cubic-bezier(.2,.7,.2,1); }
 .blind-chip { position: absolute; transform: translate(-50%, -50%); z-index: 3; font-size: 9px; font-weight: 800; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 999px; background: var(--seat); color: var(--game-muted); border: 1px solid var(--table-line); box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
 .seat-core .blind-chip { transform: none; left: auto; right: -8px; top: -7px; }
 .blind-chip.bb { color: var(--accent-table); border-color: var(--accent-table); }
@@ -184,3 +184,26 @@
 .seat-status:empty { display: none; }
 .centre:has(.choice-grid) { width: min(92%, 420px); z-index: 4; }
 .centre-card .row { flex-wrap: wrap; }
+
+/* Short portrait phones must keep betting controls in view, even with the made-hand label. */
+@media (orientation: portrait) and (max-height: 740px) {
+  .game { grid-template-rows: auto minmax(296px, 1fr) auto; }
+  .seat-core { padding: 3px; }
+  .seat-name, .seat-stack { font-size: 12px; line-height: 14px; }
+  .seat-status { font-size: 9px; line-height: 10px; min-height: 10px; }
+  .seat-wager { font-size: 9px; line-height: 11px; }
+  .seat-cards { height: 20px; margin-bottom: 2px; }
+  .seat-cards .pc.sm { height: 20px; width: 18px; }
+  .seat-cards .pc + .pc { margin-left: -9px; }
+  .seat-avatar { width: 18px; height: 18px; font-size: 10px; }
+  .g-hero { gap: 4px; padding-top: 4px; }
+  .own-cards { min-height: 44px; }
+  .hand-label { min-height: 28px; font-size: 12px; }
+  .dock button { min-height: 44px; }
+  .propose-row { gap: 5px; flex-wrap: wrap; }
+  .propose-row .dock-note { font-size: 11px; }
+}
+
+@media (orientation: portrait) and (max-height: 740px) { .centre { top: 54%; } }
+
+.seat-name.has-dealer { padding-left: 20px; min-height: 18px; width: 100%; text-align: left; }

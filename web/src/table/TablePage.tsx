@@ -9,6 +9,7 @@ import { Centre } from './Centre.tsx';
 import { Hero } from './Hero.tsx';
 import { AccountsSheet, ChatSheet, MenuSheet, PotSheet, ReloadSheet, RulesSheet } from './Sheets.tsx';
 import { betPosition, seatPositions } from './geometry.ts';
+import { DealerButton } from './DealerButton.tsx';
 import { reducedMotionPreferred, runBurnAnimation, runDealAnimation } from './animator.ts';
 import { limitLabel, variantLabel } from '../lib/format.ts';
 import { playCue } from '../lib/sound.ts';
@@ -142,7 +143,6 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const presence = useMemo(() => { const m = new Map<string, boolean>(); for (const mm of view.members) m.set(mm.user_id, !!mm.last_seen && now - new Date(mm.last_seen).getTime() < 30000); return m; }, [view.members, now]);
   const positions = useMemo(() => seatPositions(t.seats.length, mySeat, landscape), [t.seats.length, mySeat, landscape]);
   // place a small table marker (dealer button, blind chip) just inside a seat, toward the felt centre
-  const marker = (p: { left: number; top: number }, f: number) => ({ left: (p.left + (50 - p.left) * f) + '%', top: (p.top + (50 - p.top) * f) + '%' });
   const legal = hand?.phase === 'betting' && hand.actor === mySeat ? hand.actorLegal : null;
   const myTurn = !!legal?.canAct && hand?.phase === 'betting';
   // optional sound cues (no-op unless the player turned them on): a chime on the rising edge of our turn, and on a win
@@ -233,7 +233,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
           const shown: Card[] | null = shows ? shows : revealed && revealed.length ? Array.from({ length: hand!.players.find((p) => p.seat === i)?.holeCount ?? 0 }, (_, k) => revealed.find((r) => r.index === k)?.card ?? null).filter((c): c is Card => c !== null) : null;
           return <SeatView key={i} index={i} seat={seat} hand={hand} pos={positions[i]} isHost={seat.playerId === t.hostPlayerId} present={presence.get(seat.playerId) ?? false} now={now} isMe={false} shownCards={shown} winCards={winCardsBySeat.get(i) ?? null} won={winTotals[i] ?? null} revealDelayMs={revealDelay.get(i)} />;
         })}
-        {hand && hand.button !== null && positions[hand.button] && <span className="dealer-token motion" aria-label="Dealer button" style={marker(positions[hand.button], 0.12)}>D</span>}
+        {hand && hand.button !== null && positions[hand.button] && <DealerButton seat={hand.button} />}
         <Centre t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} chosen={chosen} submitting={submitting} onChoose={(v: VariantId) => void choose(v)} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} boardLeadMs={boardLead} madeBoard={madeSet} />
       </div>
       <Hero seatNames={t.seats.map((x) => x?.name ?? null)} hand={hand} mySeat={mySeat} me={meSeat} own={view.own?.cards ?? null} ownHandId={view.own?.handId ?? null} now={now} busy={pending !== null} pending={pending} legal={legal} dealt={dealt} connected={view.connected} isCash={row.mode === 'cash'}

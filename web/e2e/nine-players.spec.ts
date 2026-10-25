@@ -65,6 +65,10 @@ for (const variant of ["Hold'em", 'Omaha 4']) test(`nine separate players: ${var
   await h.page.waitForTimeout(1200); // capture completed burn + flop presentation
   await clearBoard(h.page);
   await h.page.screenshot({path:info.outputPath('02-nine-flop-portrait.png')});
+  await h.page.setViewportSize({width:390,height:700});
+  await clearBoard(h.page);
+  expect(await h.page.locator('.dock').evaluate(el => el.getBoundingClientRect().bottom <= innerHeight)).toBe(true);
+  await h.page.screenshot({path:info.outputPath('02b-nine-flop-short-screen.png')});
   await h.page.setViewportSize({width:844,height:390});
   await clearBoard(h.page);
   await h.page.screenshot({path:info.outputPath('03-nine-flop-landscape.png')});
@@ -82,6 +86,7 @@ for (const variant of ["Hold'em", 'Omaha 4']) test(`nine separate players: ${var
     for(let i=0;i<27;i++) await checkCall(pages);
   }
   await expect(h.page.locator('.result-strip')).toBeVisible({timeout:20000});
+  await expect(h.page.getByRole('group', {name:'Actions'})).toHaveCount(0);
   await h.page.waitForTimeout(1000);
   await clearBoard(h.page);
   await h.page.screenshot({path:info.outputPath('04-nine-showdown.png')});
