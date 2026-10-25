@@ -135,3 +135,7 @@ User reported tiny showdown hands and missing confetti. Added a dedicated full-w
 
 ## 2026-10-25 — folded private cards, Last Player Standing run choices, eight-second showdown
 Own hole cards remain readable after folding and can be inspected using My folded hand during a contested award; opponents' private cards stay hidden. Last Player Standing now supports the same unanimous voluntary once/twice choices and all-in run vote as cash. Voluntary two boards retains betting; Run once closes betting only after unanimous acceptance. Deck sufficiency checks and chip conservation remain enforced. Contested showdown holds 8 seconds, with staggered reveals compressed only enough to reserve readable winner time at nine seats. Uncontested reveal remains 10 seconds. Engine regressions cover both run counts, all-in double boards, private folded cards, conservation, and the 8-second result deadline.
+
+
+## Multiple active tables — 2026-10-25
+User explicitly allows simultaneous table memberships. Removed global server admission guards and the single-active-seat index; per-table membership primary key remains. Lobby lists every active table and permits host/join alongside existing games. Last Player Standing departures still preserve chips in play; an existing membership no longer blocks another game. Server regression covers cross-table joins, same-table idempotency, hosting while seated, and independent leaving.

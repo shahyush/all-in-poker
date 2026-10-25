@@ -287,8 +287,14 @@ describe('two independent tables and tournaments', () => {
     const [x, y, z] = extra;
     const t1 = await x.cmd<{ tableId: string; inviteCode: string }>('create_table', { rules: { mode: 'tournament', name: 'Cup', seats: '3', unit: '300', levels: [{ sb: '5', bb: '10', ante: '0', minutes: '1' }, { sb: '50', bb: '100', ante: '0', minutes: '1' }] } });
     const r2 = await y.cmd<{ tableId: string; inviteCode: string }>('create_table', { rules: { ...cashRules, name: 'Other', seats: '2' }, buyIn: '1000' });
-    expect((await y.raw('join', { code: t1.inviteCode })).body.error?.code).toBe('already_seated');
-    expect((await x.raw('join', { code: r2.inviteCode, amount: '1000' })).body.error?.code).toBe('already_seated');
+    await y.cmd('join', { code: t1.inviteCode });
+    await x.cmd('join', { code: r2.inviteCode, amount: '1000' });
+    expect((await x.cmd<{already:boolean}>('join', {code:r2.inviteCode,amount:'1000'})).already).toBe(true);
+    expect((await x.see('ledger', {table_id:r2.tableId, user_id:x.player!.id})).length).toBe(1);
+    await x.cmd('leave', {}, r2.tableId);
+    expect((await W.publicState(t1.tableId)).seats.some((s:any)=>s?.playerId===x.player!.id)).toBe(true);
+    const third=await x.cmd<{tableId:string}>('create_table',{rules:{...cashRules,name:'Third'},buyIn:'1000'});
+    await x.cmd('leave',{},third.tableId);
     await y.cmd('leave', {}, r2.tableId); // last member leaving archives the waiting table immediately
     expect((await W.db.select<{ status: string }>('tables', { id: r2.tableId }))[0].status).toBe('closed');
     await y.cmd('join', { code: t1.inviteCode }); await z.cmd('join', { code: t1.inviteCode });
