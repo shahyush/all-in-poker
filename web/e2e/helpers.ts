@@ -25,9 +25,9 @@ export async function expectVisibleOrDump(page: Page, locator: ReturnType<Page['
 
 /** Hosted runs record every player's screen. Playwright's `video` option only covers its own context fixture, and these
  *  tests open a context per player, so recording has to be requested here — otherwise no recording exists at all. */
-export function contextOptions(opts: { landscape?: boolean; reducedMotion?: boolean } = {}) {
+export function contextOptions(opts: { landscape?: boolean; reducedMotion?: boolean; record?: boolean } = {}) {
   const viewport = opts.landscape ? { width: 844, height: 390 } : { width: 390, height: 844 };
-  return { viewport, isMobile: true, hasTouch: true, deviceScaleFactor: 2, reducedMotion: (opts.reducedMotion ? 'reduce' : 'no-preference') as 'reduce' | 'no-preference', ...(HOSTED ? { recordVideo: { dir: 'test-results/videos', size: viewport } } : {}) };
+  return { viewport, isMobile: true, hasTouch: true, deviceScaleFactor: 2, reducedMotion: (opts.reducedMotion ? 'reduce' : 'no-preference') as 'reduce' | 'no-preference', ...(HOSTED || opts.record ? { recordVideo: { dir: 'test-results/videos', size: viewport } } : {}) };
 }
 const playerNames = new WeakMap<Page, string>();
 /** Close every context, first saving each recording as <player>.webm in the test's output directory (hosted runs). */
@@ -45,7 +45,7 @@ export async function closePlayers(browser: Browser, outputDir: string): Promise
   }
 }
 
-export async function player(browser: Browser, name: string, opts: { landscape?: boolean; reducedMotion?: boolean } = {}): Promise<{ ctx: BrowserContext; page: Page }> {
+export async function player(browser: Browser, name: string, opts: { landscape?: boolean; reducedMotion?: boolean; record?: boolean } = {}): Promise<{ ctx: BrowserContext; page: Page }> {
   const ctx = await browser.newContext(contextOptions(opts));
   const page = await ctx.newPage();
   playerNames.set(page, name);

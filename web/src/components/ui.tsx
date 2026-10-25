@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useId, type ReactNode } from 'react';
 import { formatChips } from '@allin/engine/public';
 
 export const fmt = (n: number | null | undefined): string => (n == null ? '—' : formatChips(n));
@@ -59,10 +59,11 @@ export function Sheet({ title, onClose, children, turnCue, onReturn }: { title: 
 }
 
 export function Field({ label, value, onChange, hint, error, inputMode = 'text', type = 'text', placeholder, autoComplete, maxLength, name }: { label: string; value: string; onChange: (v: string) => void; hint?: string; error?: string | null; inputMode?: 'text' | 'numeric'; type?: string; placeholder?: string; autoComplete?: string; maxLength?: number; name?: string }) {
+  const fieldId = useId();
   return (
     <label className="field">
-      <span>{label}</span>
-      <input className="input" name={name} type={type} inputMode={inputMode} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} autoComplete={autoComplete} maxLength={maxLength} aria-invalid={error ? 'true' : undefined} />
+      <span id={fieldId + '-label'}>{label}</span>
+      <input className="input" aria-labelledby={fieldId + '-label'} aria-describedby={error || hint ? fieldId + '-description' : undefined} name={name} type={type} inputMode={inputMode} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} autoComplete={autoComplete} maxLength={maxLength} aria-invalid={error ? 'true' : undefined} />
       {error ? <span className="error" role="alert">{error}</span> : hint ? <span className="fine" style={{ fontWeight: 400 }}>{hint}</span> : null}
     </label>
   );

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { resetDb, world, Client, type World } from './harness.ts';
-import { RULES } from '@allin/engine';
+import { RULES, dealTiming } from '@allin/engine';
 
 let W: World;
 beforeAll(async () => { resetDb(); W = await world(4, ['Tanisha', 'Aayush', 'Sam', 'Priya']); });
@@ -17,7 +17,10 @@ async function actorClient(tableId: string): Promise<Client> {
 async function waitBetting(tableId: string) {
   // the deal presentation window must pass before actions are accepted
   const h = await hand(tableId);
-  if (h?.actionReadyAt) await W.advanceClock(2000);
+  if (h?.actionReadyAt) {
+    const cards = h.players.reduce((n: number, p: { holeCount: number }) => n + p.holeCount, 0);
+    await W.advanceClock(dealTiming(cards).total + 1);
+  }
 }
 
 describe('full cash session through the API', () => {

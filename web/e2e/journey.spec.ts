@@ -10,7 +10,7 @@ test('three friends: invite → entry → buy-in → start → dealer choice →
   // host creates a table
   await host.page.getByRole('button', { name: 'Host a table' }).click();
   await host.page.getByLabel('Table name').fill('Friday at ours');
-  await host.page.getByLabel('Your buy-in (units)').fill('3');
+  await host.page.getByLabel('Your buy-in', {exact:true}).fill('3000');
   await host.page.getByRole('button', { name: 'Review the table' }).click();
   await host.page.getByRole('button', { name: 'Create and open the room' }).click();
   await expect(host.page.getByText('Waiting for one more player.')).toBeVisible();

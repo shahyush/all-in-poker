@@ -30,16 +30,17 @@ export function SeatView({ index, seat, hand, pos, isHost, present, now, isMe, s
   const remaining = actor && hand?.deadline ? Math.max(0, hand.deadline - now) / 30000 : 0;
   const backs = hp && !hp.folded && !shownCards ? hp.holeCount : 0;
   return (
-    <div className={`seat ${actor ? 'is-actor' : ''} ${hp?.folded ? 'is-folded' : ''} ${won != null && won > 0 ? 'is-winner' : ''} ${hp?.allIn && !hp.folded ? 'is-allin' : ''}`} style={{ left: pos.left + '%', top: pos.top + '%' }} data-seat={index} aria-label={label} role="group">
+    <div className={`seat ${actor ? 'is-actor' : ''} ${hp?.folded ? 'is-folded' : ''} ${won != null && won > 0 ? 'is-winner' : ''} ${hp?.allIn && !hp.folded ? 'is-allin' : ''}`} style={{ left: pos.left < 20 ? '40px' : pos.left > 80 ? 'calc(100% - 40px)' : pos.left + '%', top: pos.top + '%' }} data-seat={index} aria-label={label} role="group">
       <div className="seat-cards" aria-hidden={shownCards ? undefined : 'true'}>
         {shownCards ? shownCards.map((c, i) => <PlayingCard key={i} card={c} size="sm" win={!!winCards && winCards.includes(c)} dim={!!winCards && !winCards.includes(c)} flip delayMs={revealDelayMs} />)
-          : Array.from({ length: Math.min(backs, 6) }).map((_, i) => <span key={i} className="pc back sm" data-slot={i} style={{ marginLeft: i ? -8 : 0, opacity: 0.95 }} />)}
+          : Array.from({ length: Math.min(backs, 6) }).map((_, i) => <span key={i} className="deal-slot" data-slot={i}><span className="pc back sm" style={{ opacity: 0.95 }} /></span>)}
       </div>
       <div className="seat-core">
         <span className="seat-avatar" aria-hidden="true">{initialOf(seat.name)}</span>
-        <span className="seat-name">{isHost ? '★ ' : ''}{seat.name}</span>
+        <span className={`seat-name${hand?.button === index ? ' has-dealer' : ''}`}>{isHost ? '★ ' : ''}{seat.name}</span>
         <span className="seat-stack">{fmt(seat.stack)}{won ? <span style={{ color: 'var(--accent-table)' }}> +{fmt(won)}</span> : null}</span>
-        <span className="seat-status">{actor ? 'To act' : chooser ? 'Choosing' : status[0] ?? (hand && !inHand ? '' : ' ')}</span>
+        <span className="seat-status">{actor ? 'To act' : chooser ? 'Choosing' : status[0] ?? ''}</span>
+        {hp && hp.bet > 0 && <span className="seat-wager" aria-label={`Bet ${fmt(hp.bet)}`}>Bet {fmt(hp.bet)}</span>}
         {actor && <span className="timer-ring" aria-hidden="true"><i style={{ width: Math.round(remaining * 100) + '%' }} /></span>}
         {blind && <span className={`blind-chip ${blind.cls}`} aria-label={blind.label}>{blind.text}</span>}
       </div>

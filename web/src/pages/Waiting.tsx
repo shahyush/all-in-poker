@@ -23,8 +23,8 @@ export function WaitingPage({ view, go }: { view: TableView; go: (to: string) =>
   const inviteUrl = absoluteUrl('/join/' + row.invite_code);
   async function run(type: string, payload: Record<string, unknown> = {}) {
     setBusy(true); setErr(null);
-    try { await s.transport.cmd(type, payload, row.id); await view.reload(); }
-    catch (e) { setErr(e instanceof TransportError ? e.message : 'Something went wrong'); }
+    try { await s.transport.cmd(type, payload, row.id); await view.reload(); return true; }
+    catch (e) { setErr(e instanceof TransportError ? e.message : 'Something went wrong'); return false; }
     finally { setBusy(false); }
   }
   async function share() {
@@ -54,7 +54,7 @@ export function WaitingPage({ view, go }: { view: TableView; go: (to: string) =>
       <KV rows={rulesRows(row.config)} />
       {isHost && (
         <div className="stack" style={{ gap: 6 }}>
-          <button type="button" className="btn btn-primary" disabled={!canStart || busy} onClick={() => run('start')}>Start the game</button>
+          <button type="button" className="btn btn-primary" disabled={!canStart || busy} aria-busy={busy} onClick={() => run('start')}>{busy ? 'Starting…' : 'Start the game'}</button>
           {!canStart && <div className="fine" style={{ textAlign: 'center' }}>Needs two players with chips.</div>}
         </div>
       )}
@@ -71,15 +71,17 @@ export function WaitingPage({ view, go }: { view: TableView; go: (to: string) =>
       <button type="button" className="btn btn-danger" onClick={() => setConfirmLeave(true)}>Leave the room</button>
       {confirmLeave && (
         <Sheet title="Leave the room?" onClose={() => setConfirmLeave(false)}>
+          {err && <div className="error" role="alert">{err}</div>}
           <p className="lead">Your buy-in comes back to you as chips taken off. {isHost && seated.length > 1 ? 'Hosting passes to the next player.' : ''}</p>
-          <button type="button" className="btn btn-danger" disabled={busy} onClick={async () => { await run('leave'); setConfirmLeave(false); go('/'); }}>Leave</button>
+          <button type="button" className="btn btn-danger" disabled={busy} onClick={async () => { if (await run('leave')) { setConfirmLeave(false); go('/'); } }}>Leave</button>
           <button type="button" className="btn btn-secondary" onClick={() => setConfirmLeave(false)}>Stay</button>
         </Sheet>
       )}
       {removeTarget && (
         <Sheet title={`Remove ${removeTarget.name}?`} onClose={() => setRemoveTarget(null)}>
+          {err && <div className="error" role="alert">{err}</div>}
           <p className="lead">They keep their history. Their chips are recorded as taken off.</p>
-          <button type="button" className="btn btn-danger" disabled={busy} onClick={async () => { await run('remove', { playerId: removeTarget.id }); setRemoveTarget(null); }}>Remove</button>
+          <button type="button" className="btn btn-danger" disabled={busy} onClick={async () => { if (await run('remove', { playerId: removeTarget.id })) setRemoveTarget(null); }}>Remove</button>
           <button type="button" className="btn btn-secondary" onClick={() => setRemoveTarget(null)}>Keep</button>
         </Sheet>
       )}

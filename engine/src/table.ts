@@ -3,7 +3,7 @@ import type { VariantId } from './evaluator.ts';
 import { awardPots, buildPots, uncalledExcess } from './pots.ts';
 import { secureHex, secureInt, shuffledDeck, type Rng } from './random.ts';
 import { RULES, VARIANT_IDS, variantAllowed, streetsLeft } from './rules.ts';
-import { dealTiming } from './animation.ts';
+import { dealTiming, boardPresentationMs } from './animation.ts';
 import { isChipInt, MAX_CHIPS } from './amounts.ts';
 import {
   EngineError, fail,
@@ -648,7 +648,7 @@ function closeStreet(t: TableState, h: HandState, now: number): void {
   if (burned) event(t, h, now, { type: 'burn', board: 0, street: next });
   event(t, h, now, { type: 'board', board: 0, street: next, cards });
   const first = nextPlayer(t, h, h.button, active)!;
-  h.actor = first; h.deadline = now + 400 + T.bettingMs;
+  h.actor = first; h.deadline = now + boardPresentationMs(cards.length) + T.bettingMs;
 }
 
 // ---------- runouts ----------
@@ -697,6 +697,9 @@ function queueStages(t: TableState, h: HandState, now: number, runs: 1 | 2): voi
 }
 
 function beginRunout(t: TableState, h: HandState, now: number): void {
+  // Betting is complete with at most one player able to act: table all live hands before the runout.
+  // Folded/mucked hands remain private; the deck, burns and future board cards are never exposed.
+  for (const player of h.players.filter(live)) player.revealed = h.hole[player.seat].map((_, index) => index);
   const cash = t.rules.mode === 'cash';
   if (h.bettingLocked || !cash) { queueStages(t, h, now, h.bettingLocked ? h.runs : 1); return; }
   if (h.board.length < 3) {

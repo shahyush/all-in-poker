@@ -1,3 +1,4 @@
+import type { PublicLogEntry } from './types.ts';
 /* Presentation planning only: no dealing, hidden cards, timers or chip mutations.
    Ported from the reviewed planner; the renderer consumes these steps. */
 export interface DealStep { key: string; eventId: string; handId: string; type: 'card-back'; from: 'deck'; to: number; slot: number; delayMs: number; durationMs: number }
@@ -35,7 +36,7 @@ export interface BoardStep { key: string; type: 'board-reveal'; board: 'A' | 'B'
 export function planBoard(opts: { eventId: string; handId: string; fromCount: number; toCount: number; board?: 'A' | 'B'; reducedMotion?: boolean }): { eventId: string; handId: string; durationMs: number; steps: BoardStep[] } {
   const { eventId, handId, fromCount, toCount, board = 'A', reducedMotion = false } = opts;
   if (!eventId || !handId || !['A', 'B'].includes(board) || ![[0, 3], [3, 4], [4, 5]].some(([a, b]) => a === fromCount && b === toCount)) throw new Error('Invalid board transition');
-  return { eventId, handId, durationMs: reducedMotion ? 0 : 240, steps: Array.from({ length: toCount - fromCount }, (_, i) => ({ key: eventId + ':' + i, type: 'board-reveal' as const, board, slot: fromCount + i, delayMs: reducedMotion ? 0 : i * 60, durationMs: reducedMotion ? 0 : 240 })) };
+  return { eventId, handId, durationMs: reducedMotion ? 0 : boardPresentationMs(toCount - fromCount), steps: Array.from({ length: toCount - fromCount }, (_, i) => ({ key: eventId + ':' + i, type: 'board-reveal' as const, board, slot: fromCount + i, delayMs: reducedMotion ? 0 : BURN_MS + i * BOARD_GAP_MS, durationMs: reducedMotion ? 0 : BOARD_FLIP_MS })) };
 }
 
 /** Accepts events strictly in increasing sequence; a snapshot resume skips missed visual effects. */
@@ -51,4 +52,23 @@ export class EventGate {
     if (!Number.isSafeInteger(snapshotSequence) || snapshotSequence < 0) throw new Error('Invalid sequence');
     this.lastSequence = Math.max(this.lastSequence, snapshotSequence);
   }
+}
+
+/** Burn, then one-by-one board turns. Also used by the server decision deadline. */
+export const BURN_MS = 500;
+export const BOARD_FLIP_MS = 360;
+export const BOARD_GAP_MS = 300;
+export function boardPresentationMs(cards: number): number {
+  return BURN_MS + Math.max(0, cards - 1) * BOARD_GAP_MS + BOARD_FLIP_MS;
+}
+
+/** Final-street aggressor shows first; checked-down hands start left of the button. */
+export function showdownOrder(log: PublicLogEntry[], button: number, seats: number, shown: number[]): number[] {
+  let aggressor: number | null = null;
+  for (const entry of log) {
+    if (entry.t === 'street') aggressor = null;
+    if (entry.t === 'bet' || entry.t === 'raise') aggressor = entry.seat;
+  }
+  const first = aggressor !== null && shown.includes(aggressor) ? aggressor : (button + 1) % seats;
+  return Array.from({length: seats}, (_, i) => (first + i) % seats).filter(seat => shown.includes(seat));
 }

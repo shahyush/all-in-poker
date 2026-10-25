@@ -1,19 +1,23 @@
-/** Seat positions around the felt as percentages. The viewer's seat anchors at the bottom; clockwise order is preserved. */
-export function seatPositions(seatCount: number, mySeat: number, landscape: boolean): { left: number; top: number }[] {
-  const out: { left: number; top: number }[] = [];
-  // Portrait is a tall oval: seat pods sit on the rail (not floating in the felt), the viewer anchors at the bottom where
-  // the felt meets their own cards and controls. Landscape stays a wide oval beside the control column.
-  const rx = landscape ? 42 : 43, ry = landscape ? 36 : 43, cx = 50, cy = landscape ? 50 : 50;
-  for (let k = 0; k < seatCount; k++) {
-    const angle = (Math.PI / 2) + ((k - mySeat + seatCount) % seatCount) * (2 * Math.PI / seatCount);
-    out.push({ left: cx + rx * Math.cos(angle), top: cy + ry * Math.sin(angle) });
+export interface Position { left: number; top: number }
+
+/** Stable physical seats, clockwise from the viewer. Side rails reserve the whole centre for the board.
+ * Unlike an ellipse, these positions never pull a middle seat inward over the community cards.
+ * Empty seats retain their positions; joining/leaving cannot shuffle players around the screen.
+ */
+export function seatPositions(seatCount: number, mySeat: number, landscape: boolean): Position[] {
+  const rail: Position[] = [{ left: 50, top: 96 }];
+  if (seatCount === 2) rail.push({ left: landscape ? 11 : 50, top: landscape ? 12 : 8 });
+  else {
+    const leftCount = Math.ceil((seatCount - 1) / 2);
+    const rightCount = Math.floor((seatCount - 1) / 2);
+    const row = (n: number) => Array.from({ length: n }, (_, i) => n === 1 ? 32 : 12 + i * 78 / (n - 1));
+    for (const top of row(leftCount).reverse()) rail.push({ left: 11, top });
+    for (const top of row(rightCount)) rail.push({ left: 89, top });
   }
-  return out;
+  return Array.from({ length: seatCount }, (_, i) => rail[(i - mySeat + seatCount) % seatCount]);
 }
-/** Position for a bet marker: a point between the seat and the centre. */
-export function betPosition(p: { left: number; top: number }, landscape: boolean): { left: number; top: number } {
-  const cx = 50, cy = 50;
-  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-  // rail seats sit at ~7% / 93%; the chip pill is ~60px wide, so keep its centre at least 10% in from either edge
-  return { left: clamp(p.left + (cx - p.left) * 0.42, 10, 90), top: p.top + (cy - p.top) * 0.42 };
+
+/** Bets stay with their player on the rail, never in the board's reserved rectangle. */
+export function betPosition(p: Position, _landscape: boolean): Position {
+  return { left: p.left, top: p.top > 90 ? 88 : p.top + 10 };
 }

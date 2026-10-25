@@ -6,7 +6,7 @@ test.afterEach(async ({ browser }, testInfo) => { await closePlayers(browser, te
 async function hostTable(page: Page, name: string): Promise<string> {
   await page.getByRole('button', { name: 'Host a table' }).click();
   await page.getByLabel('Table name').fill(name);
-  await page.getByLabel('Your buy-in (units)').fill('2');
+  await page.getByLabel('Your buy-in', {exact:true}).fill('2000');
   await page.getByRole('button', { name: 'Review the table' }).click();
   await page.getByRole('button', { name: 'Create and open the room' }).click();
   return (await page.locator('.fine', { hasText: '/join/' }).first().textContent())!.trim();
@@ -86,6 +86,19 @@ test('table chat and reactions across two separate player sessions', async ({ br
   await expect(bodies(g.page).nth(0)).toContainText('first up ♠️');
   await expect(g.page.locator('.chat-msg').nth(2).locator('.react-chip .react-n')).toHaveText('1', { timeout: 20_000 });
 
+  // A rejected reaction must explain the failure without pretending it was saved or blocking a retry.
+  await g.page.route('**/cmd', async route => {
+    if (route.request().postDataJSON()?.type === 'react') await route.abort('failed');
+    else await route.continue();
+  });
+  const restored = g.page.locator('.chat-msg').nth(2);
+  await restored.getByRole('button', {name:/👍/}).click();
+  await expect(g.page.getByRole('dialog').getByRole('alert')).toBeVisible();
+  await expect(restored.locator('.react-n')).toHaveText('1');
+  await g.page.unroute('**/cmd');
+  await restored.getByRole('button', {name:/👍/}).click();
+  await expect(hLast.locator('.react-n')).toHaveText('2');
+
   // keyboard room: focusing the input must keep it and Send within the viewport (not covered by chrome)
   const input = g.page.getByLabel('Message');
   await input.focus();
@@ -127,13 +140,19 @@ test('rapid chat sends preserve every message, never duplicate, and keep text on
   await expect(input).toHaveValue('still composing');
 
   // a failed send (offline) keeps its own text AND anything typed while it was failing
-  await h.ctx.setOffline(true);
+  let failSend!: () => void;
+  const released = new Promise<void>(resolve => { failSend = resolve; });
+  await h.page.route('**/cmd', async route => {
+    if (route.request().postDataJSON()?.type === 'chat') { await released; await route.abort('failed'); }
+    else await route.continue();
+  });
   await input.fill('will fail');
   await input.press('Enter');
-  await input.fill('typed after');            // a newer draft entered while the send is failing
+  await input.fill('typed after'); // explicitly keep the send pending until the newer draft exists
+  failSend();
   await expect.poll(async () => input.inputValue(), { timeout: 25_000 }).toContain('will fail');
   expect(await input.inputValue()).toContain('typed after');
-  await h.ctx.setOffline(false);
+  await h.page.unroute('**/cmd');
   // nothing extra leaked to the guest: the offline message was never delivered, so the count is unchanged
   await expect(bodies(g.page)).toHaveCount(5);
 });
