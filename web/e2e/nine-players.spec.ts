@@ -9,7 +9,7 @@ async function clearBoard(page: Page) {
     const errors: string[] = [];
     const protectedEls = [...document.querySelectorAll('.board, .pot, .result-strip, .own-cards, .dock')];
     const overlap = (a: DOMRect,b: DOMRect) => a.left < b.right-1 && a.right > b.left+1 && a.top < b.bottom-1 && a.bottom > b.top+1;
-    for (const seat of document.querySelectorAll('.seat-core, .seat-cards')) for (const el of protectedEls)
+    for (const seat of document.querySelectorAll('.seat-core, .seat-cards, .deck-anchor, .burn-pile')) for (const el of protectedEls)
       if(overlap(seat.getBoundingClientRect(),el.getBoundingClientRect())) errors.push(`${seat.className} covers ${el.className}`);
     for (const el of document.querySelectorAll('.g-surface, .g-head, .g-hero')) {
       const r = el.getBoundingClientRect();
@@ -39,7 +39,7 @@ for (const variant of ["Hold'em", 'Omaha 4']) test(`nine separate players: ${var
   await h.page.getByRole('button', {name:'Host a table'}).click();
   await h.page.getByLabel('Table name').fill(`Nine seats ${variant}`);
   await h.page.getByRole('button', {name:'9', exact:true}).click();
-  await h.page.getByLabel('Your buy-in (units)').fill('2');
+  await h.page.getByLabel('Your buy-in', {exact:true}).fill('2000');
   await h.page.getByRole('button', {name:'Review the table'}).click();
   await h.page.getByRole('button', {name:'Create and open the room'}).click();
   const invite = (await h.page.locator('.fine', {hasText:'/join/'}).first().textContent())!.trim();

@@ -5,7 +5,12 @@ export class DevTransport implements Transport {
   readonly mode = 'dev' as const;
   private token: string | null = null;
   constructor(private base: string) {}
-  async ensureSession(): Promise<string> {
+  private signingIn: Promise<string> | null = null;
+  ensureSession(): Promise<string> {
+    if (!this.signingIn) this.signingIn = this.startSession().finally(() => { this.signingIn = null; });
+    return this.signingIn;
+  }
+  private async startSession(): Promise<string> {
     const saved = localStorage.getItem('allin.dev.token');
     if (saved) { this.token = saved; return saved.slice(4); }
     const r = await fetch(this.base + '/dev/signin', { method: 'POST' });

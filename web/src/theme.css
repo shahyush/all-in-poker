@@ -126,3 +126,41 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; 
   background: var(--accent); color: var(--on-accent); border: 1px solid color-mix(in srgb, var(--on-accent) 30%, var(--accent));
   font-size: 13px; font-weight: 700; padding: 10px 16px; border-radius: 999px; box-shadow: 0 6px 20px rgba(0,0,0,.35); max-width: calc(100% - 32px); }
 .build-id { margin-top: 10px; text-align: center; opacity: .6; letter-spacing: .04em; }
+
+/* Quiet, responsive feedback: a slight press, then a smooth release. */
+button, a, input, textarea { -webkit-tap-highlight-color: transparent; }
+button, a { touch-action: manipulation; }
+.btn, .chip, .seg button, .sheet-close, button.list-row, .react-chip, .react-add, .emoji-btn {
+  transition: transform 180ms cubic-bezier(.2,.7,.2,1), background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+.btn:active:not(:disabled), .chip:active:not(:disabled), .seg button:active:not(:disabled), .sheet-close:active, button.list-row:active { transform: scale(.985); filter: none; }
+.list-row:not(button):active { transform: none; filter: none; }
+.input { min-width: 0; transition: border-color 180ms ease, box-shadow 180ms ease; }
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); outline: none; }
+.input::placeholder { color: var(--muted); opacity: .75; font-weight: 400; }
+.page-inner { animation: page-enter 220ms ease-out both; }
+@keyframes page-enter { from { opacity: .6; translate: 0 5px; } to { opacity: 1; translate: none; } }
+.sheet { animation: sheet-enter 240ms cubic-bezier(.2,.7,.2,1) both; }
+.sheet-backdrop { animation: backdrop-enter 200ms ease-out both; }
+@keyframes sheet-enter { from { opacity: 0; translate: 0 16px; } to { opacity: 1; translate: none; } }
+@keyframes backdrop-enter { from { opacity: 0; } to { opacity: 1; } }
+.btn[aria-busy="true"]::before { content: ''; width: 14px; height: 14px; flex: none; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: pending-turn 900ms linear infinite; }
+@keyframes pending-turn { to { rotate: 360deg; } }
+.react-chip, .react-add { min-height: 44px; }
+.host-form { gap: 20px; }
+.host-form .seg button { min-height: 44px; font-size: 14px; }
+.buyin-section { display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+.buyin-section .input { font-size: 26px; font-weight: 600; height: 52px; background: var(--page); }
+.buyin-options, .seat-options { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
+.buyin-options .chip, .seat-options .chip { min-width: 0; padding: 0 4px; }
+.rules-panel { padding: 14px; border-radius: 12px; background: var(--paper); animation: page-enter 200ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .page-inner, .sheet, .sheet-backdrop, .rules-panel, .btn[aria-busy="true"]::before { animation: none; }
+  .btn:active:not(:disabled), .chip:active:not(:disabled), .seg button:active:not(:disabled), .sheet-close:active { transform: none; }
+}
+:root[data-reduce-motion] .btn:active, :root[data-reduce-motion] .chip:active, :root[data-reduce-motion] .seg button:active { transform: none; }
+.level-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--paper); }
+.level-fields { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; align-items: center; }
+.level-number { grid-column: 1; grid-row: 1; font-weight: 600; }
+.level-fields > button { grid-column: 2; grid-row: 1; justify-self: end; }
+.level-fields .field { font-size: 12px; }

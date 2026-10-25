@@ -46,7 +46,7 @@ export function EntryPage({ destination }: { destination: string | null }) {
           <Field label="Player code" name="code" value={code} onChange={setCode} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XX" autoComplete="off" />
         )}
         {error && <div className="error" role="alert">{error}</div>}
-        <button className="btn btn-primary" type="submit" disabled={busy}>{mode === 'enter' ? 'Continue' : 'Restore my player'}</button>
+        <button className="btn btn-primary" type="submit" disabled={busy} aria-busy={busy}>{busy ? (mode === 'enter' ? 'Joining…' : 'Restoring…') : mode === 'enter' ? 'Continue' : 'Restore my player'}</button>
         <button className="btn btn-quiet" type="button" onClick={() => { setMode(mode === 'enter' ? 'restore' : 'enter'); setError(null); }} style={{ alignSelf: 'flex-start' }}>{mode === 'enter' ? 'I saved a player code' : 'Back to entry'}</button>
       </form>
       <p className="fine">No email or phone number. We keep your nickname, your play-chip records and what is needed to run the game. Play chips only, never money.</p>

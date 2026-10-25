@@ -697,6 +697,9 @@ function queueStages(t: TableState, h: HandState, now: number, runs: 1 | 2): voi
 }
 
 function beginRunout(t: TableState, h: HandState, now: number): void {
+  // Betting is complete with at most one player able to act: table all live hands before the runout.
+  // Folded/mucked hands remain private; the deck, burns and future board cards are never exposed.
+  for (const player of h.players.filter(live)) player.revealed = h.hole[player.seat].map((_, index) => index);
   const cash = t.rules.mode === 'cash';
   if (h.bettingLocked || !cash) { queueStages(t, h, now, h.bettingLocked ? h.runs : 1); return; }
   if (h.board.length < 3) {

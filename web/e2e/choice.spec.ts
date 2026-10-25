@@ -9,7 +9,7 @@ async function hostAndJoin(browser: import('@playwright/test').Browser, name: st
   const h = await player(browser, 'Tanisha');
   await h.page.getByRole('button', { name: 'Host a table' }).click();
   await h.page.getByLabel('Table name').fill(name);
-  await h.page.getByLabel('Your buy-in (units)').fill('3');
+  await h.page.getByLabel('Your buy-in', {exact:true}).fill('3000');
   await h.page.getByRole('button', { name: 'Review the table' }).click();
   await h.page.getByRole('button', { name: 'Create and open the room' }).click();
   const url = (await h.page.locator('.fine', { hasText: '/join/' }).first().textContent())!.trim();
@@ -39,7 +39,7 @@ async function pickAndExpect(pages: Page[], label: string): Promise<void> {
 }
 
 const reachHand = async (pages: Page[], label: string) => {
-  for (let i = 0; i < 60; i++) { if (await pages[0].locator('.g-stakes').getByText(label, { exact: false }).isVisible().catch(() => false)) break; if (!(await actCurrentTurn(pages))) break; }
+  for (let i = 0; i < 60; i++) { if (await pages[0].locator('.g-stakes').getByText(label, { exact: false }).isVisible().catch(() => false)) break; if (!(await actCurrentTurn(pages))) await pages[0].waitForTimeout(250); }
   await expect(pages[0].locator('.g-stakes')).toContainText(label, { timeout: 25_000 });
 };
 

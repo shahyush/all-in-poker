@@ -27,6 +27,12 @@ Presentation checks cover per-card arrival visibility, cancellation cleanup, red
 - Highlight winning board cards separately for each Run It Twice board.
 - Compact player stack/bet rows on shallow landscape screens to prevent newly reproduced seat collisions.
 
+- Reveal live hands when an all-in runout begins; folded hole cards remain private. Check consumed deck contents against the exact shuffled prefix, including burns and both boards.
+- Simplify hosting to direct chip amounts, equal-sized seat choices, compact tournament levels and recoverable create errors. Correct obsolete per-hand/four-second choice copy.
+- Soften tap feedback and transitions; expose pending actions; keep the waiting room open if leaving fails. Add explicit lobby load errors and retry.
+- Fix development-only concurrent sign-in identity creation and allow reaction reads in the dev server. Browser traces confirmed these failures; they were not attributed to cold starts.
+- Preserve newer chat drafts in a deliberately delayed failure test; wait for the actual actor after reconnect/dealing. Assert server-only timeout outcomes after all browser contexts close.
+
 ## Limits and remaining release checks
 
 Browser automation is not proof of all phones. Actual iOS keyboard, safe-area/browser chrome, installed PWA updates, background suspension and real network loss need physical-device validation. These tests use an isolated development server and database; they do not verify production Supabase authentication, realtime cold starts or production delivery. Merge and coordinated frontend/backend deployment, followed by hosted checks, remain separate from this PR review. No claim of universal compatibility, independent security certification, or cryptographically verifiable dealing is made.

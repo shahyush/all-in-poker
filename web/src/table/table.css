@@ -234,3 +234,7 @@
   .seat-stack:last-of-type { grid-column: 1 / -1; }
   .seat-status { grid-column: 1 / -1; grid-row: 3; line-height: 10px; min-height: 10px; }
 }
+
+/* Reserve space outside the board: even two runout boards cannot cover the deck or burn pile. */
+.deal-station { display: flex; align-items: center; gap: 5px; flex: none; padding: 0 3px; }
+.deal-station .deck-anchor, .deal-station .burn-pile { position: relative; left: auto; top: auto; margin: 0; width: 18px; height: 26px; }

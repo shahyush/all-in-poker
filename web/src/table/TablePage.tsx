@@ -206,6 +206,10 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
       <div className="g-head">
         <div className="g-head-row">
           <div className="g-title">{row.name}</div>
+          <div className="deal-station" aria-hidden="true">
+            <span className="deck-anchor pc back" data-deck />
+            <span className={`burn-pile pc back ${hand?.log.some(e => e.t === 'burn') ? 'has-burn' : ''}`} data-burn-pile />
+          </div>
           <button type="button" className="g-icon" aria-label={unread ? `Chat, ${unread} unread` : 'Chat'} onClick={() => setSheet('chat')}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 3.5V17H6.5A2.5 2.5 0 0 1 4 14.5z" /></svg>
             {unread > 0 && <span className="badge">{unread}</span>}
@@ -225,8 +229,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
       </div>
       <div className="g-surface">
         <div className="felt" aria-hidden="true" />
-        <span className="deck-anchor pc back" data-deck aria-hidden="true" />
-        <span className={`burn-pile pc back ${hand?.log.some(e => e.t === 'burn') ? 'has-burn' : ''}`} data-burn-pile aria-hidden="true" />
+
         {sweeps.map((sp) => <ChipSweep key={sp.id} from={{ left: sp.left, top: sp.top }} />)}
         {t.seats.map((seat, i) => {
           if (i === mySeatIdx) return null;

@@ -12,7 +12,7 @@ const db = new PgDb(DB_URL);
 const app = new App(db, new DevAuthenticator(), { groupPassword: process.env.ALLIN_GROUP_PASSWORD ?? 'friday-night', jobKey: JOB_KEY });
 
 const QUERYABLE: Record<string, string[]> = {
-  tables: ['id', 'invite_code'], table_members: ['table_id', 'user_id'], hole_cards: ['table_id', 'user_id'], chat_messages: ['table_id'],
+  tables: ['id', 'invite_code'], table_members: ['table_id', 'user_id'], hole_cards: ['table_id', 'user_id'], chat_messages: ['table_id'], chat_reactions: ['table_id'],
   hand_history: ['table_id'], ledger: ['table_id'], reload_requests: ['table_id'], session_participants: ['table_id', 'user_id'], profiles: ['id'],
 };
 

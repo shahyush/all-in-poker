@@ -3,6 +3,7 @@ import { makeTable, start, seededRng, totalChips, ctxAll } from './helpers.ts';
 import { act, legalActions, tick, publicView, privateCards, respondVote, canRunTwice } from '../src/table.ts';
 import { secureInt, shuffledDeck } from '../src/random.ts';
 import { boardPresentationMs, planBoard, planDeal, showdownOrder } from '../src/animation.ts';
+import type { HandState } from '../src/types.ts';
 import type { VariantId } from '../src/evaluator.ts';
 
 describe('deck and chip integrity under varied legal play', () => {
@@ -18,11 +19,7 @@ describe('deck and chip integrity under varied legal play', () => {
           expect(totalChips(t)).toBe(initial);
           expect(new Set(h.deck).size).toBe(52);
           expect(h.cursor).toBeLessThanOrEqual(52);
-          const holes=Object.values(h.hole).flat();
-          const board=[...new Set(h.boards ? h.boards.flat() : h.board)];
-          const used=[...holes,...h.burned,...board];
-          expect(new Set(used).size).toBe(used.length);
-          expect(used.every(c=>h.deck.slice(0,h.cursor).includes(c))).toBe(true);
+          verifyConsumedDeck(h);
           for (const key of ['deck','cursor','hole','burned','runoutQueue']) expect(publicView(t).hand).not.toHaveProperty(key);
           expect(privateCards(t,'not-a-player')).toBeNull();
           for (let seat=0;seat<count;seat++) expect(privateCards(t,'p'+seat)?.cards).toEqual(h.hole[seat]);
@@ -42,7 +39,7 @@ describe('deck and chip integrity under varied legal play', () => {
         }
         expect(h.phase,`seed ${seed}`).toBe('result');
         expect(totalChips(t)).toBe(initial);
-        expect(new Set([...Object.values(h.hole).flat(),...h.burned,...new Set(h.boards?h.boards.flat():h.board)]).size).toBe(Object.values(h.hole).flat().length+h.burned.length+new Set(h.boards?h.boards.flat():h.board).size);
+        verifyConsumedDeck(h);
         for(const award of h.result!.awards) for(const winner of award.winners) expect(h.players.find(p=>p.seat===winner.seat)?.folded).toBe(false);
       }
     },60_000);
@@ -70,4 +67,29 @@ it('deal order and board presentation retain their complete timing',()=>{
 it('showdown starts at the final street aggressor, or left of the button when checked down',()=>{
   expect(showdownOrder([{t:'bet',seat:2,to:20,amount:20,allIn:false}],0,4,[0,1,2,3])).toEqual([2,3,0,1]);
   expect(showdownOrder([{t:'bet',seat:2,to:20,amount:20,allIn:false},{t:'street',street:'river',cards:[1],board:0},{t:'check',seat:1}],0,4,[0,1,2,3])).toEqual([1,2,3,0]);
+});
+
+function verifyConsumedDeck(h: HandState) {
+  const boards=h.boards??[h.board];
+  for(const board of boards) expect(new Set(board).size).toBe(board.length);
+  if(h.boards) for(const board of boards) expect(board.slice(0,h.board.length)).toEqual(h.board);
+  const community=h.boards ? [...h.board,...h.boards.flatMap(board=>board.slice(h.board.length))] : h.board;
+  const consumed=[...Object.values(h.hole).flat(),...h.burned,...community,...h.runoutQueue.flatMap(stage=>stage.cards)];
+  expect(new Set(consumed).size).toBe(consumed.length);
+  expect(consumed.length).toBe(h.cursor);
+  expect([...consumed].sort((a,b)=>a-b)).toEqual(h.deck.slice(0,h.cursor).sort((a,b)=>a-b));
+}
+
+it('all-in runouts table live hands immediately while folded hands stay private',()=>{
+  const {t,now,ctx}=makeTable([1000,1000,1000]);
+  const clock=start(t,now,ctx), h=t.hand!;
+  const folded=h.actor!;
+  act(t,folded,{type:'fold'},clock,ctx);
+  const raiser=h.actor!;
+  act(t,raiser,{type:'raise',raiseTo:legalActions(t,raiser,clock).raise!.maxTo},clock,ctx);
+  act(t,h.actor!,{type:'call'},clock,ctx);
+  const publicHand=publicView(t).hand!;
+  expect(publicHand.phase).toBe('runout');
+  expect(publicHand.revealedCards[folded]).toBeUndefined();
+  for(const player of h.players.filter(p=>!p.folded)) expect(publicHand.revealedCards[player.seat].map(x=>x.card)).toEqual(h.hole[player.seat]);
 });

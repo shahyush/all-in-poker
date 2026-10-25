@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Field, Page, KV } from '../components/ui.tsx';
+import { Field, Page, KV, fmt } from '../components/ui.tsx';
 import { useSession } from '../state/session.tsx';
-import { parseChipAmount, RULES, variantAllowed } from '@allin/engine/public';
+import { parseChipAmount, variantAllowed } from '@allin/engine/public';
 import { TransportError } from '../transport/index.ts';
 
 type Level = { sb: string; bb: string; ante: string; minutes: string };
@@ -13,7 +13,7 @@ export function CreatePage({ go }: { go: (to: string) => void }) {
   const [name, setName] = useState('');
   const [sb, setSb] = useState('5'); const [bb, setBb] = useState('10');
   const [unit, setUnit] = useState('1000');
-  const [buyMult, setBuyMult] = useState('3');
+  const [buyAmount, setBuyAmount] = useState('3000');
   const [seats, setSeats] = useState(6);
   const [ante, setAnte] = useState(''); const [straddle, setStraddle] = useState(false);
   const [more, setMore] = useState(false);
@@ -30,7 +30,9 @@ export function CreatePage({ go }: { go: (to: string) => void }) {
       if (a === null || a <= 0) e.sb = 'Whole number'; if (b === null || b <= 0) e.bb = 'Whole number';
       if (a !== null && b !== null && a >= b) e.sb = 'Small blind must be below the big blind';
       if (u !== null && b !== null && u < b) e.unit = 'At least one big blind';
-      const m = int(buyMult); if (m === null || m <= 0) e.buyMult = 'Whole number of units';
+      const amount = int(buyAmount);
+      if (amount === null || amount <= 0) e.buyAmount = 'Enter a whole number of chips';
+      else if (u && amount % u !== 0) e.buyAmount = `Use a multiple of ${fmt(u)} chips`;
       if (ante !== '' && (int(ante) === null)) e.ante = 'Whole number or blank';
     } else {
       levels.forEach((L, i) => {
@@ -43,31 +45,32 @@ export function CreatePage({ go }: { go: (to: string) => void }) {
       if (!levels.length) e.levels = 'Add at least one level';
     }
     return e;
-  }, [mode, sb, bb, unit, buyMult, ante, levels]);
+  }, [mode, sb, bb, unit, buyAmount, ante, levels]);
 
   const rules = { mode, name, seats: String(seats), sb, bb, ante, straddle, unit, levels };
-  const buyIn = mode === 'cash' ? (int(unit) ?? 0) * (int(buyMult) ?? 0) : int(unit) ?? 0;
+  const buyIn = mode === 'cash' ? (int(buyAmount) ?? 0) : int(unit) ?? 0;
 
   async function create() {
+    if (busy) return;
     setBusy(true); setError(null);
     try {
       const r = await s.transport.cmd<{ tableId: string }>('create_table', { rules, buyIn: String(buyIn) });
       go('/table/' + r.tableId);
     } catch (err) { setError(err instanceof TransportError ? err.message : 'Could not create the table'); setBusy(false); }
   }
-  const o6Note = !variantAllowed(seats, 'omaha6') ? `Omaha 6 needs 7 or fewer dealt players, so it is unavailable with ${seats} seats full.` : null;
+  const o6Note = !variantAllowed(seats, 'omaha6') ? (seats === 9 ? 'At nine players: Hold’em or Omaha 4.' : 'At eight players: Hold’em, Omaha 4 or Omaha 5.') : null;
   const summary: [string, string][] = mode === 'cash'
-    ? [['Format', 'Cash · play chips'], ['Blinds', `${sb} / ${bb}`], ['Buy-in unit', unit], ['Your buy-in', String(buyIn)], ['Seats', String(seats)], ['Ante', ante && int(ante) ? `${ante} per player` : 'Off'], ['UTG straddle', straddle ? '2 × big blind, optional' : 'Off']]
+    ? [['Format', 'Cash · play chips'], ['Blinds', `${sb} / ${bb}`], ['Buy-in unit', unit], ['Your buy-in', `${fmt(buyIn)} chips`], ['Seats', String(seats)], ['Ante', ante && int(ante) ? `${ante} per player` : 'Off'], ['UTG straddle', straddle ? '2 × big blind, optional' : 'Off']]
     : [['Format', 'Tournament · freezeout'], ['Starting stack', unit], ['Seats', String(seats)], ['Levels', levels.map((L, i) => `${i + 1}: ${L.sb}/${L.bb}${L.ante && int(L.ante) ? ` a${L.ante}` : ''} · ${L.minutes} min`).join(' · ')], ['After the last level', 'Blinds hold'], ['Rebuys', 'Off']];
 
   return (
     <Page back="Back" onBack={() => (review ? setReview(false) : go('/'))}>
       <div className="stack" style={{ gap: 8 }}>
-        <div className="eyebrow">Your place. Your game.</div>
+        <div className="eyebrow">{review ? 'Ready to invite your friends' : 'Your game, your table'}</div>
         <h1>{review ? 'Looks right?' : 'Host a table'}</h1>
       </div>
       {!review ? (
-        <div className="stack">
+        <div className="stack host-form">
           <div className="seg" role="group" aria-label="Format">
             <button type="button" aria-pressed={mode === 'cash'} onClick={() => setMode('cash')}>Cash · play chips</button>
             <button type="button" aria-pressed={mode === 'tournament'} onClick={() => setMode('tournament')}>Tournament</button>
@@ -79,22 +82,27 @@ export function CreatePage({ go }: { go: (to: string) => void }) {
                 <Field label="Small blind" inputMode="numeric" value={sb} onChange={setSb} error={errors.sb} />
                 <Field label="Big blind" inputMode="numeric" value={bb} onChange={setBb} error={errors.bb} />
               </div>
-              <Field label="Buy-in unit" inputMode="numeric" value={unit} onChange={setUnit} error={errors.unit} hint="Players buy in for any whole multiple of this; reloads use it too." />
-              <Field label="Your buy-in (units)" inputMode="numeric" value={buyMult} onChange={setBuyMult} error={errors.buyMult} hint={`You sit down with ${buyIn || '—'} chips`} />
+              <section className="buyin-section" aria-label="Your starting chips">
+                <Field label="Your buy-in" inputMode="numeric" value={buyAmount} onChange={setBuyAmount} error={errors.buyAmount ?? errors.unit} hint="Chips you bring to this table." />
+                <div className="buyin-options" role="group" aria-label="Quick buy-in">
+                  {[1,2,3,5].map(n => <button key={n} type="button" className="chip" aria-pressed={buyIn === n * (int(unit) ?? 0)} onClick={() => setBuyAmount(String(n * (int(unit) ?? 1000)))}>{fmt(n * (int(unit) ?? 1000))}</button>)}
+                </div>
+              </section>
             </>
           ) : (
             <Field label="Starting stack" inputMode="numeric" value={unit} onChange={setUnit} error={errors.unit} hint="Everyone starts equal. No rebuys." />
           )}
           <div className="stack" style={{ gap: 8 }}>
             <div style={{ fontSize: 14, fontWeight: 600 }}>Seats</div>
-            <div className="chips">{[2, 3, 4, 5, 6, 7, 8, 9].map((n) => <button key={n} type="button" className="chip" style={{ width: 44, padding: 0 }} aria-pressed={seats === n} onClick={() => setSeats(n)}>{n}</button>)}</div>
+            <div className="seat-options" role="group" aria-label="Number of seats">{[2, 3, 4, 5, 6, 7, 8, 9].map((n) => <button key={n} type="button" className="chip" aria-pressed={seats === n} onClick={() => setSeats(n)}>{n}</button>)}</div>
             {o6Note && <p className="fine">{o6Note}</p>}
           </div>
           {mode === 'cash' && (
             <>
               <button type="button" className="btn btn-quiet" aria-expanded={more} onClick={() => setMore(!more)} style={{ justifyContent: 'space-between', textDecoration: 'none', borderTop: '1px solid var(--line)', paddingTop: 8 }}><span>More table rules</span><span style={{ color: 'var(--muted)' }}>{more ? '−' : '+'}</span></button>
               {more && (
-                <div className="stack">
+                <div className="stack rules-panel">
+                  <Field label="Buy-in unit" inputMode="numeric" value={unit} onChange={setUnit} error={errors.unit} hint="Buy-ins and rebuys use multiples of this amount." />
                   <Field label="Ante per player (optional)" inputMode="numeric" value={ante} onChange={setAnte} error={errors.ante} hint="Paid by every dealt player before the blinds." />
                   <label className="toggle"><span>Allow a UTG straddle<br /><span className="fine" style={{ fontWeight: 400 }}>The seat after the big blind may post 2 × big blind before the deal.</span></span><input type="checkbox" checked={straddle} onChange={(e) => setStraddle(e.target.checked)} /></label>
                 </div>
@@ -105,33 +113,33 @@ export function CreatePage({ go }: { go: (to: string) => void }) {
             <div className="stack" style={{ gap: 8 }}>
               <div className="row" style={{ justifyContent: 'space-between' }}><span style={{ fontSize: 14, fontWeight: 600 }}>Blind schedule</span><span className="fine">Editable</span></div>
               {levels.map((L, i) => (
-                <div key={i} className="stack" style={{ gap: 4 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '24px 1fr 1fr 1fr 1fr 44px', gap: 6, alignItems: 'center' }}>
-                    <span style={{ fontWeight: 600 }}>{i + 1}</span>
-                    <input className="input" inputMode="numeric" aria-label={`Level ${i + 1} small blind`} value={L.sb} onChange={(e) => setLevels(levels.map((x, j) => (j === i ? { ...x, sb: e.target.value } : x)))} style={{ height: 44, padding: '0 8px' }} />
-                    <input className="input" inputMode="numeric" aria-label={`Level ${i + 1} big blind`} value={L.bb} onChange={(e) => setLevels(levels.map((x, j) => (j === i ? { ...x, bb: e.target.value } : x)))} style={{ height: 44, padding: '0 8px' }} />
-                    <input className="input" inputMode="numeric" aria-label={`Level ${i + 1} ante`} placeholder="ante" value={L.ante} onChange={(e) => setLevels(levels.map((x, j) => (j === i ? { ...x, ante: e.target.value } : x)))} style={{ height: 44, padding: '0 8px' }} />
-                    <input className="input" inputMode="numeric" aria-label={`Level ${i + 1} minutes`} value={L.minutes} onChange={(e) => setLevels(levels.map((x, j) => (j === i ? { ...x, minutes: e.target.value } : x)))} style={{ height: 44, padding: '0 8px' }} />
+                <div key={i} className="level-card stack" style={{ gap: 8 }}>
+                  <div className="level-fields">
+                    <span className="level-number">Level {i + 1}</span>
+                    <label className="field"><span>Small blind</span><input className="input" inputMode="numeric" aria-label={`Level ${i + 1} small blind`} value={L.sb} onChange={(e) => setLevels(levels.map((x, j) => (j === i ? { ...x, sb: e.target.value } : x)))} style={{ height: 44, padding: '0 8px' }} /></label>
+                    <label className="field"><span>Big blind</span><input className="input" inputMode="numeric" aria-label={`Level ${i + 1} big blind`} value={L.bb} onChange={(e) => setLevels(levels.map((x, j) => (j === i ? { ...x, bb: e.target.value } : x)))} style={{ height: 44, padding: '0 8px' }} /></label>
+                    <label className="field"><span>Ante</span><input className="input" inputMode="numeric" aria-label={`Level ${i + 1} ante`} placeholder="ante" value={L.ante} onChange={(e) => setLevels(levels.map((x, j) => (j === i ? { ...x, ante: e.target.value } : x)))} style={{ height: 44, padding: '0 8px' }} /></label>
+                    <label className="field"><span>Minutes</span><input className="input" inputMode="numeric" aria-label={`Level ${i + 1} minutes`} value={L.minutes} onChange={(e) => setLevels(levels.map((x, j) => (j === i ? { ...x, minutes: e.target.value } : x)))} style={{ height: 44, padding: '0 8px' }} /></label>
                     <button type="button" aria-label={`Remove level ${i + 1}`} className="chip" style={{ width: 44, padding: 0 }} onClick={() => setLevels(levels.filter((_, j) => j !== i))}>×</button>
                   </div>
                   {errors['L' + i] && <span className="error">{errors['L' + i]}</span>}
                 </div>
               ))}
-              <div className="fine">Small · Big · Ante · Minutes</div>
+
               <button type="button" className="btn btn-secondary" style={{ borderStyle: 'dashed' }} onClick={() => { const last = levels[levels.length - 1]; setLevels([...levels, last ? { sb: String((int(last.sb) ?? 5) * 2), bb: String((int(last.bb) ?? 10) * 2), ante: last.ante, minutes: last.minutes } : { sb: '5', bb: '10', ante: '', minutes: '15' }]); }}>Add a level</button>
               <p className="fine">After the last level the blinds hold. Rebuys are off. Hands run once.</p>
             </div>
           )}
-          <button type="button" className="btn btn-primary" disabled={Object.keys(errors).length > 0} onClick={() => setReview(true)}>Review the table</button>
+          <button type="button" className="btn btn-primary" disabled={Object.keys(errors).length > 0} onClick={() => { setReview(true); window.scrollTo({top:0,behavior:'instant'}); }}>Review the table</button>
         </div>
       ) : (
         <div className="stack">
           <KV rows={summary} />
-          <p className="fine">Dealer's Choice each hand: the dealer picks Hold'em (no limit) or Omaha 4, 5 or 6 (pot limit) within four seconds; Hold'em is the default. Everyone gets 30 seconds to act. {RULES.cash.consecutiveTimeoutsToSitOut} missed turns in a row sits a cash player out.</p>
+          <p className="fine">One game for a full orbit. The next chooser picks when the round completes. Hold’em is the default; Omaha availability depends on the number of players.</p>
           {error && <div className="error" role="alert">{error}</div>}
           <div className="grid2" style={{ gridTemplateColumns: '1fr 2fr' }}>
             <button type="button" className="btn btn-secondary" onClick={() => setReview(false)}>Edit</button>
-            <button type="button" className="btn btn-primary" disabled={busy} onClick={create}>Create and open the room</button>
+            <button type="button" className="btn btn-primary" disabled={busy} aria-busy={busy} onClick={create}>{busy ? 'Creating your table…' : 'Create and open the room'}</button>
           </div>
         </div>
       )}

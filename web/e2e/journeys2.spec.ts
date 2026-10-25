@@ -7,7 +7,7 @@ import { HOSTED, player, actWhenMyTurn, shiftClock, actCurrentTurn, closePlayers
 async function hostTable(page: Page, opts: { name: string; units?: string; straddle?: boolean }): Promise<string> {
   await page.getByRole('button', { name: 'Host a table' }).click();
   await page.getByLabel('Table name').fill(opts.name);
-  await page.getByLabel('Your buy-in (units)').fill(opts.units ?? '2');
+  await page.getByLabel('Your buy-in', {exact:true}).fill(String(Number(opts.units ?? '2') * 1000));
   if (opts.straddle) { await page.getByRole('button', { name: 'More table rules' }).click(); await page.getByLabel(/Allow a UTG straddle/).check(); }
   await page.getByRole('button', { name: 'Review the table' }).click();
   await page.getByRole('button', { name: 'Create and open the room' }).click();
@@ -66,15 +66,17 @@ test('reconnect, rotation, uncontested reveal, reload approval and run it twice'
   await g.page.screenshot({ path: 'test-results/shots/10-rotated.png' });
   await g.page.setViewportSize({ width: 390, height: 844 });
   // uncontested: first actor folds; the winner reveals one card, which MUST propagate to the opponent.
-  const first = (await turnOf(pages))!;
-  const winner = first === h.page ? g.page : h.page;
-  await actWhenMyTurn(first, 'Fold');
+  let first: Page | null = null;
+  await expect.poll(async () => { first = await turnOf(pages); return first !== null; }).toBe(true);
+  const actor = first!;
+  const winner = actor === h.page ? g.page : h.page;
+  await actWhenMyTurn(actor, 'Fold');
   // The uncontested pot lingers the full reveal window (revealMs), and a landed reveal re-extends the linger so the
   // shown card reaches every client before the next hand. This is a hard assertion now, not a best-effort race:
   // the winner taps the first card, then the folded opponent must see a face-up card in the winner's seat.
   const revealBtn = winner.getByRole('button', { name: /Tap to show: card 1/ });
   await revealBtn.click({ timeout: 9000 });
-  await expect(first.locator('.seat .pc:not(.back)').first()).toBeVisible({ timeout: 8000 });
+  await expect(actor.locator('.seat .pc:not(.back)').first()).toBeVisible({ timeout: 8000 });
   await winner.screenshot({ path: 'test-results/shots/11-reveal.png' });
   await expect(h.page.locator('.g-stakes')).toContainText('Hand 2', { timeout: 20_000 });
   // the compact last-hand recap names the previous hand's winner and award (uncontested here) without exposing mucked cards
@@ -172,11 +174,18 @@ test('server timers run with every browser closed; a timed-out player folds and 
   await joinVia(g.page, url);
   await h.page.getByRole('button', { name: 'Start the game' }).click();
   await expect(h.page.locator('.game')).toBeVisible();
+  const saved = await h.ctx.storageState();
+  const tableUrl = h.page.url();
   await h.page.context().close(); await g.page.context().close();
   // nobody is connected: choice defaults, actions time out, next hands start, purely on the server
   for (let i = 0; i < 12; i++) { await shiftClock(31_000); await new Promise((r) => setTimeout(r, 1300)); }
-  const back = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, storageState: undefined });
-  void back;
+  const back = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, storageState: saved });
+  const page = await back.newPage();
+  await page.goto(tableUrl);
+  await expect(page.locator('.game')).toBeVisible();
+  await expect(page.getByText('Sitting out', {exact:true})).toBeVisible();
+  await expect(page.locator('.g-stakes')).not.toContainText(/Hand 1(?:\s|$)/);
+  await back.close();
 });
 
 test('tournament: create with levels, play out to a winner, standings', async ({ browser }) => {
