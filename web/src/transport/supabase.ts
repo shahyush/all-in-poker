@@ -1,4 +1,5 @@
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
+import { boundedFetch } from './fetch.ts';
 
 const MIRROR_KEY = 'allin.auth.mirror';
 import { TransportError, type QueryOpts, type Row, type Transport, type Unsubscribe, type Where } from './types.ts';
@@ -11,7 +12,7 @@ export class SupabaseTransport implements Transport {
   private watching = false;
   private lastAuthError: string | null = null;
   constructor(private url: string, private key: string) {
-    this.client = createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'allin.auth' }, realtime: { params: { eventsPerSecond: 20 } } });
+    this.client = createClient(url, key, { global: { fetch: boundedFetch }, auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'allin.auth' }, realtime: { params: { eventsPerSecond: 20 } } });
     this.fnUrl = url.replace(/\/$/, '') + '/functions/v1/api';
   }
   /** Mirror of the current tokens, kept in our own storage so a session auth-js drops (seen on iOS Safari) can be restored
@@ -72,7 +73,7 @@ export class SupabaseTransport implements Transport {
     const token = await this.token();
     let r: Response;
     try {
-      r = await fetch(this.fnUrl + '/cmd', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token, apikey: this.key }, body: JSON.stringify({ actionId, type, tableId, payload }), signal: AbortSignal.timeout(20_000) });
+      r = await fetch(this.fnUrl + '/cmd', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token, apikey: this.key }, body: JSON.stringify({ actionId, type, tableId, payload }), signal: AbortSignal.timeout(type === 'preview' ? 12_000 : 20_000) });
     } catch (e) {
       if ((e as Error)?.name === 'TimeoutError') throw new TransportError('timeout', 'The server did not answer. Check your connection and try again.', 0);
       throw new TransportError('network', 'No connection. Check your network and try again.', 0);

@@ -1,4 +1,26 @@
 import {test, expect} from '@playwright/test';
+test('a stalled read times out and the next request recovers', async ({page}) => {
+  await page.route('http://127.0.0.1:5173/', route => route.fulfill({contentType:'text/html', body:'<html></html>'}));
+  await page.route('**/stalled-read', () => {});
+  await page.route('**/healthy-read', route => route.fulfill({json:{version:2}}));
+  await page.goto('/');
+  await page.clock.install();
+  await page.evaluate(async () => {
+    const {boundedFetch} = await import(/* @vite-ignore */ '/src/transport/fetch.ts');
+    (window as any).readResult = boundedFetch('/stalled-read').then(() => 'unexpected success', (e:Error) => e.name);
+  });
+  await page.clock.fastForward(12001);
+  expect(await page.evaluate(() => (window as any).readResult)).toBe('TimeoutError');
+  expect(await page.evaluate(async () => {
+    const {boundedFetch} = await import(/* @vite-ignore */ '/src/transport/fetch.ts');
+    return (await (await boundedFetch('/healthy-read')).json()).version;
+  })).toBe(2);
+  expect(await page.evaluate(async () => {
+    const {boundedFetch} = await import(/* @vite-ignore */ '/src/transport/fetch.ts');
+    const c = new AbortController(); c.abort();
+    return boundedFetch('/healthy-read', {signal:c.signal}).then(() => 'unexpected success', (e:Error) => e.name);
+  })).toBe('AbortError');
+});
 test('long chats retain the newest messages and reactions in display order', async ({page}) => {
   let count = 205;
   await page.route('http://127.0.0.1:8787/**', async route => {
