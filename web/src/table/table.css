@@ -319,3 +319,4 @@
 }
 .showdown-heading { position: relative; }
 .showdown-heading > .winner-sparks { inset: 0 0 auto auto; width: 20px; height: 20px; }
+.own-cards.own-folded .pc { opacity: .72; }

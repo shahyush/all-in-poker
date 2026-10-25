@@ -714,9 +714,8 @@ function beginRunout(t: TableState, h: HandState, now: number): void {
   // Betting is complete with at most one player able to act: table all live hands before the runout.
   // Folded/mucked hands remain private; the deck, burns and future board cards are never exposed.
   for (const player of h.players.filter(live)) player.revealed = h.hole[player.seat].map((_, index) => index);
-  const cash = t.rules.mode === 'cash';
   if (h.boards) { queueStages(t, h, now, 2); return; }
-  if (h.bettingLocked || !cash) { queueStages(t, h, now, h.bettingLocked ? h.runs : 1); return; }
+  if (h.bettingLocked) { queueStages(t, h, now, h.runs); return; }
   if (h.board.length < 3) {
     // shared flop first, then the tail offer
     const burn = burnCard(h, 0, 'flop');
@@ -746,8 +745,8 @@ function applyStage(t: TableState, h: HandState, now: number): void {
   if (h.runoutQueue.length > 0) return;
   const boardLen = h.boards ? h.boards[0].length : h.board.length;
   if (boardLen < 5) {
-    // shared flop dealt for a preflop all-in: offer the tail (cash) or continue once
-    if (t.rules.mode === 'cash' && !h.bettingLocked) return openOffer(t, h, now);
+    // Shared flop dealt for a preflop all-in: offer the remaining streets in either mode.
+    if (!h.bettingLocked) return openOffer(t, h, now);
     return queueStages(t, h, now, 1);
   }
   settle(t, h, now, false);
@@ -757,7 +756,6 @@ export function propose(t: TableState, seat: number, runs: 1 | 2, now: number, c
   const effects = tick(t, now, ctx);
   const h = t.hand;
   if (!h || h.phase !== 'betting') fail('not_now', 'You can only propose on your turn');
-  if (t.rules.mode !== 'cash') fail('not_cash', 'Last player standing uses one board');
   if (h.actionReadyAt !== null && now < h.actionReadyAt) fail('not_ready', 'Cards are still being dealt');
   if (h.actor !== seat) fail('not_turn', 'Wait for your turn');
   if (h.street !== 'flop' && h.street !== 'turn') fail('wrong_street', 'Proposals are open on the flop and turn');

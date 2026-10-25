@@ -17,7 +17,7 @@ export interface HeroProps {
 }
 
 export function Hero(p: HeroProps) {
-  const { hand, mySeat, me, own, now, busy, pending, legal, isCash } = p;
+  const { hand, mySeat, me, own, now, busy, pending, legal } = p;
   const [composer, setComposer] = useState(false);
   const inHand = !!hand?.players.find((x) => x.seat === mySeat);
   const myHp = hand?.players.find((x) => x.seat === mySeat) ?? null;
@@ -27,20 +27,20 @@ export function Hero(p: HeroProps) {
   const ready = now >= Math.max(hand?.actionReadyAt ?? 0, p.presentationUntil ?? 0);
   const frac = deadline ? Math.max(0, Math.min(1, (deadline - now) / 30000)) : 0;
   useEffect(() => { if (!myTurn) setComposer(false); }, [myTurn]);
-  const showCards = own && hand && p.ownHandId === hand.id && myHp && !myHp.folded;
-  const canPropose = isCash && myTurn && hand && !hand.boards && (hand.street === 'flop' || hand.street === 'turn') && hand.currentBet === 0 && !hand.players.some((x) => x.bet > 0) && !hand.proposedStreets.includes(hand.street) && hand.players.filter((x) => !x.folded).length > 1;
+  const showCards = own && hand && p.ownHandId === hand.id && myHp;
+  const canPropose = myTurn && hand && !hand.boards && (hand.street === 'flop' || hand.street === 'turn') && hand.currentBet === 0 && !hand.players.some((x) => x.bet > 0) && !hand.proposedStreets.includes(hand.street) && hand.players.filter((x) => !x.folded).length > 1;
   const revealOpen = hand?.phase === 'result' && hand.result?.uncontested && hand.result.winnerSeat === mySeat && hand.revealDeadline !== null && now <= hand.revealDeadline;
   const revealed = new Set(myHp?.revealed ?? []);
   const winCards = new Set<Card>();
   if (p.awardReady && hand?.result) for (const a of hand.result.awards) for (const w of a.winners) if (w.seat === mySeat) for (const c of w.cards) winCards.add(c);
   const turnLabel = !p.connected ? 'Reconnecting…' : !ready ? 'Dealing…' : pending ? 'Sending…' : myTurn && ready ? (legal!.owed > 0 ? `Your turn · ${fmt(legal!.call)} to call` : 'Your turn') : hand?.phase === 'betting' && hand.actor !== null ? `Waiting for ${hand.actor === mySeat ? 'you' : p.seatNames[hand.actor] ?? 'seat ' + (hand.actor + 1)}` : hand?.phase === 'result' ? (revealOpen ? `Show your cards? ${timeLeft(hand.revealDeadline, now)}s` : 'Next hand shortly') : '';
   if (hand?.result && !hand.result.uncontested && p.awardReady && hand.result.awards.some(a => a.winners.some(w => w.cards.length === 5))) {
-    return <Showdown key={hand.id} hand={hand} names={p.seatNames} stack={me?.stack} mySeat={mySeat} />;
+    return <Showdown key={hand.id} hand={hand} names={p.seatNames} stack={me?.stack} mySeat={mySeat} foldedCards={showCards && myHp?.folded ? own! : undefined} />;
   }
   return (
     <div className="g-hero">
       <div className="hero-top">
-        <div className="own-cards" style={{'--hole-count': myHp?.holeCount ?? 2} as CSSProperties} aria-label={showCards ? 'Your cards' : 'Your cards appear here'} data-seat={mySeat} data-own>
+        <div className={`own-cards ${myHp?.folded ? 'own-folded' : ''}`} style={{'--hole-count': myHp?.holeCount ?? 2} as CSSProperties} aria-label={showCards ? 'Your cards' : 'Your cards appear here'} data-seat={mySeat} data-own>
           {showCards ? own!.map((c, i) => (<span className="deal-slot" data-slot={i} key={i}>
             {revealOpen || revealed.has(i)
               ? <PlayingCard key={i} card={c} as="button" label={`${revealed.has(i) ? 'Shown: ' : 'Tap to show: '}card ${i + 1}`} onClick={() => !revealed.has(i) && p.onReveal([i])} tag={revealed.has(i) ? 'Shown' : undefined} ariaPressed={revealed.has(i)} win={winCards.has(c)} hi={!!p.madeSet?.has(c)} />
@@ -79,7 +79,7 @@ export function Hero(p: HeroProps) {
             <button type="button" className="raise" disabled={!myTurn || busy || !ready || !legal?.raise} onClick={() => setComposer(true)}>{legal?.raise?.isBet ? 'Bet' : 'Raise'}</button>
           </div>
           <div className="dock-note">{!ready && inHand ? '' : legal?.raiseClosed && myTurn ? legal.raiseClosed : legal?.raise && legal.allInTo === null && legal.raise.maxTo < legal.stack + legal.bet ? `Max ${fmt(legal.raise.maxTo)}` : ''}</div>
-          {canPropose && <div className="propose-row"><button type="button" disabled={busy || !ready || !hand!.canRunTwice} onClick={() => p.onPropose(2)}>Two boards · keep betting</button></div>}
+          {canPropose && <div className="propose-row"><button type="button" disabled={busy || !ready} onClick={() => p.onPropose(1)}>Run once</button><button type="button" disabled={busy || !ready || !hand!.canRunTwice} onClick={() => p.onPropose(2)}>Two boards · keep betting</button></div>}
         </>
       ) : null}
       {composer && legal?.raise && <Composer legal={legal} hand={hand!} onClose={() => setComposer(false)} onSubmit={(to) => { setComposer(false); p.onAct('raise', to); }} />}
