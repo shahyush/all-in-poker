@@ -230,7 +230,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
         {recap && (!hand?.result || hand.handNo !== recap.handNo) && (
           <div className="g-recap" role="status" aria-label="Last hand result">
             <span className="g-recap-tag">Last hand</span>
-            <span className="g-recap-body">{recap.wins.map((w, i) => <span key={i}>{i > 0 ? ' · ' : ''}{w.who} won {fmt(w.amount)}{w.hand ? ` — ${w.hand}` : recap.uncontested ? ' — uncontested' : ''}</span>)}</span>
+            <span className="g-recap-body">{recap.wins.map((w, i) => <span key={i}>{i > 0 ? ' · ' : ''}{w.who} won {fmt(w.amount)}</span>)}</span>
           </div>
         )}
         <div className="g-notice" role="status">{notice}</div>
