@@ -18,6 +18,7 @@ export interface TableRules {
   ante: number;             // per dealt player, 0 = off (cash)
   straddle: boolean;        // cash only
   unit: number;             // cash buy-in unit; tournament starting stack
+  orbitBlindStep?: 5;       // new last-player-standing tables: both blinds +5 per completed orbit
   levels: Level[];          // tournament schedule (ordered)
 }
 
@@ -161,7 +162,7 @@ export interface TableState {
   // Dealer's choice runs once per orbit: one chooser's pick stands for a whole lap of the button. handsTotal is fixed
   // when the orbit starts (from the players dealt that hand) so joins/leaves/sit-outs can't reshape the orbit; variant
   // is null until the chooser picks (or the window defaults it). Persisted in state, so it survives reload/reconnect.
-  orbit: { chooserSeat: number; variant: VariantId | null; handsTotal: number; handsPlayed: number } | null;
+  orbit: { chooserSeat: number; variant: VariantId | null; handsTotal: number; handsPlayed: number; number?: number } | null;
   hostPlayerId: string;
   hostEpoch: number;
   createdAt: number;

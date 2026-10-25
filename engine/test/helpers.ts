@@ -51,7 +51,7 @@ export function start(t: TableState, now: number, ctx: TickContext, variant: Var
 /** Drive betting with check/call until predicate or no hand. */
 export function autoplay(t: TableState, now: number, ctx: TickContext, until: (t: TableState) => boolean, maxSteps = 500): number {
   for (let i = 0; i < maxSteps; i++) {
-    if (until(t)) return now;
+    if (until(t)) return t.hand?.phase === 'betting' ? Math.max(now, t.hand.actionReadyAt ?? 0) : now;
     ctx = { ...ctx, presence: Object.fromEntries(t.seats.filter((s) => s).map((s) => [s!.playerId, now])) };
     const h = t.hand;
     if (!h) { tick(t, now, ctx); now += 1000; continue; }

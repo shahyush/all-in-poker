@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Card, PublicEvent, VariantId } from '@allin/engine/public';
-import { currentBest, boardPresentationMs, showdownOrder } from '@allin/engine/public';
+import { currentBest, boardPresentationMs, showdownOrder, RULES } from '@allin/engine/public';
 import { useSession } from '../state/session.tsx';
 import { useNow, type TableView } from '../state/table.ts';
 import { TransportError } from '../transport/index.ts';
@@ -63,6 +63,8 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
     if (gap) { cancelAnim.current?.(); cancelAnim.current = null; setDealt(true); return; }                                      // missed too much: jump to settled view
     const reduced = reducedMotionPreferred();
     let lead = 0; // a burn announced just before a street: the street's reveal waits this long so the burn is seen first
+    const boardKeys = new Set<string>();
+    let boardDuration = 0;
     for (const ev of fresh) {
       if (ev.handId !== hand?.id) continue;
       if (ev.type === 'deal' && hand?.phase === 'betting' && now < (hand.actionReadyAt ?? 0) && ev.handId === hand.id && rootRef.current) {
@@ -77,11 +79,13 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
       }
       if (ev.type === 'board') {
         const keys = (ev as Extract<PublicEvent, { type: 'board' }>).cards.map((c) => `${(ev as { board: number }).board}:${c}`);
-        setPresentationUntil(reduced ? 0 : now + boardPresentationMs(ev.cards.length));
+        boardDuration += boardPresentationMs(ev.cards.length);
+        for (const key of keys) boardKeys.add(key);
+        setPresentationUntil(reduced ? 0 : now + boardDuration);
         setBoardLead(lead);
-        setNewBoardKeys(new Set(keys));
+        setNewBoardKeys(new Set(boardKeys));
         if (boardTimer.current) clearTimeout(boardTimer.current);
-        boardTimer.current = setTimeout(() => setNewBoardKeys(new Set()), boardPresentationMs(ev.cards.length) + 20);
+        boardTimer.current = setTimeout(() => setNewBoardKeys(new Set()), boardDuration + 20);
         lead = 0;
         // the previous street's bets have just collected into the pot: sweep a chip in from each contesting seat
         if (!reduced && hand) {
@@ -162,9 +166,9 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
 
   const stakes: string[] = [];
   if (hand?.variant) stakes.push(`${variantLabel(hand.variant)} · ${limitLabel(hand.variant)}`); else stakes.push("Dealer's Choice");
-  if (row.mode === 'tournament' && t.tournament) { const L = row.config.levels[hand?.level ?? t.tournament.level]; stakes.push(`${row.config.levels.length === 1 ? "Blinds" : `Level ${(hand?.level ?? t.tournament.level) + 1} ·`} ${L.sb}/${L.bb}${L.ante ? ` a${L.ante}` : ''}`); }
+  if (row.mode === 'tournament' && t.tournament) { const L = row.config.levels[hand?.level ?? t.tournament.level]; stakes.push(`${row.config.levels.length === 1 ? "Blinds" : `Level ${(hand?.level ?? t.tournament.level) + 1} ·`} ${hand?.sb ?? L.sb}/${hand?.bb ?? L.bb}${L.ante ? ` a${L.ante}` : ''}`); }
   else stakes.push(`Blinds ${hand?.sb ?? row.config.sb}/${hand?.bb ?? row.config.bb}${(hand?.ante ?? row.config.ante) ? ` · ante ${hand?.ante ?? row.config.ante}` : ''}`);
-  const notice = !view.connected ? 'Reconnecting…' : t.error ? 'This table stopped after a problem. Tell the host.' : err ?? (hand?.phase === 'result' ? 'Next hand' : t.waitingReason ?? '');
+  const notice = !view.connected ? 'Reconnecting…' : t.error ? 'This table stopped after a problem. Tell the host.' : err ?? (t.waitingReason ?? '');
 
   // the viewer's own best made hand so far (flop onward), with the contributing cards for an on-tap highlight
   const made = useMemo(() => {
@@ -176,15 +180,19 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   useEffect(() => { setMadeShown(false); }, [hand?.id]);
   const madeSet = useMemo(() => (madeShown && made ? new Set<Card>(made.cards) : null), [madeShown, made]);
 
-  const winTotals = hand?.result?.totals ?? {};
+  const resultAge = hand?.result && hand.nextAt ? now - (hand.nextAt - (hand.result.uncontested ? RULES.timers.revealMs : RULES.timers.showdownMs)) : 0;
+  const awardDelay = hand?.result?.uncontested ? 0 : 1300 + Object.keys(hand?.result?.shows ?? {}).length * 850;
+  const awardReady = !!hand?.result && resultAge >= awardDelay;
+  const winnerBurst = awardReady && resultAge < awardDelay + 2200;
+  const winTotals = awardReady ? hand?.result?.totals ?? {} : {};
   const winCardsBySeat = new Map<number, Card[]>();
-  if (hand?.result) for (const a of hand.result.awards) for (const w of a.winners) winCardsBySeat.set(w.seat, [...(winCardsBySeat.get(w.seat) ?? []), ...w.cards]);
+  if (awardReady && hand?.result) for (const a of hand.result.awards) for (const w of a.winners) winCardsBySeat.set(w.seat, [...(winCardsBySeat.get(w.seat) ?? []), ...w.cards]);
   // Final-street aggressor first, otherwise clockwise from left of the button; never winner-dependent.
   const revealDelay = new Map<number, number>();
   if (hand?.result && !hand.result.uncontested && hand.result.shows && hand.button !== null) {
     const shown = new Set(Object.keys(hand.result.shows).map(Number));
     const n = t.seats.length;
-    showdownOrder(hand.log, hand.button, n, [...shown]).forEach((seat, index) => revealDelay.set(seat, index * 450));
+    showdownOrder(hand.log, hand.button, n, [...shown]).forEach((seat, index) => revealDelay.set(seat, 700 + index * 850));
   }
 
   // Compact last-hand recap: captured when a hand settles, shown through the next hand. Winner, amount and the made-hand
@@ -218,7 +226,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
         </div>
-        <div className="g-stakes">{stakes.map((x, i) => <span key={i}>{i === 0 ? <b>{x}</b> : x}</span>)}{hand && <span>Hand {hand.handNo}</span>}{t.orbit && t.orbit.variant && t.orbit.handsTotal > 1 && <span>Choice {Math.min(t.orbit.handsPlayed, t.orbit.handsTotal)}/{t.orbit.handsTotal}</span>}</div>
+        <div className="g-stakes">{stakes.map((x, i) => <span key={i}>{i === 0 ? <b>{x}</b> : x}</span>)}{hand && <span>Hand {hand.handNo}</span>}{t.orbit && t.orbit.variant && t.orbit.handsTotal > 1 && <span>Orbit {Math.min(t.orbit.handsPlayed, t.orbit.handsTotal)}/{t.orbit.handsTotal}</span>}</div>
         {recap && (!hand?.result || hand.handNo !== recap.handNo) && (
           <div className="g-recap" role="status" aria-label="Last hand result">
             <span className="g-recap-tag">Last hand</span>
@@ -237,12 +245,12 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
           const shows = hand?.result?.shows?.[i] ?? null;
           const revealed = hand?.revealedCards?.[i];
           const shown: Card[] | null = shows ? shows : revealed && revealed.length ? Array.from({ length: hand!.players.find((p) => p.seat === i)?.holeCount ?? 0 }, (_, k) => revealed.find((r) => r.index === k)?.card ?? null).filter((c): c is Card => c !== null) : null;
-          return <SeatView key={i} index={i} seat={seat} hand={hand} pos={positions[i]} isHost={seat.playerId === t.hostPlayerId} present={presence.get(seat.playerId) ?? false} now={now} isMe={false} shownCards={shown} winCards={winCardsBySeat.get(i) ?? null} won={winTotals[i] ?? null} revealDelayMs={revealDelay.get(i)} />;
+          return <SeatView key={i} index={i} seat={seat} hand={hand} pos={positions[i]} isHost={seat.playerId === t.hostPlayerId} present={presence.get(seat.playerId) ?? false} now={now} isMe={false} shownCards={shown} winCards={winCardsBySeat.get(i) ?? null} won={winTotals[i] ?? null} revealDelayMs={revealDelay.get(i)} winnerBurst={winnerBurst} />;
         })}
         {hand && hand.button !== null && positions[hand.button] && <DealerButton seat={hand.button} />}
-        <Centre t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} chosen={chosen} submitting={submitting} onChoose={(v: VariantId) => void choose(v)} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} boardLeadMs={boardLead} madeBoard={madeSet} />
+        <Centre awardReady={awardReady} t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} chosen={chosen} submitting={submitting} onChoose={(v: VariantId) => void choose(v)} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} boardLeadMs={boardLead} madeBoard={madeSet} />
       </div>
-      <Hero seatNames={t.seats.map((x) => x?.name ?? null)} hand={hand} mySeat={mySeat} me={meSeat} own={view.own?.cards ?? null} ownHandId={view.own?.handId ?? null} now={now} busy={pending !== null} pending={pending} legal={legal} presentationUntil={presentationUntil} dealt={dealt} connected={view.connected} isCash={row.mode === 'cash'}
+      <Hero awardReady={awardReady} winnerBurst={winnerBurst} seatNames={t.seats.map((x) => x?.name ?? null)} hand={hand} mySeat={mySeat} me={meSeat} own={view.own?.cards ?? null} ownHandId={view.own?.handId ?? null} now={now} busy={pending !== null} pending={pending} legal={legal} presentationUntil={presentationUntil} dealt={dealt} connected={view.connected} isCash={row.mode === 'cash'}
         onAct={(a, to) => void quiet('act', a === 'raise' ? { action: 'raise', raiseTo: String(to) } : { action: a })}
         onPropose={(runs) => void quiet('propose', { runs })} onReveal={(what) => void quiet('reveal', what === 'all' || what === 'muck' ? { what } : { indices: what })} onReturn={(post) => void quiet('return', { post })}
         made={made} madeShown={madeShown} madeSet={madeSet} onToggleMade={() => setMadeShown((v) => !v)} />

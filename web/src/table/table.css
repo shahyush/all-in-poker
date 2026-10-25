@@ -238,3 +238,22 @@
 /* Reserve space outside the board: even two runout boards cannot cover the deck or burn pile. */
 .deal-station { display: flex; align-items: center; gap: 5px; flex: none; padding: 0 3px; }
 .deal-station .deck-anchor, .deal-station .burn-pile { position: relative; left: auto; top: auto; margin: 0; width: 18px; height: 26px; }
+
+/* A compact rail plaque and deliberate, tactile action keys. */
+.seat-core { border-radius: 7px; padding: 5px 4px; background: linear-gradient(160deg,#17263d,#091321); }
+.seat-status:empty { display: none; }
+.seat-avatar { width: 16px; height: 16px; font-size: 9px; top: -7px; left: -3px; }
+.seat-stack { letter-spacing: .02em; }
+.dock button { border-radius: 8px; border: 1px solid rgba(255,255,255,.18); box-shadow: inset 0 1px 0 rgba(255,255,255,.18),0 4px 0 rgba(0,0,0,.4),0 7px 12px rgba(0,0,0,.2); font-weight: 750; letter-spacing: .02em; transition: transform 120ms ease,box-shadow 120ms ease,background-color 180ms ease; }
+.dock button:active:not(:disabled) { transform: translateY(3px); box-shadow: inset 0 2px 5px rgba(0,0,0,.25),0 1px 0 rgba(0,0,0,.4); }
+.dock button:disabled { box-shadow: none; border-color: transparent; }
+.showdown-title { font-family: var(--display); font-size: 23px; letter-spacing: .04em; color: var(--accent-table); }
+.hero-winner { color: var(--accent-table); text-shadow: 0 0 18px rgba(238,190,78,.35); }
+.hero-meta { position: relative; }
+.winner-sparks { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.winner-sparks i { position: absolute; left: 50%; top: 50%; width: 1px; height: 1px; }
+.winner-sparks i::after { content: ''; display: block; width: 3px; height: 7px; border-radius: 1px; background: #efcf86; box-shadow: 0 0 7px #d9ad54; animation: winner-spark 1800ms ease-out both; }
+@keyframes winner-spark { 0% { opacity: 0; transform: translateY(-12px) scale(.4); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-48px) scale(.2); } }
+@media(prefers-reduced-motion:reduce) { .winner-sparks { display:none; } .dock button:active:not(:disabled) { transform:none; } }
+:root[data-reduce-motion] .winner-sparks { display:none; }
+.g-notice:empty { display:none; }
