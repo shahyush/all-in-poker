@@ -26,8 +26,11 @@ for (const [width, height] of [[320,568], [375,667], [390,700], [430,932], [844,
           const errors: string[] = [];
           const intersects = (a: DOMRect,b: DOMRect) => a.left < b.right-1 && a.right > b.left+1 && a.top < b.bottom-1 && a.bottom > b.top+1;
           for (const s of seats) for (const b of protectedItems) if (intersects(s.getBoundingClientRect(),b.getBoundingClientRect())) errors.push(`${s.className} overlaps ${b.className}`);
-          for (let i = 0; i < seats.length; i++) for (let j = i + 1; j < seats.length; j++) { if (seats[i].parentElement !== seats[j].parentElement && intersects(seats[i].getBoundingClientRect(), seats[j].getBoundingClientRect())) errors.push('player panels overlap'); }
+          for (let i = 0; i < seats.length; i++) for (let j = i + 1; j < seats.length; j++) { if (seats[i].parentElement !== seats[j].parentElement && intersects(seats[i].getBoundingClientRect(), seats[j].getBoundingClientRect())) errors.push(`player panels overlap: ${seats[i].parentElement?.getAttribute('data-seat')} ${seats[i].className} ${JSON.stringify(seats[i].getBoundingClientRect())} / ${seats[j].parentElement?.getAttribute('data-seat')} ${seats[j].className} ${JSON.stringify(seats[j].getBoundingClientRect())}`); }
           for (const el of document.querySelectorAll('.seat, .board, .own-cards, .hero-meta, .dock')) { const r = el.getBoundingClientRect(); if(r.left < -1 || r.right > innerWidth+1) errors.push(`${el.className} overflows horizontally`); }
+          const cards = document.querySelector('.own-cards')!.getBoundingClientRect();
+          const stack = document.querySelector('.hero-meta')!.getBoundingClientRect();
+          if (intersects(cards, stack)) errors.push('own cards cover stack');
           const dock = document.querySelector('.dock')?.getBoundingClientRect();
           if (dock && dock.bottom > innerHeight + 1) errors.push('betting controls below viewport');
           const dealer = document.querySelector('.dealer-token')?.getBoundingClientRect();

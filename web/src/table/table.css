@@ -1,4 +1,4 @@
-.game { height: var(--vh); background: var(--game); color: var(--game-text); display: grid; grid-template-rows: auto minmax(400px, 1fr) auto; overflow: auto; padding-top: var(--safe-t); }
+.game { height: var(--vh); background: var(--game); color: var(--game-text); display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(400px, 1fr) auto; overflow: auto; padding-top: var(--safe-t); }
 .g-head { padding: 6px max(12px, var(--safe-r)) 4px max(12px, var(--safe-l)); display: flex; flex-direction: column; gap: 2px; }
 .g-head-row { display: flex; align-items: center; gap: 6px; min-height: 40px; }
 .g-title { flex: 1; min-width: 0; font-family: var(--display); font-size: 20px; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -204,6 +204,16 @@
   .propose-row .dock-note { font-size: 11px; }
 }
 
-@media (orientation: portrait) and (max-height: 740px) { .centre { top: 54%; } }
+@media (orientation: portrait) and (max-height: 740px) { .centre { top: 56%; } }
 
 .seat-name.has-dealer { padding-left: 20px; min-height: 18px; width: 100%; text-align: left; }
+
+.g-head, .g-hero { min-width: 0; }
+
+@media (max-height: 740px) {
+  .seat-name.has-dealer { min-height: 14px; }
+  .dealer-token { width: 14px; height: 14px; font-size: 9px; }
+}
+
+.own-cards { flex: 1; container-type: inline-size; }
+.own-cards .pc { width: min(40px, calc((100cqw - (var(--hole-count, 6) - 1) * 4px) / var(--hole-count, 6))); }

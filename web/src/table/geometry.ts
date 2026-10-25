@@ -10,7 +10,7 @@ export function seatPositions(seatCount: number, mySeat: number, landscape: bool
   else {
     const leftCount = Math.ceil((seatCount - 1) / 2);
     const rightCount = Math.floor((seatCount - 1) / 2);
-    const row = (n: number) => Array.from({ length: n }, (_, i) => n === 1 ? 32 : 12 + i * 74 / (n - 1));
+    const row = (n: number) => Array.from({ length: n }, (_, i) => n === 1 ? 32 : 12 + i * 78 / (n - 1));
     for (const top of row(leftCount).reverse()) rail.push({ left: 11, top });
     for (const top of row(rightCount)) rail.push({ left: 89, top });
   }

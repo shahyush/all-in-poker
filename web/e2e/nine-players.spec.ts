@@ -10,6 +10,10 @@ async function clearBoard(page: Page) {
     const overlap = (a: DOMRect,b: DOMRect) => a.left < b.right-1 && a.right > b.left+1 && a.top < b.bottom-1 && a.bottom > b.top+1;
     for (const seat of document.querySelectorAll('.seat-core, .seat-cards')) for (const el of protectedEls)
       if(overlap(seat.getBoundingClientRect(),el.getBoundingClientRect())) errors.push(`${seat.className} covers ${el.className}`);
+    for (const el of document.querySelectorAll('.g-surface, .g-head, .g-hero')) {
+      const r = el.getBoundingClientRect();
+      if (r.left < -1 || r.right > innerWidth + 1) errors.push(`${el.className} wider than screen`);
+    }
     return errors;
   });
   expect(errors).toEqual([]);
@@ -98,6 +102,9 @@ for (const variant of ["Hold'em", 'Omaha 4']) test(`nine separate players: ${var
   for(const p of pages) await expect(p.locator('.chat-body', {hasText:message})).toHaveCount(1);
   await h.page.screenshot({path:info.outputPath('05-nine-chat.png')});
   await Promise.all(pages.map(p=>p.keyboard.press('Escape')));
+  await expect(h.page.getByLabel('Last hand result')).toBeVisible();
+  await clearBoard(h.page);
+  await h.page.screenshot({path:info.outputPath('05b-nine-next-hand.png')});
   await h.page.getByRole('button',{name:'Table menu'}).click();
   await h.page.getByRole('button',{name:'Accounts',exact:true}).click();
   await expect(h.page.getByRole('dialog',{name:'Table accounts'})).toBeVisible();

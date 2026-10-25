@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { parseChipAmount, type BestHand, type Card, type LegalActions, type PublicHand, type SeatState } from '@allin/engine/public';
 import { PlayingCard } from './Card.tsx';
 import { Sheet, fmt } from '../components/ui.tsx';
@@ -34,7 +34,7 @@ export function Hero(p: HeroProps) {
   return (
     <div className="g-hero">
       <div className="hero-top">
-        <div className="own-cards" aria-label={showCards ? 'Your cards' : 'Your cards appear here'} data-seat={mySeat} data-own>
+        <div className="own-cards" style={{'--hole-count': myHp?.holeCount ?? 2} as CSSProperties} aria-label={showCards ? 'Your cards' : 'Your cards appear here'} data-seat={mySeat} data-own>
           {showCards ? own!.map((c, i) => (
             revealOpen || revealed.has(i)
               ? <PlayingCard key={i} card={c} as="button" label={`${revealed.has(i) ? 'Shown: ' : 'Tap to show: '}card ${i + 1}`} onClick={() => !revealed.has(i) && p.onReveal([i])} tag={revealed.has(i) ? 'Shown' : undefined} ariaPressed={revealed.has(i)} win={winCards.has(c)} hi={!!p.madeSet?.has(c)} />
