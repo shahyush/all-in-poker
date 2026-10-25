@@ -1,6 +1,6 @@
 # Local reliability and interaction review — October 25
 
-Status: NOT DEPLOYED. The user's deployment pause remains in force. Workspace maintenance removed the previous unpushed checkout; this pass restored the source from main 4cb5eee and reconstructed the approved privacy/cleanup/showdown changes from the conversation. No database writes, production games, deploys, or GitHub pushes occurred.
+Status: deployment authorised by the user. Backend api v24 deployed on October 25 and all four deployed files read back with exact equality. Waiting-table scheduling migration applied. Frontend PR #8 is awaiting the final browser checks; the release checkpoint below will record the final outcome. No historical accounts or hand records are deleted.
 
 ## Findings and changes
 
@@ -21,7 +21,7 @@ Status: NOT DEPLOYED. The user's deployment pause remains in force. Workspace ma
 
 Opponent cards remain private during all-in voting; a first “once” vote does not reveal while others are deciding. On all responses, once wins unless all select twice; at the existing deadline, once is the default. Voluntary two-board betting keeps cards private until betting closes. Contested showdown hold: six seconds.
 
-Three-minute inactivity uses last seated-player presence, not automated game events. Waiting rooms receive timers; abandoned live hands settle and record before closure. Cash stacks are returned through ledger exits; no historical accounts are deleted. The local scheduling migration wakes old waiting rooms after the new engine is deployed. Last Player Standing departure removes active dashboard membership while retaining the stack in play. API regression added, not executed without Postgres.
+Three-minute inactivity uses last seated-player presence, not automated game events. Waiting rooms receive timers; abandoned live hands settle and record before closure. Cash stacks are returned through ledger exits; no historical accounts are deleted. The local scheduling migration wakes old waiting rooms after the new engine is deployed. Last Player Standing departure removes active dashboard membership while retaining the stack in play. API regression passes against Postgres in GitHub Actions.
 
 ## Live read-only evidence
 
@@ -29,12 +29,20 @@ Supabase logs queried for the preceding 24 hours. This window mixes human and CI
 
 ## Verification and limits
 
-77 engine tests pass (including deck/chip integrity and exhaustive five-card category counts). Two isolated server timer-dispatch tests pass, proving a stalled table doesn't block all other tables and concurrency never exceeds three. Web production build and server typecheck pass. 31 distinct Chromium browser checks pass across the final targeted runs (21 animation/layout, 4 setup/dashboard, 6 transport/data checks). Browser tests cover refresh bursts, retained trailing updates, timeout recovery, identity preservation, cached private cards, separation of chat from game reads, setup failures, folded-hand privacy, showdown presentation and portrait/landscape geometry through nine seats. Fixture tests use mocked backend state; they are not hosted multiplayer certification.
+79 engine tests and 27 server tests pass, including database-backed accounting, host-only table closure, duplicate-request safety and Last Player Standing departure. Web and server typechecks pass. All 31 local Chromium browser checks pass. CI also runs the layout checks in Firefox and WebKit and full separate-player journeys in Chromium and WebKit.
 
-Not run: Postgres integration suite (runtime unavailable), real iOS/Android device checks, hosted multiplayer soak with this revision. No production latency improvement is claimed before release and measurement. Existing server bundle was intentionally not rebuilt/deployed.
+The API test helper now advances to the actual private-state presentation deadline; its old assumption that a hole-card deal was always longer than a flop reveal failed after faster dealing. The action guard remains intact.
+
+Browser fixture checks cover refresh bursts, retained trailing updates, timeout recovery, identity preservation, cached private cards, separation of chat from game reads, setup failures, folded-hand privacy, showdown presentation and portrait/landscape geometry through nine seats. Fixtures are not hosted multiplayer certification. Real iOS/Android hardware remains untested, and no production latency improvement is claimed solely from a passing build.
+
+## Host controls and final refinements
+
+Hosts have Delete table in both waiting and running tables. A running hand finishes and records before closure; cash chips are returned exactly once. Non-host attempts are forbidden. Leaving remains a separate action. Inactivity is based on player presence rather than timer traffic, with a three-minute threshold and current-hand settlement before closure.
+
+Simple labels include History, Profile, Add chips, Leave table and Delete table. Dealing uses 320 ms travel and 220 ms gaps without compressing a full table; runout street spacing is 1,700 ms and contested showdown holds six seconds. Shared presentation timing preserves the complete betting window. Origin-scoped CORS preflights cache for ten minutes to reduce redundant command round trips.
 
 ## Release priorities
 
-Verify the complete patch against an isolated database and separate hosted identities before production approval. Measure action-to-confirmation and update latency during a nine-player session, reconnect, background/foreground, table switching and long chat. Investigate remaining slow backend phases using existing command timing logs; do not assume every delay is cold start or mask it with longer test waits. Preserve action IDs on any future retry work so uncertain bet/rebuy responses cannot duplicate transactions. Do not introduce automatic betting, hide stalled connections, or change shuffle probabilities for presentation.
+Verify the complete patch against an isolated database and separate hosted identities before declaring the release verified. Measure action-to-confirmation and update latency during a nine-player session, reconnect, background/foreground, table switching and long chat. Investigate remaining slow backend phases using existing command timing logs; do not assume every delay is cold start or mask it with longer test waits. Preserve action IDs on any future retry work so uncertain bet/rebuy responses cannot duplicate transactions. Do not introduce automatic betting, hide stalled connections, or change shuffle probabilities for presentation.
 
 Design direction: reserve animation for meaningful events, keep decisions responsive, keep a small connection indicator while retaining the table, keep accounts/history inspectable, and make Last Hand the place to revisit results rather than extending everyone's forced wait. Prioritize these over adding further features.

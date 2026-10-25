@@ -150,3 +150,7 @@ Deployment pause remains active. Recovered prior unpushed privacy/three-minute c
 User explicitly authorised deploying the complete refinement. Host-only close_table archives a waiting table immediately or finishes and records the current hand before closing. Cash chips exit through the ledger; history is preserved; non-host closure is rejected. UI says Delete table, Leave table, Add chips, Sit out. Deal travel/gap are 320/220 ms (down from 420/320); runout stages 1700 ms (down from 2200); contested showdown remains six seconds. Decision windows are unchanged.
 
 Removed redundant table/hole-card safety polls because the game loop already polls those; account fallback is 15 seconds and membership fallback 10 seconds, while realtime changes still refresh immediately. All prior local recovery/privacy/cleanup fixes are included. Deployment and hosted verification results will be recorded after completion.
+
+## October 25 release checkpoint — api v24
+
+The previous deployment pause is superseded by explicit user approval. API v24 is deployed; all four deployed files were read back and match the release exactly. The waiting-table scheduling migration succeeded. Scheduler calls after deployment returned 200 and old inactive waiting rooms were archived. No account/history records were deleted. Latest code commit b1009514 passes 79 engine and 27 server tests plus typechecks in run 40220560530. Browser gameplay verification and frontend deployment are the remaining release steps, tracked in PR #8. Real-device iOS keyboard/toolbar behaviour remains unverified.
