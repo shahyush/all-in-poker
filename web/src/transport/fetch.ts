@@ -12,6 +12,11 @@ export async function boundedFetch(input: RequestInfo | URL, init?: RequestInit)
     // Keep the deadline through body delivery, not only until headers arrive.
     await response.clone().arrayBuffer();
     return response;
+  } catch (error) {
+    // WebKit reports AbortError even when the abort reason is a timeout.
+    // Preserve our explicit reason so recovery behaves consistently across browsers.
+    if (controller.signal.aborted) throw controller.signal.reason;
+    throw error;
   } finally {
     clearTimeout(timer);
     parent?.removeEventListener('abort', abort);

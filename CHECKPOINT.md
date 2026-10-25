@@ -4,6 +4,18 @@ Branch `main` on github.com/shahyush/all-in-poker . Read `CLAUDE.md` for the rul
 This file separates **implemented** (code merged, local tests green), **deployed** (live on the hosted app) and **verified**
 (passed against the deployed app, or seen in its recordings). Nothing is called done on the strength of a push alone.
 
+## October 25 follow-up review
+
+Frontend 5ab89cb deployed (run 40207759196); api v21 unchanged. Current hosted gameplay result remains pending; live-smoke hit its job limit while installing browser dependencies, before app testing. This is not a successful smoke result.
+
+Re-reviewed secure Fisher–Yates/rejection sampling, deck privacy, burns/capacity, Omaha evaluation, side pots, accounting and the current house rules. Engine 71/71 and Chromium layout/interaction 14/14 pass locally. Server 22/22 passed in current CI. No new engine or accounting defect was found by this review; this is not a guarantee against all defects.
+
+WebKit regression found that its fetch rejects a timed-out request with AbortError instead of the supplied TimeoutError reason. The wrapper now preserves the controller's explicit reason. Existing timeout/recovery/caller-cancellation regression remains unchanged.
+
+Nine-player WebKit traces on a58be45 exceeded the 300s journey budget; both continued through showdown, chat, next hand and nine balanced account rows. The longer case completed its assertions at approximately 339s. The test now reads turn cues once per check, checks message delivery concurrently and closes contexts concurrently. Whole-journey budget is 420s; individual action deadlines, balance assertions and game clocks are unchanged. It must pass a fresh run before being marked verified.
+
+Security advisor review: no ERROR-level findings. Server-only tables intentionally have RLS with no client policy. Anonymous access is deliberate and membership/own-card scoped. Remaining configuration warnings include mutable search_path on allin_now overloads, pg_net in public, and password-protection settings; no data or grants were changed in this review. Real-device keyboards, installed-PWA behaviour and physical iPhone/Android performance remain unverified.
+
 ## October 25 gameplay refinement (supersedes fixed-blind setup below)
 
 New last-player-standing tables set `orbitBlindStep: 5`: both blinds increase exactly five at the next complete dealer-choice orbit, with the orbit count persisted. Existing game configurations remain unchanged.
@@ -113,3 +125,6 @@ tables, hole_cards, chat_messages, chat_reactions, reload_requests, table_member
   and insets the sheet above the keyboard (`--kb`). Mechanism-verified (code + the two-session hosted chat test) but NOT
   verified on a real iPhone from this environment. The separate, confirmed cause of "chat doesn't work" — messages dropped
   under the table lock — is fixed and verified live (see Status matrix).
+
+### Browser-toolbar layout follow-up
+User's real-browser concern reproduced: at visible heights 520/560 portrait and 280/290 landscape, betting controls fell below the viewport despite prior full-device-size checks. Table breakpoints now use a named size container following `100dvh`, rather than media-query height that can still represent the larger layout viewport. TablePage observes its own rendered size for seat orientation. Compact layouts remove the old-hand recap, tighten seat/hero spacing and retain the controls. Expanded geometry coverage includes browser/layout-height mismatch, current-player actions and two boards; all 21 Chromium layout/interaction tests pass. Actual iOS toolbar/keyboard behavior remains physical-device unverified; these are explicit browser-area simulations, not device certification.

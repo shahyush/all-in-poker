@@ -20,8 +20,11 @@ async function clearBoard(page: Page) {
   expect(errors).toEqual([]);
 }
 async function actor(pages: Page[]) {
-  await expect.poll(async () => (await Promise.all(pages.map(p => p.locator('.turn-line').innerText()))).some(s => s.startsWith('Your turn')), {timeout: 35000}).toBe(true);
-  const texts = await Promise.all(pages.map(p => p.locator('.turn-line').innerText()));
+  let texts: string[] = [];
+  await expect.poll(async () => {
+    texts = await Promise.all(pages.map(p => p.locator('.turn-line').innerText()));
+    return texts.some(s => s.startsWith('Your turn'));
+  }, {timeout: 35000}).toBe(true);
   return pages[texts.findIndex(s => s.startsWith('Your turn'))];
 }
 async function checkCall(pages: Page[]) {
@@ -33,7 +36,9 @@ async function checkCall(pages: Page[]) {
 }
 
 for (const variant of ["Hold'em", 'Omaha 4']) test(`nine separate players: ${variant}, clear board, chat and balanced accounts`, async ({browser}, info) => {
-  test.setTimeout(300000);
+  // WebKit's nine separate contexts took 339s through all gameplay/accounting
+  // assertions in CI. This bounds the complete journey, not individual actions.
+  test.setTimeout(420000);
   const h = await player(browser, 'Nine Host', {record: true});
   const pages = [h.page];
   await h.page.getByRole('button', {name:'Host a table'}).click();
@@ -110,7 +115,7 @@ for (const variant of ["Hold'em", 'Omaha 4']) test(`nine separate players: ${var
   const message=`Nine-seat ${variant} message ♠️`;
   await h.page.getByLabel('Message').fill(message);
   await h.page.getByRole('button',{name:'Send',exact:true}).click();
-  for(const p of pages) await expect(p.locator('.chat-body', {hasText:message})).toHaveCount(1);
+  await Promise.all(pages.map(p => expect(p.locator('.chat-body', {hasText:message})).toHaveCount(1)));
   await h.page.screenshot({path:info.outputPath('05-nine-chat.png')});
   await Promise.all(pages.map(p=>p.keyboard.press('Escape')));
   await expect(h.page.getByLabel('Last hand result')).toBeVisible();

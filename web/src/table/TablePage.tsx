@@ -41,7 +41,15 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const [err, setErr] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const [landscape, setLandscape] = useState(() => window.innerWidth > window.innerHeight && window.innerHeight < 500);
-  useEffect(() => { const h = () => setLandscape(window.innerWidth > window.innerHeight && window.innerHeight < 500); window.addEventListener('resize', h); return () => window.removeEventListener('resize', h); }, []);
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const update = () => { const {width, height} = root.getBoundingClientRect(); setLandscape(width > height && height < 500); };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, []);
 
   // ---- event gate + animations ----
   const lastSeq = useRef<number>(-1);
