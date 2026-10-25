@@ -318,7 +318,7 @@ describe('betting rules', () => {
     for (let guard = 0; guard < 100 && !(t.handNo === 2 && t.hand); guard++) {
       const hh = t.hand!;
       if (hh.phase === 'betting' && hh.actor === bb) { n = hh.deadline! + 1; tick(t, n, ctxAll(t, n, ctx.rng)); }
-      else if (hh.phase === 'betting' && hh.actor !== null) { const la = legalActions(t, hh.actor, n); act(t, hh.actor, { type: la.check ? 'check' : 'call' }, n, ctx); }
+      else if (hh.phase === 'betting' && hh.actor !== null) { n = Math.max(n, hh.actionReadyAt ?? 0); const la = legalActions(t, hh.actor, n); act(t, hh.actor, { type: la.check ? 'check' : 'call' }, n, ctx); }
       else { n = Math.max(n, t.dueAt ?? n + 1000); tick(t, n, ctxAll(t, n, ctx.rng)); }
     }
     expect(t.seats[bb]!.status).toBe('sitout');
@@ -444,6 +444,45 @@ describe('runouts', () => {
     expect(h.result!.uncontested).toBe(false);
     void n2;
   });
+  it('agreed two-board play preserves calls and raises on every remaining street, without exposing holes', () => {
+    const { t, n: startTime, ctx, h } = toFlopNoBet();
+    let n = startTime;
+    const actor = h.actor!;
+    const remaining = h.deadline! - n;
+    propose(t, actor, 2, n, ctx);
+    for (const seat of [...h.vote!.electorate]) if (h.vote && !h.vote.votes[seat]) respondVote(t, seat, 'agree', n + 500, ctx);
+    n += 500;
+    expect(h.phase).toBe('betting'); expect(h.actor).toBe(actor);
+    expect(h.deadline).toBe(n + remaining); expect(h.bettingLocked).toBe(false);
+    expect(h.players.every(p => !p.shown && p.revealed.length === 0)).toBe(true);
+    for (const street of ['flop', 'turn', 'river']) {
+      expect(h.street).toBe(street);
+      n = Math.max(n, h.actionReadyAt ?? 0);
+      const la = legalActions(t, h.actor!, n);
+      act(t, h.actor!, { type: 'raise', raiseTo: la.raise!.minTo }, n, ctx);
+      const paid = h.players.reduce((a,p)=>a+p.paid,0);
+      while (h.phase === 'betting' && h.street === street) act(t, h.actor!, {type: legalActions(t,h.actor!,n).owed ? 'call' : 'check'}, n, ctx);
+      expect(h.players.reduce((a,p)=>a+p.paid,0)).toBeGreaterThan(paid);
+      expect(totalChips(t)).toBe(3000);
+    }
+    expect(h.result!.boards.map(b=>b.length)).toEqual([5,5]);
+    expect(h.result!.awards.some(a=>a.board===1)).toBe(true);
+    expect(h.nextAt! - n).toBe(T.showdownMs);
+  });
+  it('an all-in after double-board turn preserves both turn cards and consumes distinct river burns/cards', () => {
+    const { t, n: first, ctx, h } = toFlopNoBet();
+    propose(t, h.actor!, 2, first, ctx);
+    for (const seat of [...h.vote!.electorate]) if (h.vote && !h.vote.votes[seat]) respondVote(t,seat,'agree',first,ctx);
+    let n = autoplay(t, first, ctx, x => x.hand!.street === 'turn');
+    const turns = h.boards!.map(b=>b.slice());
+    const actor = h.actor!;
+    act(t,actor,{type:'raise',raiseTo:legalActions(t,actor,n).allInTo!},n,ctx);
+    n = autoplay(t,n,ctx,x=>x.hand!.phase==='result');
+    expect(h.boards!.map(b=>b.slice(0,4))).toEqual(turns);
+    const cards = [...Object.values(h.hole).flat(),...h.burned,...h.boards![0],...h.boards![1].slice(3)];
+    expect(new Set(cards).size).toBe(cards.length); expect(h.burned).toHaveLength(5);
+    expect(totalChips(t)).toBe(3000);
+  });
   it('A11/R4-07: a decline restores the exact remaining time and one proposal per street', () => {
     const { t, n, ctx, h } = toFlopNoBet();
     const actor = h.actor!;
@@ -504,7 +543,7 @@ describe('runouts', () => {
     const { t, now, ctx } = makeTable([300, 300, 300], { unit: 100 });
     let n = start(t, now, ctx);
     const h = t.hand!;
-    while (h.phase === 'betting') { const a = h.actor!; const la = legalActions(t, a, n); act(t, a, la.allInTo ? { type: 'raise', raiseTo: la.allInTo } : { type: la.owed ? 'call' : 'check' }, n, ctx); }
+    while (h.phase === 'betting') { n = Math.max(n, h.actionReadyAt ?? 0); const a = h.actor!; const la = legalActions(t, a, n); act(t, a, la.allInTo ? { type: 'raise', raiseTo: la.allInTo } : { type: la.owed ? 'call' : 'check' }, n, ctx); }
     expect(h.phase).toBe('runout');
     tick(t, n, ctx);
     expect(h.board.length).toBe(3);
@@ -518,7 +557,7 @@ describe('runouts', () => {
     const { t, now, ctx } = makeTable([300, 300], { unit: 100 });
     let n = start(t, now, ctx);
     const h = t.hand!;
-    while (h.phase === 'betting') { const a = h.actor!; const la = legalActions(t, a, n); act(t, a, la.allInTo ? { type: 'raise', raiseTo: la.allInTo } : { type: la.owed ? 'call' : 'check' }, n, ctx); }
+    while (h.phase === 'betting') { n = Math.max(n, h.actionReadyAt ?? 0); const a = h.actor!; const la = legalActions(t, a, n); act(t, a, la.allInTo ? { type: 'raise', raiseTo: la.allInTo } : { type: la.owed ? 'call' : 'check' }, n, ctx); }
     tick(t, n, ctx);
     expect(h.phase).toBe('offer');
     for (const s of [...h.vote!.electorate]) { if (!h.vote) break; respondVote(t, s, 'twice', n, ctx); }
@@ -531,7 +570,7 @@ describe('runouts', () => {
     const { t, now, ctx } = makeTable([300, 300], { mode: 'tournament', unit: 300, levels: [{ sb: 5, bb: 10, ante: 0, minutes: 5 }] });
     let n = start(t, now, ctx);
     const h = t.hand!;
-    while (h.phase === 'betting') { const a = h.actor!; const la = legalActions(t, a, n); act(t, a, la.allInTo ? { type: 'raise', raiseTo: la.allInTo } : { type: la.owed ? 'call' : 'check' }, n, ctx); }
+    while (h.phase === 'betting') { n = Math.max(n, h.actionReadyAt ?? 0); const a = h.actor!; const la = legalActions(t, a, n); act(t, a, la.allInTo ? { type: 'raise', raiseTo: la.allInTo } : { type: la.owed ? 'call' : 'check' }, n, ctx); }
     expect(h.phase).toBe('runout');
     expect(() => propose(t, h.players[0].seat, 2, n, ctx)).toThrow();
     autoplay(t, n, ctx, (x) => !x.hand || x.hand.phase === 'result' || x.status !== 'running');
@@ -644,6 +683,20 @@ describe('tournament levels and eliminations', () => {
     tick(t, n, ctxAll(t, n, ctx.rng));
     expect(t.hand!.level).toBe(2); expect(t.hand!.bb).toBe(40); expect(t.hand!.ante).toBe(5);
   });
+  it('last player standing increments both blinds exactly 5 at orbit boundaries, never on clock time or mid-hand', () => {
+    let {t,now,ctx} = makeTable([3000,3000,3000],{mode:'tournament',unit:3000,orbitBlindStep:5,levels:[{sb:5,bb:10,ante:0,minutes:15}]});
+    let n = start(t,now,ctx);
+    for(let handNo=1;handNo<=7;handNo++) {
+      expect(t.hand!.sb).toBe(5+Math.floor((handNo-1)/3)*5);
+      expect(t.hand!.bb).toBe(10+Math.floor((handNo-1)/3)*5);
+      if(handNo===7) break;
+      n=autoplay(t,n,ctx,x=>x.handNo===handNo+1 && !!x.hand);
+      if(t.hand!.phase==='choice') {chooseVariant(t,t.hand!.chooserSeat,'holdem',n,ctx);n=t.hand!.actionReadyAt!;}
+      // Simulate persistence/reconnect rather than recomputing from elapsed minutes.
+      t=JSON.parse(JSON.stringify(t)); ctx=ctxAll(t,n,ctx.rng);
+    }
+    expect(totalChips(t)).toBe(9000);
+  });
   it('last player standing keeps its single fixed blind level after hours of play', () => {
     const { t, now, ctx } = makeTable([3000, 3000, 3000], { mode: 'tournament', unit: 3000, levels: [{ sb: 10, bb: 20, ante: 0, minutes: 15 }] });
     const n = start(t, now, ctx);
@@ -678,7 +731,7 @@ describe('tournament levels and eliminations', () => {
       expect(bbp.allIn).toBe(true); expect(bbp.bet).toBe(15);
       expect(h.currentBet).toBe(20); // nominal bring-in stays 20
       // the other two call the nominal blind; the short stack is contested, not walked
-      while (h.phase === 'betting') { const a = h.actor!; const la = legalActions(t, a, n); act(t, a, { type: la.owed ? 'call' : 'check' }, n, ctx); }
+      while (h.phase === 'betting') { n = Math.max(n, h.actionReadyAt ?? 0); const a = h.actor!; const la = legalActions(t, a, n); act(t, a, { type: la.owed ? 'call' : 'check' }, n, ctx); }
       const effects: ReturnType<typeof tick> = [];
       for (let g = 0; g < 50 && h.phase !== 'result'; g++) { n = Math.max(n, t.dueAt!); effects.push(...tick(t, n, ctxAll(t, n, ctx.rng))); }
       expect(h.phase).toBe('result');

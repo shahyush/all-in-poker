@@ -37,9 +37,9 @@ export function CreatePage({ go }: { go: (to: string) => void }) {
     return e;
   }, [mode, sb, bb, unit, buyAmount, ante]);
 
-  // Reuse the proven elimination engine. One level holds these blinds for the entire game.
+  // Reuse the proven elimination engine. One base level plus an orbit increment; no wall-clock schedule.
   const levels = [{ sb, bb, ante: '', minutes: '15' }];
-  const rules = { mode, name, seats: String(seats), sb, bb, ante: mode === 'cash' ? ante : '', straddle: mode === 'cash' && straddle, unit, levels };
+  const rules = { orbitBlindStep: mode === 'tournament' ? 5 : undefined, mode, name, seats: String(seats), sb, bb, ante: mode === 'cash' ? ante : '', straddle: mode === 'cash' && straddle, unit, levels };
   const buyIn = mode === 'cash' ? (int(buyAmount) ?? 0) : int(unit) ?? 0;
 
   async function create() {
@@ -53,7 +53,7 @@ export function CreatePage({ go }: { go: (to: string) => void }) {
   const o6Note = !variantAllowed(seats, 'omaha6') ? (seats === 9 ? 'At nine players: Hold’em or Omaha 4.' : 'At eight players: Hold’em, Omaha 4 or Omaha 5.') : null;
   const summary: [string, string][] = mode === 'cash'
     ? [['Format', 'Cash · play chips'], ['Blinds', `${sb} / ${bb}`], ['Buy-in unit', unit], ['Your buy-in', `${fmt(buyIn)} chips`], ['Seats', String(seats)], ['Ante', ante && int(ante) ? `${ante} per player` : 'Off'], ['UTG straddle', straddle ? '2 × big blind, optional' : 'Off']]
-    : [['Format', 'Last player standing'], ['Starting bank', `${fmt(buyIn)} chips each`], ['Blinds', `${sb} / ${bb} · fixed`], ['Seats', String(seats)], ['Rebuys', 'Off'], ['Winner', 'Last player with chips']];
+    : [['Format', 'Last player standing'], ['Starting bank', `${fmt(buyIn)} chips each`], ['Blinds', `${sb} / ${bb} · +5 each orbit`], ['Seats', String(seats)], ['Rebuys', 'Off'], ['Winner', 'Last player with chips']];
 
   return (
     <Page back="Back" onBack={() => (review ? setReview(false) : go('/'))}>
@@ -82,7 +82,7 @@ export function CreatePage({ go }: { go: (to: string) => void }) {
               </section>
             </>
           ) : (
-            <Field label="Starting bank" inputMode="numeric" value={unit} onChange={setUnit} error={errors.unit} hint="Same chips for everyone. One entry, no rebuys. Last player with chips wins." />
+            <Field label="Starting bank" inputMode="numeric" value={unit} onChange={setUnit} error={errors.unit} hint="One bank each. No rebuys. Both blinds rise by 5 each orbit." />
           )}
           <div className="stack" style={{ gap: 8 }}>
             <div style={{ fontSize: 14, fontWeight: 600 }}>Seats</div>

@@ -84,6 +84,10 @@ function currentLevel(t: TableState, now: number): number {
 }
 function blindsFor(t: TableState, now: number): { sb: number; bb: number; ante: number; level: number | null } {
   if (t.rules.mode === 'tournament') {
+    if (t.rules.orbitBlindStep === 5) {
+      const increase = (t.orbit?.number ?? 0) * 5;
+      return { sb: t.rules.sb + increase, bb: t.rules.bb + increase, ante: 0, level: 0 };
+    }
     const li = currentLevel(t, now);
     const L: Level = t.rules.levels[li];
     return { sb: L.sb, bb: L.bb, ante: L.ante, level: li };
@@ -121,6 +125,7 @@ export function validateRules(r: TableRules): TableRules {
   }
   return {
     mode: r.mode, name, seats: r.seats,
+    ...(r.mode === 'tournament' && r.orbitBlindStep === 5 ? { orbitBlindStep: 5 as const } : {}),
     sb: r.mode === 'cash' ? r.sb : levels[0].sb, bb: r.mode === 'cash' ? r.bb : levels[0].bb,
     ante: r.mode === 'cash' ? r.ante : 0, straddle: r.mode === 'cash' && !!r.straddle, unit: r.unit, levels,
   };
@@ -357,7 +362,6 @@ function startNextHand(t: TableState, now: number, ctx: TickContext, effects: Ef
   }
   dealt.sort((a, b) => a - b);
 
-  const { sb, bb, ante, level } = blindsFor(t, now);
   // Dealer's choice runs once per orbit. A new orbit begins only when the previous one has played its full count of
   // hands; its chooser is the first eligible seat clockwise from the previous orbit's chooser (or, for the very first
   // orbit, the button). While an orbit is in progress we skip the choice phase and deal its variant straight away.
@@ -366,8 +370,9 @@ function startNextHand(t: TableState, now: number, ctx: TickContext, effects: Ef
   if (orbitDone) {
     const prev = t.orbit?.chooserSeat ?? null;
     const chooserSeat = prev !== null ? nextSeat(t, prev, inHand)! : (dealt.includes(button) ? button : nextSeat(t, button, inHand)!);
-    t.orbit = { chooserSeat, variant: null, handsTotal: dealt.length, handsPlayed: 0 };
+    t.orbit = { chooserSeat, variant: null, handsTotal: dealt.length, handsPlayed: 0, number: t.orbit ? (t.orbit.number ?? 0) + 1 : 0 };
   }
+  const { sb, bb, ante, level } = blindsFor(t, now);
   const orbit = t.orbit!;
   const choosing = orbit.variant === null;          // first hand of an orbit: the chooser still has to pick
   const chooser = orbit.chooserSeat;
@@ -641,14 +646,23 @@ function closeStreet(t: TableState, h: HandState, now: number): void {
   }
   if (h.street === 'river') return settle(t, h, now, false);
   const next = STREETS[STREETS.indexOf(h.street) + 1];
-  const burned = burnCard(h, 0, next);
-  const cards = h.deck.slice(h.cursor, h.cursor + (next === 'flop' ? 3 : 1)); h.cursor += cards.length;
-  h.board.push(...cards); h.street = next;
-  h.log.push({ t: 'street', street: next, cards, board: 0 });
-  if (burned) event(t, h, now, { type: 'burn', board: 0, street: next });
-  event(t, h, now, { type: 'board', board: 0, street: next, cards });
-  const first = nextPlayer(t, h, h.button, active)!;
-  h.actor = first; h.deadline = now + boardPresentationMs(cards.length) + T.bettingMs;
+  const boards = h.boards ?? [h.board];
+  let presentationMs = 0;
+  for (let bi = 0; bi < boards.length; bi++) {
+    const boardIndex = bi as 0 | 1;
+    const burned = burnCard(h, boardIndex, next);
+    const cards = h.deck.slice(h.cursor, h.cursor + (next === 'flop' ? 3 : 1)); h.cursor += cards.length;
+    boards[bi].push(...cards);
+    h.log.push({ t: 'street', street: next, cards, board: boardIndex });
+    if (burned) event(t, h, now, { type: 'burn', board: boardIndex, street: next });
+    event(t, h, now, { type: 'board', board: boardIndex, street: next, cards });
+    presentationMs += boardPresentationMs(cards.length);
+  }
+  if (h.boards) h.board = h.boards[0].slice();
+  h.street = next;
+  h.actor = nextPlayer(t, h, h.button, active)!;
+  h.actionReadyAt = now + presentationMs;
+  h.deadline = h.actionReadyAt + T.bettingMs;
 }
 
 // ---------- runouts ----------
@@ -674,7 +688,7 @@ function queueStages(t: TableState, h: HandState, now: number, runs: 1 | 2): voi
   const need = 5 - prefix.length;
   if (runs === 2) {
     if (!canRunTwice(h)) fail('capacity', 'Not enough cards to run it twice');
-    h.boards = [prefix.slice(), prefix.slice()];
+    h.boards ??= [prefix.slice(), prefix.slice()];
   }
   let at = now;
   const stageFor = (board: 0 | 1, start: number) => {
@@ -701,6 +715,7 @@ function beginRunout(t: TableState, h: HandState, now: number): void {
   // Folded/mucked hands remain private; the deck, burns and future board cards are never exposed.
   for (const player of h.players.filter(live)) player.revealed = h.hole[player.seat].map((_, index) => index);
   const cash = t.rules.mode === 'cash';
+  if (h.boards) { queueStages(t, h, now, 2); return; }
   if (h.bettingLocked || !cash) { queueStages(t, h, now, h.bettingLocked ? h.runs : 1); return; }
   if (h.board.length < 3) {
     // shared flop first, then the tail offer
@@ -742,10 +757,12 @@ export function propose(t: TableState, seat: number, runs: 1 | 2, now: number, c
   const effects = tick(t, now, ctx);
   const h = t.hand;
   if (!h || h.phase !== 'betting') fail('not_now', 'You can only propose on your turn');
-  if (t.rules.mode !== 'cash') fail('not_cash', 'Tournaments run once');
+  if (t.rules.mode !== 'cash') fail('not_cash', 'Last player standing uses one board');
+  if (h.actionReadyAt !== null && now < h.actionReadyAt) fail('not_ready', 'Cards are still being dealt');
   if (h.actor !== seat) fail('not_turn', 'Wait for your turn');
   if (h.street !== 'flop' && h.street !== 'turn') fail('wrong_street', 'Proposals are open on the flop and turn');
   if (h.currentBet > 0 || h.players.some((p) => p.bet > 0)) fail('wager', 'Not after a wager on this street');
+  if (h.boards) fail('already', 'Already playing two boards');
   if (h.proposedStreets.includes(h.street)) fail('already', 'One proposal per street');
   if (runs !== 1 && runs !== 2) fail('bad_runs', 'Once or twice');
   if (runs === 2 && !canRunTwice(h)) fail('capacity', 'Not enough cards to run it twice');
@@ -783,6 +800,12 @@ function resolveProposal(t: TableState, h: HandState, now: number, outcome: 'agr
   const v = h.vote!;
   h.log.push({ t: 'vote', kind: 'proposal', outcome, runs: v.runs });
   h.vote = null;
+  if (outcome === 'agreed' && v.runs === 2) {
+    // House double-board play: retain the exact current betting round and all private hands.
+    h.boards = [h.board.slice(), h.board.slice()]; h.runs = 2;
+    h.phase = 'betting'; h.actor = v.suspendedActor; h.deadline = now + v.remainingMs;
+    return;
+  }
   if (outcome === 'agreed') {
     h.bettingLocked = true; h.runs = v.runs;
     collectBets(h); h.actor = null; h.deadline = null;

@@ -12,7 +12,7 @@ export function rulesSummary(r: TableRules): string[] {
     if (r.straddle) out.push('UTG straddle allowed');
   } else {
     out.push(`Starting bank ${r.unit}`);
-    out.push(r.levels.length === 1 ? `Fixed blinds ${r.levels[0].sb} / ${r.levels[0].bb}` : `${r.levels.length} blind levels`);
+    out.push(r.orbitBlindStep === 5 ? `Blinds ${r.sb}/${r.bb} · +5 each orbit` : r.levels.length === 1 ? `Fixed blinds ${r.levels[0].sb} / ${r.levels[0].bb}` : `${r.levels.length} blind levels`);
     out.push('One entry · no rebuys');
   }
   out.push(`${r.seats} seats`);
@@ -28,5 +28,5 @@ export function rulesRows(r: TableRules): [string, string][] {
     rows.push(['Games', "Dealer's Choice · NL Hold'em, PL Omaha 4/5/6"]);
     return rows;
   }
-  return [['Starting bank', formatChips(r.unit)], ['Seats', String(r.seats)], [r.levels.length === 1 ? 'Fixed blinds' : 'Levels', r.levels.length === 1 ? `${r.levels[0].sb} / ${r.levels[0].bb}` : r.levels.map((L, i) => `${i + 1}: ${L.sb}/${L.bb}${L.ante ? ` a${L.ante}` : ''} · ${L.minutes} min`).join('\n')], ['Rebuys', 'Off'], ['Winner', 'Last player with chips'], ['Games', "Dealer's Choice · NL Hold'em, PL Omaha 4/5/6"]];
+  return [['Starting bank', formatChips(r.unit)], ['Seats', String(r.seats)], [r.orbitBlindStep === 5 ? 'Blinds · +5 each orbit' : r.levels.length === 1 ? 'Fixed blinds' : 'Levels', r.orbitBlindStep === 5 ? `${r.sb} / ${r.bb}` : r.levels.length === 1 ? `${r.levels[0].sb} / ${r.levels[0].bb}` : r.levels.map((L, i) => `${i + 1}: ${L.sb}/${L.bb}${L.ante ? ` a${L.ante}` : ''} · ${L.minutes} min`).join('\n')], ['Rebuys', 'Off'], ['Winner', 'Last player with chips'], ['Games', "Dealer's Choice · NL Hold'em, PL Omaha 4/5/6"]];
 }

@@ -113,6 +113,7 @@ describe('full cash session through the API', () => {
       const st = await W.publicState(tableId);
       const me = h.players.find((p: { seat: number }) => p.seat === h.actor);
       const owed = h.currentBet - me.bet;
+      await waitBetting(tableId); // includes the new board presentation window
       await cl.cmd('act', { action: owed > 0 ? 'call' : 'check' }, tableId);
       void st;
     }

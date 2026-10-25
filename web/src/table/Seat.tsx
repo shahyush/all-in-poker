@@ -3,11 +3,12 @@ import { PlayingCard } from './Card.tsx';
 import { fmt } from '../components/ui.tsx';
 
 export interface SeatProps {
+  winnerBurst?: boolean;
   index: number; seat: SeatState; hand: PublicHand | null; pos: { left: number; top: number };
   isHost: boolean; present: boolean; now: number; isMe: boolean; shownCards: Card[] | null; winCards: Card[] | null; won: number | null; revealDelayMs?: number;
 }
 
-export function SeatView({ index, seat, hand, pos, isHost, present, now, isMe, shownCards, winCards, won, revealDelayMs }: SeatProps) {
+export function SeatView({ index, seat, hand, pos, isHost, present, now, isMe, shownCards, winCards, won, revealDelayMs, winnerBurst }: SeatProps) {
   const hp = hand?.players.find((p) => p.seat === index) ?? null;
   const inHand = !!hp;
   const actor = hand?.phase === 'betting' && hand.actor === index;
@@ -36,10 +37,11 @@ export function SeatView({ index, seat, hand, pos, isHost, present, now, isMe, s
           : Array.from({ length: Math.min(backs, 6) }).map((_, i) => <span key={i} className="deal-slot" data-slot={i}><span className="pc back sm" style={{ opacity: 0.95 }} /></span>)}
       </div>
       <div className="seat-core">
+        {won && winnerBurst ? <span className="winner-sparks" aria-hidden="true">{Array.from({length:8},(_,i)=><i key={i} style={{transform:`rotate(${i*45}deg)`}} />)}</span> : null}
         <span className="seat-avatar" aria-hidden="true">{initialOf(seat.name)}</span>
         <span className={`seat-name${hand?.button === index ? ' has-dealer' : ''}`}>{isHost ? '★ ' : ''}{seat.name}</span>
         <span className="seat-stack">{fmt(seat.stack)}{won ? <span style={{ color: 'var(--accent-table)' }}> +{fmt(won)}</span> : null}</span>
-        <span className="seat-status">{actor ? 'To act' : chooser ? 'Choosing' : status[0] ?? ''}</span>
+        <span className="seat-status">{chooser ? 'Choosing' : status[0] ?? ''}</span>
         {hp && hp.bet > 0 && <span className="seat-wager" aria-label={`Bet ${fmt(hp.bet)}`}>Bet {fmt(hp.bet)}</span>}
         {actor && <span className="timer-ring" aria-hidden="true"><i style={{ width: Math.round(remaining * 100) + '%' }} /></span>}
         {blind && <span className={`blind-chip ${blind.cls}`} aria-label={blind.label}>{blind.text}</span>}

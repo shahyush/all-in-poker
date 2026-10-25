@@ -170,6 +170,7 @@ export class Handlers {
     const raw = (p.rules ?? {}) as Record<string, unknown>;
     const int = (v: unknown) => parseChipAmount(v) ?? NaN;
     const rules: TableRules = validateRules({
+      orbitBlindStep: raw.orbitBlindStep === 5 ? 5 : undefined,
       mode: raw.mode === 'tournament' ? 'tournament' : 'cash', name: String(raw.name ?? ''), seats: int(raw.seats),
       sb: int(raw.sb), bb: int(raw.bb), ante: raw.ante === undefined || raw.ante === '' ? 0 : int(raw.ante), straddle: !!raw.straddle, unit: int(raw.unit),
       levels: Array.isArray(raw.levels) ? (raw.levels as Record<string, unknown>[]).map((L) => ({ sb: int(L.sb), bb: int(L.bb), ante: L.ante === undefined || L.ante === '' ? 0 : int(L.ante), minutes: int(L.minutes) })) : [],

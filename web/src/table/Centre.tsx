@@ -4,6 +4,7 @@ import { fmt } from '../components/ui.tsx';
 import { timeLeft } from '../lib/format.ts';
 
 export interface CentreProps {
+  awardReady?: boolean;
   t: PublicTable; hand: PublicHand | null; now: number; mySeat: number; busy: boolean;
   chosen?: VariantId | null; submitting?: VariantId | null;
   onChoose(v: VariantId): void; onStraddle(accept: boolean): void; onVote(choice: string): void; onPots(): void;
@@ -12,7 +13,7 @@ export interface CentreProps {
   madeBoard?: Set<Card> | null;
 }
 
-export function Centre({ t, hand, now, mySeat, busy, chosen, submitting, onChoose, onStraddle, onVote, onPots, newBoardKeys, boardLeadMs, madeBoard }: CentreProps) {
+export function Centre({ awardReady = true, t, hand, now, mySeat, busy, chosen, submitting, onChoose, onStraddle, onVote, onPots, newBoardKeys, boardLeadMs, madeBoard }: CentreProps) {
   if (!hand) {
     return <div className="centre"><div className="centre-card"><div className="centre-title">{t.status === 'running' ? (t.waitingReason ?? 'Waiting') : 'Paused'}</div><div className="centre-copy">{t.status === 'running' ? 'Hands continue automatically.' : ''}</div></div></div>;
   }
@@ -53,13 +54,13 @@ export function Centre({ t, hand, now, mySeat, busy, chosen, submitting, onChoos
       {!res && <div className="pot">Pot<b>{fmt(pot)}</b></div>}
       {boards.map((b, bi) => {
         const winCards = new Set<Card>();
-        if (res) for (const a of res.awards) if (a.board === bi) for (const w of a.winners) for (const c of w.cards) winCards.add(c);
+        if (res && awardReady) for (const a of res.awards) if (a.board === bi) for (const w of a.winners) for (const c of w.cards) winCards.add(c);
         const freshOrder = b.cards.map((c, i) => (newBoardKeys.has(`${bi}:${c}`) ? i : -1)).filter((i) => i >= 0);
         return (
         <div key={bi} className="stack" style={{ gap: 2, alignItems: 'center' }}>
           {b.label && <div className="board-label">{b.label}</div>}
           <div className="board" aria-label={b.label ?? 'Community cards'}>
-            {Array.from({ length: 5 }).map((_, i) => { if (b.cards[i] === undefined) return <SlotCard key={'s' + i} />; const fresh = newBoardKeys.has(`${bi}:${b.cards[i]}`); return <PlayingCard key={b.cards[i]} card={b.cards[i]} win={res ? winCards.has(b.cards[i]) : false} dim={res ? winCards.size > 0 && !winCards.has(b.cards[i]) : false} hi={!res && !!madeBoard?.has(b.cards[i])} flip={fresh} delayMs={fresh ? (boardLeadMs ?? 0) + freshOrder.indexOf(i) * BOARD_GAP_MS : undefined} />; })}
+            {Array.from({ length: 5 }).map((_, i) => { if (b.cards[i] === undefined) return <SlotCard key={'s' + i} />; const fresh = newBoardKeys.has(`${bi}:${b.cards[i]}`); return <PlayingCard key={b.cards[i]} card={b.cards[i]} win={res && awardReady ? winCards.has(b.cards[i]) : false} dim={res ? winCards.size > 0 && !winCards.has(b.cards[i]) : false} hi={!res && !!madeBoard?.has(b.cards[i])} flip={fresh} delayMs={fresh ? (boardLeadMs ?? 0) + freshOrder.indexOf(i) * BOARD_GAP_MS + (bi === 1 && newBoardKeys.size > freshOrder.length ? 860 : 0) : undefined} />; })}
           </div>
         </div>
         );
@@ -67,11 +68,11 @@ export function Centre({ t, hand, now, mySeat, busy, chosen, submitting, onChoos
       {!res && <div className="board-label">{hand.street === 'preflop' && hand.board.length === 0 ? 'Pre-flop' : hand.street}</div>}
       {hand.phase === 'vote' && hand.vote && (
         <div className="centre-card" role="group" aria-label="Runout proposal">
-          <div className="row" style={{ justifyContent: 'space-between' }}><b>{seatName(hand.vote.proposer)} proposes: run it {hand.vote.runs === 2 ? 'twice' : 'once'}</b><span>{timeLeft(hand.vote.deadline, now)}s</span></div>
-          <div className="centre-copy">Everyone agrees: betting ends for this hand. Silence counts as no.</div>
+          <div className="row" style={{ justifyContent: 'space-between' }}><b>{hand.vote.runs === 2 ? 'Play two boards?' : 'Run the board?'}</b><span>{timeLeft(hand.vote.deadline, now)}s</span></div>
+          <div className="centre-copy">{hand.vote.runs === 2 ? 'Betting continues. Each board wins half the pot.' : 'Betting ends if everyone agrees.'}</div>
           {hand.vote.electorate.includes(mySeat) && !hand.vote.answered.includes(mySeat) ? (
             <div className="row" style={{ justifyContent: 'center' }}>
-              <button type="button" className="btn-game" disabled={busy} onClick={() => onVote('decline')}>Keep playing</button>
+              <button type="button" className="btn-game" disabled={busy} onClick={() => onVote('decline')}>No</button>
               <button type="button" className="btn-game btn-game-primary" disabled={busy} onClick={() => onVote('agree')}>Agree</button>
             </div>
           ) : <div className="centre-copy">{hand.vote.answered.length} of {hand.vote.electorate.length} answered</div>}
@@ -88,7 +89,8 @@ export function Centre({ t, hand, now, mySeat, busy, chosen, submitting, onChoos
           ) : <div className="centre-copy">{hand.vote.answered.length} of {hand.vote.electorate.length} answered</div>}
         </div>
       )}
-      {res && (
+      {res && !awardReady && <div className="showdown-title">Showdown</div>}
+      {res && awardReady && (
         <div className="result-strip">
           {Object.entries(res.totals).map(([seat, amt]) => {
             const names = res.awards.filter((a) => a.winners.some((w) => w.seat === +seat)).map((a) => a.winners.find((w) => w.seat === +seat)!.name).filter(Boolean);

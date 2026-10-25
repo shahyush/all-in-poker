@@ -106,12 +106,17 @@ test('reconnect, rotation, uncontested reveal, reload approval and run it twice'
   for (let i = 0; i < 30; i++) { if (await h.page.locator('.board-label', { hasText: /^flop$/i }).isVisible().catch(() => false)) break; if (!(await actCurrentTurn(pages))) break; }
   let proposer: Page | null = null;
   for (let i = 0; i < 20 && !proposer; i++) { proposer = await turnOf(pages); if (!proposer) await h.page.waitForTimeout(300); }
-  await proposer!.getByRole('button', { name: 'twice' }).click();
+  await proposer!.getByRole('button', { name: 'Two boards · keep betting' }).click();
   const other = proposer === h.page ? g.page : h.page;
-  await expect(other.getByText(/proposes: run it twice/)).toBeVisible();
+  await expect(other.getByText(/Play two boards/)).toBeVisible();
   await other.getByRole('button', { name: 'Agree' }).click();
   await expect(h.page.getByText('Board B')).toBeVisible({ timeout: 15_000 });
   await h.page.screenshot({ path: 'test-results/shots/12-two-boards.png' });
+  // Agreement preserves betting: play the remaining streets on both boards before the award.
+  for (let i = 0; i < 35; i++) {
+    if (await h.page.getByText(/Pot detail/).isVisible().catch(() => false)) break;
+    if (!(await actCurrentTurn(pages))) await h.page.waitForTimeout(300);
+  }
   await expect(h.page.getByText(/Pot detail/)).toBeVisible({ timeout: 15_000 });
   await h.page.screenshot({ path: 'test-results/shots/13-two-boards.png' });
   // leave, history and recovery are verified on a fresh session below, not stacked onto this long reload-heavy journey
@@ -188,7 +193,7 @@ test('server timers run with every browser closed; a timed-out player folds and 
   await back.close();
 });
 
-test('last player standing: equal banks, fixed blinds, play to a winner and standings', async ({ browser }) => {
+test('last player standing: equal banks, orbit blinds, play to a winner and standings', async ({ browser }) => {
   test.setTimeout(180_000);
   const h = await player(browser, 'Tan');
   const g = await player(browser, 'Aay');

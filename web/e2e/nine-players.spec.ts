@@ -57,13 +57,14 @@ for (const variant of ["Hold'em", 'Omaha 4']) test(`nine separate players: ${var
   await expect(chooser.getByRole('button',{name:/Omaha 6/})).toBeDisabled();
   await chooser.getByRole('button',{name: variant === 'Omaha 4' ? /Omaha 4/ : /Hold'em/}).click();
   const holes = variant === 'Omaha 4' ? 4 : 2;
-  for (const p of pages) {
+  // Inspect all nine views together so the test does not consume a live turn serially.
+  await Promise.all(pages.map(async p => {
     await expect(p.locator('.g-stakes')).toContainText(variant);
     await expect(p.locator('.seat')).toHaveCount(8);
     await expect(p.locator('.own-cards .pc:not(.back)')).toHaveCount(holes,{timeout:25000});
     await expect(p.locator('.seat .pc.back')).toHaveCount(holes*8);
     await clearBoard(p);
-  }
+  }));
   await h.page.screenshot({path:info.outputPath('01-nine-dealt.png')});
   for(let i=0;i<9;i++) await checkCall(pages);
   await expect(h.page.locator('.board .pc:not(.slot)')).toHaveCount(3);

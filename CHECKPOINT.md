@@ -4,6 +4,16 @@ Branch `main` on github.com/shahyush/all-in-poker . Read `CLAUDE.md` for the rul
 This file separates **implemented** (code merged, local tests green), **deployed** (live on the hosted app) and **verified**
 (passed against the deployed app, or seen in its recordings). Nothing is called done on the strength of a push alone.
 
+## October 25 gameplay refinement (supersedes fixed-blind setup below)
+
+New last-player-standing tables set `orbitBlindStep: 5`: both blinds increase exactly five at the next complete dealer-choice orbit, with the orbit count persisted. Existing game configurations remain unchanged.
+
+Voluntary two-board agreement now resumes the exact actor/remaining clock and keeps betting open. Two boards receive their own burn and card each subsequent street; one betting round covers both boards and each pot is split at settlement. Standard forced all-in run twice is retained. Legacy run-once commands still close betting, but are no longer offered as a voluntary UI action.
+
+Showdowns hold 12 seconds; ordered reveals are spaced 850ms, followed by winner highlights and a brief gold spark burst. Action keys have tactile depth, seat plaques are compact, and house-rule text now matches the implementation. Reduced motion is respected.
+
+Validation: 71 engine tests, 13 Chromium layout/interaction tests and production build passed. Local server integration is blocked because the local Postgres reset cannot run; GitHub's Postgres-backed suite is required before deployment. Hosted multiplayer verification remains separate.
+
 ## October 25 update
 
 Frontend main `5ec0de5` deployed successfully (Cloudflare version `0963a91f-68ac-47bb-b1fc-57c717a9cf2a`); Chromium and WebKit live sign-in smoke passed. Full hosted gameplay verification remains pending. Backend api v20 is active, deploying `static.ts` with the committed bundle directly (SHA `54929c91a8450083563c5c5b1cde0c32336b999e02d40e367fb05d0d2db9befa`), avoiding the asset-store cold-boot dependency.

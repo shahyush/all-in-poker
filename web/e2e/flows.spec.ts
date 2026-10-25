@@ -52,11 +52,12 @@ for(const [width,height] of [[320,568],[390,844],[667,375]]) test(`host flow use
   await page.screenshot({path:info.outputPath('last-player-standing.png'),fullPage:true});
   await page.getByRole('button',{name:'Review the table'}).click();
   await expect(page.getByText('3,000 chips each',{exact:true})).toBeVisible();
-  await expect(page.getByText('10 / 20 · fixed',{exact:true})).toBeVisible();
+  await expect(page.getByText('10 / 20 · +5 each orbit',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Create and open the room'}).click();
   await expect(page.getByRole('alert')).toContainText('Connection lost');
   expect(submitted.payload.buyIn).toBe('3000');
   expect(submitted.payload.rules.mode).toBe('tournament');
+  expect(submitted.payload.rules.orbitBlindStep).toBe(5);
   expect(submitted.payload.rules.levels).toEqual([{sb:'10',bb:'20',ante:'',minutes:'15'}]);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
