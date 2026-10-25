@@ -13,8 +13,11 @@ test('cards appear only as each deal arrives; cancellation restores all slots',a
     const hidden=slots.every(slot=>slot.style.visibility==='hidden');
     const animations=document.getAnimations();
     animations.forEach(a=>a.pause());
-    animations[0].finish();
-    await new Promise(resolve=>setTimeout(resolve,30));
+    await Promise.all(animations.map(a => a.ready));
+    await new Promise<void>(resolve => {
+      animations[0].addEventListener('finish', () => resolve(), {once:true});
+      animations[0].finish();
+    });
     const arrived=slots.filter(slot=>slot.style.visibility!=='hidden').length;
     const destination=slots.find(slot=>slot.style.visibility!=='hidden')?.parentElement?.getAttribute('data-seat');
     cancel();

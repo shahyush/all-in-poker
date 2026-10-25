@@ -51,6 +51,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const [boardLead, setBoardLead] = useState(0);        // ms the current board reveal waits for a preceding burn to show
   const [sweeps, setSweeps] = useState<{ id: number; left: number; top: number }[]>([]);
   const sweepId = useRef(0);
+  const boardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelAnim = useRef<(() => void) | null>(null);
   useLayoutEffect(() => {
     const events = t.events ?? [];
@@ -79,7 +80,8 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
         setPresentationUntil(reduced ? 0 : now + boardPresentationMs(ev.cards.length));
         setBoardLead(lead);
         setNewBoardKeys(new Set(keys));
-        setTimeout(() => setNewBoardKeys(new Set()), 1400 + lead); // burn lead + the staggered one-by-one flop (3 × ~300ms + flip)
+        if (boardTimer.current) clearTimeout(boardTimer.current);
+        boardTimer.current = setTimeout(() => setNewBoardKeys(new Set()), boardPresentationMs(ev.cards.length) + 20);
         lead = 0;
         // the previous street's bets have just collected into the pot: sweep a chip in from each contesting seat
         if (!reduced && hand) {
@@ -90,7 +92,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
       }
     }
   }, [t.seq, t.events, hand]);
-  useEffect(() => () => { cancelAnim.current?.(); }, []);
+  useEffect(() => () => { cancelAnim.current?.(); if (boardTimer.current) clearTimeout(boardTimer.current); }, []);
   useEffect(() => { const h = () => { if (cancelAnim.current) { cancelAnim.current(); cancelAnim.current = null; setDealt(true); } }; window.addEventListener('orientationchange', h); return () => window.removeEventListener('orientationchange', h); }, []);
   // hand changed without an animation (reconnect/mid-hand): show settled cards
   useEffect(() => { if (!hand || hand.phase !== 'betting' || (hand.actionReadyAt && now >= hand.actionReadyAt + 2000)) setDealt(true); }, [hand?.id, hand?.phase, hand?.actionReadyAt, now, hand]);

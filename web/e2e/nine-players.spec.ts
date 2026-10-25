@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { boardPresentationMs } from '@allin/engine/public';
 import { player, closePlayers } from './helpers.ts';
 
 test.afterEach(async ({browser}, info) => closePlayers(browser, info.outputDir));
@@ -66,7 +67,7 @@ for (const variant of ["Hold'em", 'Omaha 4']) test(`nine separate players: ${var
   await h.page.screenshot({path:info.outputPath('01-nine-dealt.png')});
   for(let i=0;i<9;i++) await checkCall(pages);
   await expect(h.page.locator('.board .pc:not(.slot)')).toHaveCount(3);
-  await h.page.waitForTimeout(1200); // capture completed burn + flop presentation
+  await h.page.waitForTimeout(boardPresentationMs(3) + 100); // capture completed burn + flop presentation
   await clearBoard(h.page);
   await h.page.screenshot({path:info.outputPath('02-nine-flop-portrait.png')});
   await h.page.setViewportSize({width:390,height:700});
@@ -77,6 +78,12 @@ for (const variant of ["Hold'em", 'Omaha 4']) test(`nine separate players: ${var
   await clearBoard(h.page);
   await h.page.screenshot({path:info.outputPath('03-nine-flop-landscape.png')});
   await h.page.setViewportSize({width:390,height:844});
+  const landscapeActor = await actor(pages);
+  await landscapeActor.setViewportSize({width:667,height:375});
+  await clearBoard(landscapeActor);
+  await checkCall(pages);
+  await landscapeActor.screenshot({path:info.outputPath('03b-action-landscape.png')});
+  await landscapeActor.setViewportSize({width:390,height:844});
   if(variant === 'Omaha 4') {
     const p = await actor(pages);
     await p.getByRole('button',{name:'Run twice',exact:true}).click();
@@ -87,7 +94,7 @@ for (const variant of ["Hold'em", 'Omaha 4']) test(`nine separate players: ${var
     }));
     await expect(h.page.locator('.board')).toHaveCount(2);
   } else {
-    for(let i=0;i<27;i++) await checkCall(pages);
+    for(let i=0;i<26;i++) await checkCall(pages);
   }
   await expect(h.page.locator('.result-strip')).toBeVisible({timeout:20000});
   await expect(h.page.getByRole('group', {name:'Actions'})).toHaveCount(0);
