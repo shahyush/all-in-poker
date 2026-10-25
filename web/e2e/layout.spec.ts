@@ -1,11 +1,20 @@
 import { test, expect } from '@playwright/test';
-for (const [width, height, layoutHeight] of [[390,560,844], [375,520,667], [667,280,375], [390,560], [375,520], [667,280], [844,290], [320,568], [375,667], [390,700], [430,932], [844,390], [667,375], [740,360], [932,430]]) {
-  test(`board remains clear at ${width}x${height}${layoutHeight ? " with browser bars" : ""}`, async ({page}, info) => {
+for (const [width, height, layoutHeight, safe] of [[390,700,844,1], [844,290,390,1], [390,560,844], [375,520,667], [667,280,375], [390,560], [375,520], [667,280], [844,290], [320,568], [375,667], [390,700], [430,932], [844,390], [667,375], [740,360], [932,430]]) {
+  test(`board remains clear at ${width}x${height}${layoutHeight ? " with browser bars" : ""}${safe ? " and safe areas" : ""}`, async ({page}, info) => {
     await page.setViewportSize({width, height: layoutHeight ?? height});
     // Replace the HTML entry, preserving Vite module serving; no auth/backend calls are needed.
     await page.route('http://127.0.0.1:5173/', route => route.fulfill({contentType:'text/html', body:'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>.dealer-token { transition: none !important; }</style></head><body><div id="root"></div></body></html>'}));
     await page.goto('/');
-    await page.evaluate(h => document.documentElement.style.setProperty('--vh', `${h}px`), height);
+    await page.evaluate(({height, width, safe}) => {
+      const style = document.documentElement.style;
+      style.setProperty('--vh', `${height}px`);
+      if (safe) {
+        style.setProperty('--safe-t', width < height ? '47px' : '0px');
+        style.setProperty('--safe-b', width < height ? '34px' : '21px');
+        style.setProperty('--safe-l', width < height ? '0px' : '47px');
+        style.setProperty('--safe-r', width < height ? '0px' : '47px');
+      }
+    }, {height, width, safe});
     for (const [count, holes] of [[2,2], [3,4], [4,4], [6,6], [7,6], [8,5], [9,4]]) {
       for (const [twice, result, acting] of [[false, false, false], [false, false, true], [true, false, true], [true, true, false]]) {
         await page.evaluate(async ({count, holes, twice, result, acting}) => {
