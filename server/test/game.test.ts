@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { resetDb, world, Client, type World } from './harness.ts';
-import { RULES, dealTiming } from '@allin/engine';
+import { RULES } from '@allin/engine';
 
 let W: World;
 beforeAll(async () => { resetDb(); W = await world(4, ['Tanisha', 'Aayush', 'Sam', 'Priya']); });
@@ -15,11 +15,11 @@ async function actorClient(tableId: string): Promise<Client> {
   return W.clients.find((c) => c.player!.id === pid)!;
 }
 async function waitBetting(tableId: string) {
-  // the deal presentation window must pass before actions are accepted
-  const h = await hand(tableId);
+  // Use the authoritative deadline: hole-card deals and board reveals have
+  // different durations, and advanceClock shifts the private persisted state.
+  const h = (await W.privateState(tableId)).hand;
   if (h?.actionReadyAt) {
-    const cards = h.players.reduce((n: number, p: { holeCount: number }) => n + p.holeCount, 0);
-    await W.advanceClock(dealTiming(cards).total + 1);
+    await W.advanceClock(Math.max(0, h.actionReadyAt - Date.now()) + 100);
   }
 }
 
@@ -192,7 +192,7 @@ describe('full cash session through the API', () => {
     expect(rx.length).toBe(3);
     // removing takes away only that player's own reaction
     await host.cmd('react', { messageId: mid, emoji: '👍', op: 'remove' }, tableId);
-    rx = await W.db.select<{ emoji: string }>('chat_reactions', { table_id: tableId, message_id: mid });
+    rx = await W.db.select<{ emoji: string; user_id: string }>('chat_reactions', { table_id: tableId, message_id: mid });
     expect(rx.filter((r) => r.emoji === '👍').length).toBe(1);
     // an emoji outside the allowlist is refused, and an unknown message id cannot be reacted to
     expect((await a.raw('react', { messageId: mid, emoji: '🚫', op: 'add' }, tableId)).body.error?.code).toBe('bad_emoji');
@@ -221,7 +221,7 @@ describe('full cash session through the API', () => {
     expect(first.body.ok).toBe(true);
     const replay = await host.raw('chat', { body: 'once only' }, tableId, aid);
     expect(replay.body.replayed ?? false).toBe(true);
-    expect((await W.db.select('chat_messages', { table_id: tableId })).filter((r: { body: string }) => r.body === 'once only').length).toBe(1);
+    expect((await W.db.select<{ body: string }>('chat_messages', { table_id: tableId })).filter((r) => r.body === 'once only').length).toBe(1);
   });
 
   it('leave after the hand records the exit, frees the seat, keeps history for the departed player', async () => {
@@ -509,4 +509,33 @@ describe('dealer\'s choice readiness (cold start)', () => {
     st = await W.publicState(tid);
     expect(st.hand.variant).toBe('omaha4');
   });
+});
+
+it('departing Last Player Standing hides the host membership but retains the competing stack', async () => {
+  const host = new Client(W.app,W.db), guest = new Client(W.app,W.db);
+  for(const [i,c] of [host,guest].entries()){await c.signIn();await c.admit('LeaveLPS'+i);}
+  const r=await host.cmd<{tableId:string;inviteCode:string}>('create_table',{rules:{mode:'tournament',name:'Leave LPS',seats:'2',unit:'1000',levels:[{sb:'5',bb:'10',ante:'0',minutes:'15'}]}});
+  await guest.cmd('join',{code:r.inviteCode});await host.cmd('start',{},r.tableId);
+  const before=await W.publicState(r.tableId);await host.cmd('leave',{},r.tableId);const after=await W.publicState(r.tableId);
+  expect(after.seats.find((s:any)=>s?.playerId===host.player!.id)?.stack).toBe(before.seats.find((s:any)=>s?.playerId===host.player!.id)?.stack);
+  expect(await W.db.select('table_members',{table_id:r.tableId,user_id:host.player!.id,status:'active'})).toHaveLength(0);
+  expect(await W.db.select('ledger',{table_id:r.tableId,user_id:host.player!.id,kind:'exit'})).toHaveLength(0);
+});
+
+
+it('only the host can delete a table, with balanced exits and preserved history',async()=>{
+  const host=new Client(W.app,W.db),guest=new Client(W.app,W.db);
+  for(const [i,c] of [host,guest].entries()){await c.signIn();await c.admit('Close'+i);}
+  const r=await host.cmd<{tableId:string;inviteCode:string}>('create_table',{rules:cashRules,buyIn:'1000'});
+  await guest.cmd('join',{code:r.inviteCode,amount:'2000'});
+  const rejected=await guest.raw('close_table',{},r.tableId);
+  expect(rejected.body.error?.code).toBe('host_only');
+  expect((await W.db.select<{archived_at:string|null}>('tables',{id:r.tableId}))[0].archived_at).toBeNull();
+  const actionId=crypto.randomUUID();
+  expect((await host.raw('close_table',{},r.tableId,actionId)).body.ok).toBe(true);
+  expect((await host.raw('close_table',{},r.tableId,actionId)).body.replayed).toBe(true);
+  const ledger=await W.db.select<{kind:string;amount:number}>('ledger',{table_id:r.tableId});
+  expect(ledger.filter(r=>r.kind==='exit').reduce((sum,r)=>sum+Number(r.amount),0)).toBe(3000);
+  expect(await W.db.select('session_participants',{table_id:r.tableId})).toHaveLength(2);
+  expect((await W.db.select<{archived_at:string|null}>('tables',{id:r.tableId}))[0].archived_at).not.toBeNull();
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeTable, start, autoplay, seededRng, totalChips, ctxAll } from './helpers.ts';
-import { act, legalActions, tick, chooseVariant, choiceReady, propose, respondVote, reveal, respondStraddle, requestLeave, requestSitOut, requestReturn, startTable, seatPlayer, createTable, publicView, privateCards, canRunTwice, EngineError, setStraddlePref } from '../src/table.ts';
+import { act, legalActions, tick, chooseVariant, choiceReady, propose, respondVote, reveal, respondStraddle, requestClose, requestLeave, requestSitOut, requestReturn, startTable, seatPlayer, createTable, publicView, privateCards, canRunTwice, EngineError, setStraddlePref } from '../src/table.ts';
 import { RULES, variantAllowed } from '../src/rules.ts';
 import type { TableState } from '../src/types.ts';
 
@@ -852,7 +852,7 @@ describe('tournament levels and eliminations', () => {
     expect(t.dueAt).toBeNull();
   });
 
-  it('all players absent: new hands hold after 45 s, resume when someone returns, and a 30-minute absence abandons the tournament (closes a cash table with exits)', () => {
+  it('all players absent: new hands hold after 45 s, resume when someone returns, and a three-minute absence abandons the tournament (closes a cash table with exits)', () => {
     const lv = [{ sb: 5, bb: 10, ante: 0, minutes: 60 }];
     for (const mode of ['tournament', 'cash'] as const) {
       const { t, now, ctx } = makeTable([1000, 1000, 1000], mode === 'tournament' ? { mode, unit: 1000, levels: lv } : {});
@@ -865,7 +865,7 @@ describe('tournament levels and eliminations', () => {
       expect(fx.some((e) => e.type === 'history')).toBe(true); // the finished hand is still recorded
       expect(t.hand).toBeNull(); expect(t.status).toBe('running'); expect(t.waitingReason).toBe('Waiting for someone to return');
       expect(t.dueAt).toBe(n + T.nobodyPresentHoldMs); // the scheduler keeps re-checking presence while held
-      n += 10 * 60_000; tick(t, n, nobody);
+      n += 30_000; tick(t, n, nobody);
       expect(t.dueAt).toBe(n + T.nobodyPresentHoldMs);
       expect(t.hand).toBeNull(); expect(t.status).toBe('running');
       // one player comes back: a hand starts again
@@ -875,8 +875,7 @@ describe('tournament levels and eliminations', () => {
       const total = totalChips(t);
       n = t.hand!.nextAt! + T.abandonmentMs + 1;
       fx = tick(t, n, nobody);                 // settles the hand, holds, arms the idle check
-      expect(t.status).toBe('running');
-      fx.push(...tick(t, t.dueAt!, nobody));   // the scheduler's next visit abandons
+      if (t.dueAt !== null) fx.push(...tick(t, t.dueAt, nobody));   // the scheduler's next visit abandons
       if (mode === 'tournament') {
         expect(t.status).toBe('abandoned');
         expect(fx.some((e) => e.type === 'tournament_finished' && e.abandoned && e.winnerPlayerId === null)).toBe(true);
@@ -974,7 +973,7 @@ describe('last player standing run choices', () => {
     autoplay(t,n,ctx,x=>x.hand!.phase==='result');
     expect(h.boards?.length ?? 1).toBe(runs);
     expect(totalChips(t)).toBe(3000);
-    expect(h.nextAt! - t.events.findLast(e=>e.type==='award')!.at).toBe(8000);
+    expect(h.nextAt! - t.events.findLast(e=>e.type==='award')!.at).toBe(6000);
   });
   it('offers once/twice after an all-in in last player standing',()=>{
     const {t,now,ctx}=makeTable([1000,1000],rules);
@@ -995,4 +994,47 @@ it('folded cards remain available only in the player private view',()=>{
   expect(privateCards(t,player)).toEqual(cards);
   expect(publicView(t).hand!.players.find(p=>p.seat===seat)!.revealed).toEqual([]);
   expect('hole' in publicView(t).hand!).toBe(false);
+});
+
+describe('three-minute inactive cleanup', () => {
+  it('keeps a connected waiting room, then archives once with every chip accounted for', () => {
+    const {t,now}=makeTable([1000,2000]);
+    expect(t.dueAt).toBe(now+180000);
+    tick(t,now+180000,{presence:{p0:now+179000}});
+    expect(t.status).toBe('waiting'); expect(t.dueAt).toBe(now+359000);
+    const effects=tick(t,now+359000,{presence:{}});
+    expect(t.status).toBe('closed');
+    expect(effects.filter(e=>e.type==='exit').reduce((n,e)=>n+(e.type==='exit'?e.amount:0),0)).toBe(3000);
+    expect(tick(t,now+360000,{presence:{}})).toEqual([]);
+  });
+  it('settles and records an active hand before archiving', () => {
+    const {t,now,ctx}=makeTable([1000,1000]); start(t,now,ctx);
+    const effects=tick(t,now+180001,{presence:{},rng:ctx.rng});
+    expect(t.status).toBe('closed');
+    expect(effects.findIndex(e=>e.type==='history')).toBeGreaterThanOrEqual(0);
+    expect(effects.findIndex(e=>e.type==='history')).toBeLessThan(effects.findIndex(e=>e.type==='archive'));
+    expect(effects.filter(e=>e.type==='exit').reduce((n,e)=>n+(e.type==='exit'?e.amount:0),0)).toBe(2000);
+  });
+});
+
+
+describe('host table closure', () => {
+  it('closes a waiting cash table once and returns every chip', () => {
+    const {t,now,ctx}=makeTable([1000,2000]);
+    const effects=requestClose(t,now,ctx);
+    expect(t.status).toBe('closed');expect(t.hand).toBeNull();
+    expect(effects.filter(e=>e.type==='exit').reduce((n,e)=>n+(e.type==='exit'?e.amount:0),0)).toBe(3000);
+    expect(requestClose(t,now+1,ctx)).toEqual([]);
+  });
+  it('finishes the current hand without dealing another or losing the pot', () => {
+    const {t,now,ctx}=makeTable([1000,1000]);let n=start(t,now,ctx);
+    const original=t.hand!.id;
+    expect(requestClose(t,n,ctx)).toEqual([]);expect(t.hand!.id).toBe(original);
+    expect(()=>seatPlayer(t,{playerId:'late',name:'Late'},1000,n)).toThrow();
+    n=autoplay(t,n,ctx,x=>x.hand!.phase==='result');
+    const effects=tick(t,t.hand!.nextAt!,ctxAll(t,t.hand!.nextAt!,ctx.rng));
+    expect(t.status).toBe('closed');expect(t.handNo).toBe(1);
+    expect(effects.some(e=>e.type==='history')).toBe(true);
+    expect(effects.filter(e=>e.type==='exit').reduce((sum,e)=>sum+(e.type==='exit'?e.amount:0),0)).toBe(2000);
+  });
 });

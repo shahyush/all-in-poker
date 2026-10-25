@@ -16,7 +16,7 @@ import { Page, Spinner } from './components/ui.tsx';
 function TableRoute({ id, go }: { id: string; go: (to: string, replace?: boolean) => void }) {
   const view = useTable(id);
   const s = useSession();
-  useEffect(() => { if (view.error === 'gone') go('/', true); }, [view.error, go]);
+  if (view.loaded && !view.row && !view.connected) return <Page back="Lobby" onBack={() => go('/')}><h1>Connection interrupted.</h1><p>Your table has not been reset.</p><button className="btn btn-primary" onClick={() => void view.reload()}>Reconnect</button></Page>;
   if (!view.loaded || !view.row) return <Page><Spinner label="Opening the table" /></Page>;
   const r = view.row;
   const seated = r.state.seats.some((x) => x && x.playerId === s.player!.id);
@@ -52,11 +52,11 @@ export default function App() {
     page = <EntryPage destination={path.startsWith('/join/') ? path : null} />;
   }
   else if (m?.[1] === 'join') page = <InvitePage code={m[2].toUpperCase()} go={go} />;
-  else if (m?.[1] === 'table') page = <TableRoute id={m[2]} go={go} />;
+  else if (m?.[1] === 'table') page = <TableRoute key={m[2]} id={m[2]} go={go} />;
   else if (m?.[1] === 'session') page = <SessionPage tableId={m[2]} go={go} />;
   else if (path === '/create') page = <CreatePage go={go} />;
   else if (path === '/profile') page = <ProfilePage go={go} />;
   else if (path === '/history') page = <HistoryPage go={go} />;
   else page = <LobbyPage go={go} />;
-  return <>{page}<UpdatePrompt /></>;
+  return <>{page}{!path.startsWith('/table/') && <UpdatePrompt />}</>;
 }

@@ -79,7 +79,7 @@ export function Hero(p: HeroProps) {
             <button type="button" className="raise" disabled={!myTurn || busy || !ready || !legal?.raise} onClick={() => setComposer(true)}>{legal?.raise?.isBet ? 'Bet' : 'Raise'}</button>
           </div>
           <div className="dock-note">{!ready && inHand ? '' : legal?.raiseClosed && myTurn ? legal.raiseClosed : legal?.raise && legal.allInTo === null && legal.raise.maxTo < legal.stack + legal.bet ? `Max ${fmt(legal.raise.maxTo)}` : ''}</div>
-          {canPropose && <div className="propose-row"><button type="button" disabled={busy || !ready} onClick={() => p.onPropose(1)}>Run once</button><button type="button" disabled={busy || !ready || !hand!.canRunTwice} onClick={() => p.onPropose(2)}>Two boards · keep betting</button></div>}
+          {canPropose && <div className="propose-row"><button type="button" disabled={busy || !ready} aria-label="Run out now, end betting if everyone agrees" onClick={() => p.onPropose(1)}>Run out now</button><button type="button" disabled={busy || !ready || !hand!.canRunTwice} onClick={() => p.onPropose(2)}>Two boards · keep betting</button></div>}
         </>
       ) : null}
       {composer && legal?.raise && <Composer legal={legal} hand={hand!} onClose={() => setComposer(false)} onSubmit={(to) => { setComposer(false); p.onAct('raise', to); }} />}

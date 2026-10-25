@@ -22,7 +22,7 @@ export function HistoryPage({ go }: { go: (to: string) => void }) {
   }, [s.transport, s.player]);
   return (
     <Page back="Lobby" onBack={() => go('/')}>
-      <div className="stack" style={{ gap: 8 }}><div className="eyebrow">Your history</div><h1>My evenings</h1></div>
+      <div className="stack" style={{ gap: 8 }}><div className="eyebrow">Your history</div><h1>History</h1></div>
       {rows === null ? <Spinner /> : rows.length === 0 ? <p className="lead">No evenings yet. Host a table or open an invite.</p> : (
         <div>
           {rows.map((r) => {

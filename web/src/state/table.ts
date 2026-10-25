@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PublicTable, Card, TableRules } from '@allin/engine/public';
+import { coalescedRefresh } from './refresh.ts';
 import { useSession } from './session.tsx';
 
 export interface TableRow { id: string; name: string; status: string; mode: string; config: TableRules; invite_code: string; host_id: string; version: number; state: PublicTable; archived_at: string | null; summary: unknown }
@@ -22,7 +23,7 @@ export interface TableView {
   own: OwnCards | null;
   error: string | null;
   loaded: boolean;
-  reload(): Promise<void>;
+  reload(scope?: 'game' | 'chat' | 'all'): Promise<void>;
   connected: boolean;
 }
 
@@ -41,10 +42,11 @@ export function useTable(tableId: string): TableView {
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [connected, setConnected] = useState(true);
+  const ownRef = useRef<OwnCards | null>(null);
   const versionRef = useRef(-1);
   const stateRef = useRef<PublicTable | null>(null);
 
-  const loadTable = useCallback(async () => {
+  const loadTable = useMemo(() => coalescedRefresh(async () => {
     try {
       let rows = await t.query<TableRow>('tables', { id: tableId });
       if (!rows.length) {
@@ -52,41 +54,52 @@ export function useTable(tableId: string): TableView {
         // everything on screen — an open sheet, a half-typed chat message — so confirm it with a second read first.
         await new Promise((res) => setTimeout(res, 900));
         rows = await t.query<TableRow>('tables', { id: tableId });
-        if (!rows.length) { setError('gone'); setLoaded(true); return; }
+        if (!rows.length) { setError('unavailable'); setConnected(false); setLoaded(true); return; }
       }
       const r = rows[0];
       // never regress to an older version (out-of-order delivery)
       if (r.version < versionRef.current) return;
       versionRef.current = r.version;
       stateRef.current = r.state;
-      setRow(r); setLoaded(true); setConnected(true);
-    } catch { setConnected(false); }
-  }, [t, tableId]);
-  const loadOwn = useCallback(async () => {
+      setRow(previous => previous?.version === r.version && previous.archived_at === r.archived_at ? previous : r);
+      setError(null); setLoaded(true); setConnected(true);
+    } catch { setConnected(false); setLoaded(true); }
+  }), [t, tableId]);
+  const loadOwn = useMemo(() => coalescedRefresh(async () => {
+    const currentHand = stateRef.current?.hand;
+    if (currentHand && ownRef.current?.handId === currentHand.id) return;
     try {
       const rows = await t.query<{ hand_id: string; cards: number[] }>('hole_cards', { table_id: tableId, user_id: s.player!.id });
-      setOwn(rows.length ? { handId: rows[0].hand_id, cards: rows[0].cards } : null);
+      ownRef.current = rows.length ? { handId: rows[0].hand_id, cards: rows[0].cards } : null;
+      setOwn(ownRef.current);
     } catch { /* keep last */ }
-  }, [t, tableId, s.player]);
-  const loadMembers = useCallback(async () => { try { setMembers(await t.query<MemberRow>('table_members', { table_id: tableId })); } catch { /* ignore */ } }, [t, tableId]);
-  const loadChat = useCallback(async () => { try { setChat((await t.query<ChatRow>('chat_messages', { table_id: tableId }, { order: 'id', asc: false, limit: 200 })).reverse()); } catch { /* keep the last successful chat */ } }, [t, tableId]);
-  const loadReactions = useCallback(async () => { try { setReactions(await t.query<ReactionRow>('chat_reactions', { table_id: tableId }, { order: 'id', asc: false, limit: 1000 })); } catch { /* ignore */ } }, [t, tableId]);
-  const loadReloads = useCallback(async () => { try { setReloads(await t.query<ReloadRow>('reload_requests', { table_id: tableId }, { order: 'requested_at' })); } catch { /* ignore */ } }, [t, tableId]);
-  const loadLedger = useCallback(async () => {
+  }), [t, tableId, s.player]);
+  const loadMembers = useMemo(() => coalescedRefresh(async () => { try { setMembers(await t.query<MemberRow>('table_members', { table_id: tableId })); } catch { /* ignore */ } }), [t, tableId]);
+  const loadChat = useMemo(() => coalescedRefresh(async () => { try { setChat((await t.query<ChatRow>('chat_messages', { table_id: tableId }, { order: 'id', asc: false, limit: 200 })).reverse()); } catch { /* keep the last successful chat */ } }), [t, tableId]);
+  const loadReactions = useMemo(() => coalescedRefresh(async () => { try { setReactions(await t.query<ReactionRow>('chat_reactions', { table_id: tableId }, { order: 'id', asc: false, limit: 1000 })); } catch { /* ignore */ } }), [t, tableId]);
+  const loadReloads = useMemo(() => coalescedRefresh(async () => { try { setReloads(await t.query<ReloadRow>('reload_requests', { table_id: tableId }, { order: 'requested_at' })); } catch { /* ignore */ } }), [t, tableId]);
+  const loadLedger = useMemo(() => coalescedRefresh(async () => {
     try { setLedger(await t.query<LedgerRow>('ledger', { table_id: tableId }, { order: 'id' })); setParticipants(await t.query<ParticipantRow>('session_participants', { table_id: tableId })); } catch { /* ignore */ }
-  }, [t, tableId]);
-  const reload = useCallback(async () => { await Promise.all([loadTable(), loadOwn(), loadMembers(), loadChat(), loadReactions(), loadReloads(), loadLedger()]); }, [loadTable, loadOwn, loadMembers, loadChat, loadReactions, loadReloads, loadLedger]);
+  }), [t, tableId]);
+  const reload = useCallback(async (scope: 'game' | 'chat' | 'all' = 'all') => {
+    if (scope === 'chat') { await Promise.all([loadChat(), loadReactions()]); return; }
+    await loadTable();
+    await loadOwn();
+    if (scope === 'all') await Promise.all([loadMembers(), loadChat(), loadReactions(), loadReloads(), loadLedger()]);
+  }, [loadTable, loadOwn, loadMembers, loadChat, loadReactions, loadReloads, loadLedger]);
 
   useEffect(() => {
     versionRef.current = -1;
     void reload();
     const subs = [
-      t.subscribe('tables', tableId, () => { void loadTable(); void loadLedger(); }),
-      t.subscribe('hole_cards', tableId, loadOwn),
-      t.subscribe('chat_messages', tableId, () => { void loadChat(); void loadReactions(); }),
+      t.subscribe('tables', tableId, () => { void reload('game'); }, { pollMs: 0 }),
+      t.subscribe('ledger', tableId, loadLedger, { pollMs: 15000 }),
+      t.subscribe('session_participants', tableId, loadLedger, { pollMs: 0 }),
+      t.subscribe('hole_cards', tableId, loadOwn, { pollMs: 0 }),
+      t.subscribe('chat_messages', tableId, loadChat),
       t.subscribe('chat_reactions', tableId, loadReactions),
       t.subscribe('reload_requests', tableId, loadReloads),
-      t.subscribe('table_members', tableId, loadMembers),
+      t.subscribe('table_members', tableId, loadMembers, { pollMs: 10000 }),
     ];
     // Adaptive poll: realtime postgres_changes are not guaranteed on every network/host, and the game has windows
     // shorter than any safe fixed poll (4 s dealer's choice, 3 s reveal). Poll fast while a short window or the local
@@ -109,12 +122,13 @@ export function useTable(tableId: string): TableView {
     };
     const pollLoop = () => {
       if (disposed) return;
-      pollTimer = setTimeout(async () => { await Promise.all([loadTable(), loadOwn()]); pollLoop(); }, pollInterval());
+      pollTimer = setTimeout(async () => { if (document.visibilityState === 'visible' && navigator.onLine) await reload('game'); pollLoop(); }, pollInterval());
     };
     pollLoop();
-    const hb = setInterval(() => { void t.heartbeat(tableId); }, 10_000);
-    void t.heartbeat(tableId);
-    const vis = () => { if (document.visibilityState === 'visible') { void reload(); void t.heartbeat(tableId); } };
+    const heartbeat = coalescedRefresh(async () => { if (document.visibilityState === 'visible' && navigator.onLine) await t.heartbeat(tableId); });
+    const hb = setInterval(() => { void heartbeat(); }, 10_000);
+    void heartbeat();
+    const vis = () => { if (document.visibilityState === 'visible') { void reload(); void heartbeat(); } };
     document.addEventListener('visibilitychange', vis);
     window.addEventListener('online', vis);
     window.addEventListener('focus', vis);

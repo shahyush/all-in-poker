@@ -68,7 +68,7 @@ export function Centre({ awardReady = true, t, hand, now, mySeat, busy, chosen, 
       {!res && <div className="board-label">{hand.street === 'preflop' && hand.board.length === 0 ? 'Pre-flop' : hand.street}</div>}
       {hand.phase === 'vote' && hand.vote && (
         <div className="centre-card" role="group" aria-label="Runout proposal">
-          <div className="row" style={{ justifyContent: 'space-between' }}><b>{hand.vote.runs === 2 ? 'Play two boards?' : 'Run the board?'}</b><span>{timeLeft(hand.vote.deadline, now)}s</span></div>
+          <div className="row" style={{ justifyContent: 'space-between' }}><b>{hand.vote.runs === 2 ? 'Play two boards?' : 'End betting and run out?'}</b><span>{timeLeft(hand.vote.deadline, now)}s</span></div>
           <div className="centre-copy">{hand.vote.runs === 2 ? 'Betting continues. Each board wins half the pot.' : 'Betting ends if everyone agrees.'}</div>
           {hand.vote.electorate.includes(mySeat) && !hand.vote.answered.includes(mySeat) ? (
             <div className="row" style={{ justifyContent: 'center' }}>

@@ -84,7 +84,7 @@ test('reconnect, rotation, uncontested reveal, reload approval and run it twice'
   // hand 2 is mid-orbit (dealer's choice runs once per orbit), so no new variant is offered here — it continues the orbit
   // reload: guest requests, host approves; credited at the next boundary only
   await g.page.getByRole('button', { name: 'Table menu' }).click();
-  await g.page.getByRole('button', { name: 'Reload chips' }).click();
+  await g.page.getByRole('button', { name: 'Add chips' }).click();
   await g.page.getByRole('button', { name: '1,000', exact: true }).click();
   await g.page.getByRole('button', { name: /^Request/ }).click();
   await g.page.getByRole('button', { name: 'Table menu' }).click();
@@ -137,12 +137,12 @@ test('leave after a hand: the session summary, history and player recovery', asy
   for (let i = 0; i < 40; i++) { if (await h.page.getByText(/Pot detail|Showdown/).first().isVisible().catch(() => false)) break; if (!(await actCurrentTurn(pages))) break; }
   // guest leaves after the hand
   await g.page.getByRole('button', { name: 'Table menu' }).click();
-  await g.page.getByRole('button', { name: 'Leave after this hand' }).click();
+  await g.page.getByRole('button', { name: 'Leave table' }).click();
   await g.page.getByRole('button', { name: 'Confirm' }).click();
   // the leave command must reach the server (the menu then offers to undo it, or the summary already shows)
   await expect
     .poll(async () =>
-      (await g.page.getByRole('button', { name: 'Stay after all' }).isVisible().catch(() => false)) ||
+      (await g.page.getByRole('button', { name: 'Stay', exact: true }).isVisible().catch(() => false)) ||
       (await g.page.getByRole('heading', { name: 'Two of us' }).isVisible().catch(() => false)),
     { timeout: 25_000 })
     .toBe(true);
@@ -167,7 +167,7 @@ test('leave after a hand: the session summary, history and player recovery', asy
   await expect(g.page.getByRole('heading', { name: 'Aayush' })).toBeVisible();
   await g.page.goto('/');
   await expect(g.page.getByText('Good to see you, Aayush')).toBeVisible();
-  await g.page.getByRole('button', { name: 'My evenings' }).click();
+  await g.page.getByRole('button', { name: 'History' }).click();
   await expect(g.page.getByRole('button', { name: /Two of us/ })).toBeVisible();
 });
 

@@ -13,24 +13,28 @@ export function InvitePage({ code, go }: { code: string; go: (to: string, replac
   const [err, setErr] = useState<string | null>(null);
   const [mult, setMult] = useState('1');
   const [busy, setBusy] = useState(false);
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
+    let cancelled = false;
+    setErr(null); setP(null);
     // A cold edge boot can fail the first preview with a transient server error; retry once before showing a dead end.
     const load = () => s.transport.cmd<Preview>('preview', { code });
-    load().catch(() => new Promise((res) => setTimeout(res, 1500)).then(load))
-      .then((r) => { setP(r); if (r.isMember) go('/table/' + r.tableId, true); })
-      .catch((e) => setErr(e instanceof TransportError ? e.message : 'Could not load this invite'));
-  }, [code, s.transport, go]);
+    load().catch(() => new Promise((res) => setTimeout(res, 1500)).then(() => { if (cancelled) throw new Error('Cancelled'); return load(); }))
+      .then((r) => { if (cancelled) return; setP(r); if (r.isMember) go('/table/' + r.tableId, true); })
+      .catch((e) => { if (!cancelled) setErr(e instanceof TransportError ? e.message : 'Could not load this invite'); });
+    return () => { cancelled = true; };
+  }, [code, s.transport, go, retry]);
   const unit = p?.rules.unit ?? 0;
   const m = parseChipAmount(mult);
   const total = m && m > 0 ? m * unit : null;
   const options = useMemo(() => [1, 2, 3, 5].map((k) => ({ k, label: fmt(k * unit) })), [unit]);
   async function join() {
-    if (!p) return;
+    if (!p || busy) return;
     setBusy(true); setErr(null);
     try { const r = await s.transport.cmd<{ tableId: string }>('join', { code, amount: total != null ? String(total) : '0' }); go('/table/' + r.tableId, true); }
     catch (e) { setErr(e instanceof TransportError ? e.message : 'Could not join'); setBusy(false); }
   }
-  if (err && !p) return <Page back="Lobby" onBack={() => go('/')}><h1>That invite will not open.</h1><p className="lead">{err}</p><button className="btn btn-secondary" type="button" onClick={() => go('/')}>Back to the lobby</button></Page>;
+  if (err && !p) return <Page back="Lobby" onBack={() => go('/')}><h1>Could not open the invite.</h1><p className="lead">{err}</p><button className="btn btn-primary" type="button" onClick={() => setRetry(n => n + 1)}>Try again</button><button className="btn btn-secondary" type="button" onClick={() => go('/')}>Back to the lobby</button></Page>;
   if (!p) return <Page><Spinner label="Opening your invite" /></Page>;
   const closed = p.status !== 'waiting' && p.status !== 'running';
   const started = p.mode === 'tournament' && p.status === 'running';

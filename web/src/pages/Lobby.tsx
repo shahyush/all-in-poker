@@ -54,13 +54,13 @@ export function LobbyPage({ go }: { go: (to: string) => void }) {
       {loadError && <div className="notice" role="alert">Could not check your current table. <button className="btn btn-quiet" onClick={() => setRetry(n => n + 1)}>Try again</button></div>}
       <div className="grid2">
         <button type="button" className="btn btn-secondary" onClick={() => go('/create')} disabled={loadError || tables === null}>Host a table</button>
-        <button type="button" className="btn btn-secondary" onClick={() => go('/history')}>My evenings</button>
+        <button type="button" className="btn btn-secondary" onClick={() => go('/history')}>History</button>
       </div>
       <form className="card-box" onSubmit={joinByCode}>
         <Field label="Join with an invite code" value={code} onChange={setCode} placeholder="e.g. K7PX2M9Q" autoComplete="off" error={error} />
         <button className="btn btn-secondary" type="submit" disabled={checking || loadError || tables === null} aria-busy={checking}>{checking ? 'Checking invite…' : 'See the table'}</button>
       </form>
-      <button type="button" className="btn btn-quiet" style={{ alignSelf: 'flex-start' }} onClick={() => go('/profile')}>Your player</button>
+      <button type="button" className="btn btn-quiet" style={{ alignSelf: 'flex-start' }} onClick={() => go('/profile')}>Profile</button>
     </Page>
   );
 }

@@ -175,6 +175,8 @@ export interface TableState {
   events: PublicEvent[];             // recent public events (bounded)
   error: string | null;              // invariant failure halts the table
   lastActivityAt: number;
+  closeRequested?: boolean; // Host closes after the current hand is settled.
+  lastPresenceAt?: number; // Optional for previously persisted tables
 }
 
 export type PublicEvent = { seq: number; handId: string | null; at: number } & (

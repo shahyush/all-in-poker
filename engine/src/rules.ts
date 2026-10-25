@@ -19,13 +19,13 @@ export const RULES = {
     voluntaryVoteMs: 8000,
     forcedOfferMs: 5000,
     revealMs: 10000,
-    showdownMs: 8000,
+    showdownMs: 6000,
     awardToNextChoiceMs: 3000,
     // There is deliberately no cap on the deal presentation: actionReadyAt waits the full dealTiming() for the cards
     // actually dealt (it scales with players × hole cards), and the betting clock starts only after it.
-    boardStageMs: 2200,
+    boardStageMs: 1700,
     hostGraceMs: 30000,
-    abandonmentMs: 30 * 60 * 1000,
+    abandonmentMs: 3 * 60 * 1000,
     nobodyPresentHoldMs: 45000,
   },
   cash: { consecutiveTimeoutsToSitOut: 2 },
