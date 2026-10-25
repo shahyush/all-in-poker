@@ -86,6 +86,19 @@ test('table chat and reactions across two separate player sessions', async ({ br
   await expect(bodies(g.page).nth(0)).toContainText('first up ♠️');
   await expect(g.page.locator('.chat-msg').nth(2).locator('.react-chip .react-n')).toHaveText('1', { timeout: 20_000 });
 
+  // A rejected reaction must explain the failure without pretending it was saved or blocking a retry.
+  await g.page.route('**/cmd', async route => {
+    if (route.request().postDataJSON()?.type === 'react') await route.abort('failed');
+    else await route.continue();
+  });
+  const restored = g.page.locator('.chat-msg').nth(2);
+  await restored.getByRole('button', {name:/👍/}).click();
+  await expect(g.page.getByRole('dialog').getByRole('alert')).toBeVisible();
+  await expect(restored.locator('.react-n')).toHaveText('1');
+  await g.page.unroute('**/cmd');
+  await restored.getByRole('button', {name:/👍/}).click();
+  await expect(hLast.locator('.react-n')).toHaveText('2');
+
   // keyboard room: focusing the input must keep it and Send within the viewport (not covered by chrome)
   const input = g.page.getByLabel('Message');
   await input.focus();

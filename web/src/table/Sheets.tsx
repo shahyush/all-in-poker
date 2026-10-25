@@ -14,7 +14,7 @@ import { ordinal } from './Seat.tsx';
 
 const common = { turnCue: undefined as string | null | undefined };
 
-export function ChatSheet({ chat, reactions, names, myId, onSend, onReact, onClose, turnCue, onReturn, draft, setDraft }: { chat: ChatRow[]; reactions: ReactionRow[]; names: Map<string, string>; myId: string; onSend: (body: string) => Promise<void>; onReact: (messageId: number, emoji: string, op: 'add' | 'remove') => void; onClose: () => void; turnCue: string | null; onReturn: () => void; draft: string; setDraft: (s: string) => void }) {
+export function ChatSheet({ chat, reactions, names, myId, onSend, onReact, onClose, turnCue, onReturn, draft, setDraft }: { chat: ChatRow[]; reactions: ReactionRow[]; names: Map<string, string>; myId: string; onSend: (body: string) => Promise<void>; onReact: (messageId: number, emoji: string, op: 'add' | 'remove') => Promise<void>; onClose: () => void; turnCue: string | null; onReturn: () => void; draft: string; setDraft: (s: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -53,6 +53,11 @@ export function ChatSheet({ chat, reactions, names, myId, onSend, onReact, onClo
       write(newer && newer !== body ? `${body}\n${newer}` : body);
     } finally { setBusy(false); }
   }
+  async function react(messageId: number, emoji: string, op: 'add' | 'remove') {
+    setErr(null);
+    try { await onReact(messageId, emoji, op); }
+    catch (e) { setErr(e instanceof Error ? e.message : 'Could not add the reaction. Try again.'); }
+  }
   function addEmoji(e: string) { write(draftRef.current + e); inputRef.current?.focus(); }
   return (
     <Sheet title="Table chat" onClose={onClose} turnCue={turnCue} onReturn={onReturn}>
@@ -69,14 +74,14 @@ export function ChatSheet({ chat, reactions, names, myId, onSend, onReact, onClo
                 {groups.map(([emoji, g]) => (
                   <button key={emoji} type="button" className={`react-chip ${g.mine ? 'mine' : ''}`} aria-pressed={g.mine}
                     aria-label={`${emoji}, ${g.count}, from ${g.names.join(', ')}. Tap to ${g.mine ? 'remove your' : 'add your'} reaction`} title={g.names.join(', ')}
-                    onClick={() => onReact(m.id, emoji, g.mine ? 'remove' : 'add')}><span aria-hidden="true">{emoji}</span><span className="react-n">{g.count}</span></button>
+                    onClick={() => void react(m.id, emoji, g.mine ? 'remove' : 'add')}><span aria-hidden="true">{emoji}</span><span className="react-n">{g.count}</span></button>
                 ))}
                 <button type="button" className="react-add" aria-label="Add a reaction" aria-expanded={reactFor === m.id} onClick={() => setReactFor(reactFor === m.id ? null : m.id)}>☺＋</button>
               </div>
               {groups.length > 0 && <div className="react-who fine">{groups.map(([emoji, g]) => `${emoji} ${g.names.join(', ')}`).join('   ')}</div>}
               {reactFor === m.id && (
                 <div className="react-grid" role="group" aria-label="Choose a reaction">
-                  {REACTIONS.map((e) => { const mineE = !!byMessage.get(m.id)?.get(e)?.mine; return <button key={e} type="button" className={mineE ? 'on' : undefined} aria-pressed={mineE} onClick={() => { onReact(m.id, e, mineE ? 'remove' : 'add'); setReactFor(null); }}>{e}</button>; })}
+                  {REACTIONS.map((e) => { const mineE = !!byMessage.get(m.id)?.get(e)?.mine; return <button key={e} type="button" className={mineE ? 'on' : undefined} aria-pressed={mineE} onClick={() => { void react(m.id, e, mineE ? 'remove' : 'add'); setReactFor(null); }}>{e}</button>; })}
                 </div>
               )}
             </div>

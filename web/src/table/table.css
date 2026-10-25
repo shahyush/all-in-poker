@@ -89,8 +89,8 @@
 .pc.flip { animation: flip 360ms cubic-bezier(.2,.75,.25,1) both; transform-origin: center; }
 @keyframes flip { 0% { transform: rotateY(92deg) scale(.9); opacity: 0; } 55% { opacity: 1; } 70% { transform: rotateY(0) scale(1.06); } 100% { transform: none; opacity: 1; } }
 /* tap feedback: every interactive control gives an immediate press response */
-.btn-game, .dock button, .choice-grid button, .hand-label, .g-icon, .reveal-row button, .propose-row button, .seat-cards button { transition: transform 90ms ease, filter 90ms ease; }
-.btn-game:active:not(:disabled), .dock button:active:not(:disabled), .choice-grid button:active:not(:disabled), .hand-label:active, .g-icon:active, .reveal-row button:active:not(:disabled), .propose-row button:active:not(:disabled) { transform: scale(.96); filter: brightness(.9); }
+.btn-game, .dock button, .choice-grid button, .hand-label, .g-icon, .reveal-row button, .propose-row button, .seat-cards button { transition: transform 180ms cubic-bezier(.2,.75,.25,1), filter 180ms ease, background-color 180ms ease; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.btn-game:active:not(:disabled), .dock button:active:not(:disabled), .choice-grid button:active:not(:disabled), .hand-label:active, .g-icon:active, .reveal-row button:active:not(:disabled), .propose-row button:active:not(:disabled) { transform: scale(.985); filter: brightness(.96); }
 /* win + all-in emphasis */
 .seat.is-winner .seat-core { box-shadow: 0 0 0 2px var(--accent-table), 0 0 22px color-mix(in srgb, var(--accent-table) 55%, transparent); animation: winpulse 900ms ease-out 2; }
 @keyframes winpulse { 0%,100% { box-shadow: 0 0 0 2px var(--accent-table), 0 0 14px color-mix(in srgb,var(--accent-table) 35%, transparent); } 50% { box-shadow: 0 0 0 3px var(--accent-table), 0 0 30px color-mix(in srgb,var(--accent-table) 70%, transparent); } }
