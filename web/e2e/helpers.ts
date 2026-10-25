@@ -33,16 +33,15 @@ const playerNames = new WeakMap<Page, string>();
 /** Close every context, first saving each recording as <player>.webm in the test's output directory (hosted runs). */
 export async function closePlayers(browser: Browser, outputDir: string): Promise<void> {
   let k = 0;
-  for (const c of browser.contexts()) {
-    for (const pg of c.pages()) {
-      const v = pg.video(); if (!v) continue;
-      const name = (playerNames.get(pg) ?? `page-${++k}`).replace(/[^\w.-]+/g, '_');
-      await c.close().catch(() => undefined);           // finalises the file
-      await v.saveAs(`${outputDir}/${name}.webm`).catch(() => undefined);
-      await v.delete().catch(() => undefined);
-    }
+  await Promise.all(browser.contexts().map(async c => {
+    const videos = c.pages().map(pg => ({ video: pg.video(), name: (playerNames.get(pg) ?? `page-${++k}`).replace(/[^\w.-]+/g, '_') }));
     await c.close().catch(() => undefined);
-  }
+    await Promise.all(videos.map(async ({video, name}) => {
+      if (!video) return;
+      await video.saveAs(`${outputDir}/${name}.webm`).catch(() => undefined);
+      await video.delete().catch(() => undefined);
+    }));
+  }));
 }
 
 export async function player(browser: Browser, name: string, opts: { landscape?: boolean; reducedMotion?: boolean; record?: boolean } = {}): Promise<{ ctx: BrowserContext; page: Page }> {
