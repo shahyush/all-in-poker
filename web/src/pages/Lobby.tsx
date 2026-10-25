@@ -37,29 +37,28 @@ export function LobbyPage({ go }: { go: (to: string) => void }) {
     catch (err) { setError(err instanceof TransportError ? err.message : 'Could not check that code'); }
     finally { setChecking(false); }
   }
-  const active = tables?.[0];
+  const active = !!tables?.length;
   return (
     <Page>
       <div className="stack" style={{ gap: 8 }}>
         <div className="eyebrow">Good to see you, {s.player!.name}</div>
-        <h1>{active ? 'Your seat is live.' : 'Shall we deal you in?'}</h1>
+        <h1>{active ? 'Your tables.' : 'Shall we deal you in?'}</h1>
       </div>
-      {tables === null ? <Spinner /> : active ? (
-        <button type="button" className="btn btn-primary" style={{ flexDirection: 'column', alignItems: 'flex-start', padding: 16, minHeight: 0, gap: 4 }} onClick={() => go('/table/' + active.id)}>
-          <span className="eyebrow" style={{ color: 'inherit', opacity: 0.85 }}>{active.status === 'waiting' ? 'Waiting room' : 'In play'}</span>
-          <span style={{ fontFamily: 'var(--display)', fontSize: 22, fontWeight: 400 }}>{active.name}</span>
-          <span style={{ fontSize: 14, fontWeight: 500 }}>{rulesSummary(active.config).slice(0, 2).join(' · ')} · {active.state.seats.filter(Boolean).length} seated</span>
+      {tables === null ? <Spinner /> : tables.map(table => (
+        <button key={table.id} type="button" className="btn btn-primary" style={{ flexDirection: 'column', alignItems: 'flex-start', padding: 16, minHeight: 0, gap: 4 }} onClick={() => go('/table/' + table.id)}>
+          <span className="eyebrow" style={{ color: 'inherit', opacity: 0.85 }}>{table.status === 'waiting' ? 'Waiting room' : 'In play'}</span>
+          <span style={{ fontFamily: 'var(--display)', fontSize: 22, fontWeight: 400 }}>{table.name}</span>
+          <span style={{ fontSize: 14, fontWeight: 500 }}>{rulesSummary(table.config).slice(0, 2).join(' · ')} · {table.state.seats.filter(Boolean).length} seated</span>
         </button>
-      ) : null}
+      ))}
       {loadError && <div className="notice" role="alert">Could not check your current table. <button className="btn btn-quiet" onClick={() => setRetry(n => n + 1)}>Try again</button></div>}
       <div className="grid2">
-        <button type="button" className="btn btn-secondary" onClick={() => go('/create')} disabled={!!active || loadError || tables === null}>Host a table</button>
+        <button type="button" className="btn btn-secondary" onClick={() => go('/create')} disabled={loadError || tables === null}>Host a table</button>
         <button type="button" className="btn btn-secondary" onClick={() => go('/history')}>My evenings</button>
       </div>
       <form className="card-box" onSubmit={joinByCode}>
         <Field label="Join with an invite code" value={code} onChange={setCode} placeholder="e.g. K7PX2M9Q" autoComplete="off" error={error} />
-        <button className="btn btn-secondary" type="submit" disabled={!!active || checking || loadError || tables === null} aria-busy={checking}>{checking ? 'Checking invite…' : 'See the table'}</button>
-        {active && <p className="fine">Leave your current table before joining another.</p>}
+        <button className="btn btn-secondary" type="submit" disabled={checking || loadError || tables === null} aria-busy={checking}>{checking ? 'Checking invite…' : 'See the table'}</button>
       </form>
       <button type="button" className="btn btn-quiet" style={{ alignSelf: 'flex-start' }} onClick={() => go('/profile')}>Your player</button>
     </Page>

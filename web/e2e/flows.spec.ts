@@ -61,3 +61,23 @@ for(const [width,height] of [[320,568],[390,844],[667,375]]) test(`host flow use
   expect(submitted.payload.rules.levels).toEqual([{sb:'10',bb:'20',ante:'',minutes:'15'}]);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+test('lobby lists all memberships and permits another host or join', async ({page})=>{
+  await page.route('http://127.0.0.1:8787/**',async route=>{
+    const url=route.request().url(), headers={'access-control-allow-origin':'*','access-control-allow-headers':'content-type,authorization'};
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+    let body:any;
+    if(url.endsWith('/dev/signin'))body={token:'dev:review',authUid:'review'};
+    else if(url.endsWith('/dev/now'))body={now:Date.now()};
+    else if(url.endsWith('/dev/query')) {
+      const q=route.request().postDataJSON();
+      body=q.table==='table_members'?[{table_id:'one'},{table_id:'two'}]:q.table==='tables'?['one','two'].map(id=>({id,name:'Table '+id,status:'running',mode:'cash',archived_at:null,config:{mode:'cash',sb:5,bb:10,unit:1000,seats:6},state:{seats:[{}]}})):[];
+    } else body={ok:true,result:{player:{id:'review',name:'teens',isOwner:true}}};
+    await route.fulfill({json:body,headers});
+  });
+  await page.goto('/');
+  await expect(page.getByRole('button',{name:/Table one/})).toBeVisible();
+  await expect(page.getByRole('button',{name:/Table two/})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Host a table'})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'See the table'})).toBeEnabled();
+});

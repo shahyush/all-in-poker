@@ -175,8 +175,6 @@ export class Handlers {
       sb: int(raw.sb), bb: int(raw.bb), ante: raw.ante === undefined || raw.ante === '' ? 0 : int(raw.ante), straddle: !!raw.straddle, unit: int(raw.unit),
       levels: Array.isArray(raw.levels) ? (raw.levels as Record<string, unknown>[]).map((L) => ({ sb: int(L.sb), bb: int(L.bb), ante: L.ante === undefined || L.ante === '' ? 0 : int(L.ante), minutes: int(L.minutes) })) : [],
     });
-    const active = await this.db.select<{ table_id: string }>('table_members', { user_id: player.id, status: 'active' });
-    if (active.length) bad(409, 'already_seated', 'You are already at a table. Leave it before hosting another.');
     const buyIn = rules.mode === 'tournament' ? rules.unit : parseChipAmount(p.buyIn);
     if (buyIn === null || buyIn <= 0 || buyIn % rules.unit !== 0) bad(400, 'bad_buyin', `Buy-in must be a positive multiple of ${rules.unit}`);
     const now = Number(await this.db.rpc<number>('allin_now', {}));
@@ -219,7 +217,6 @@ export class Handlers {
     const tableId = rows[0].id;
     const active = await this.db.select<{ table_id: string }>('table_members', { user_id: player.id, status: 'active' });
     if (active.some((a) => a.table_id === tableId)) return { result: { tableId, already: true } };
-    if (active.length) bad(409, 'already_seated', 'You are seated at another table. Leave it first.');
     const amount = parseChipAmount(p.amount);
     const r = await this.withTable(tableId, receipt, (L) => {
       const unit = L.t.rules.unit;
