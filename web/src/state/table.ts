@@ -69,8 +69,8 @@ export function useTable(tableId: string): TableView {
     } catch { /* keep last */ }
   }, [t, tableId, s.player]);
   const loadMembers = useCallback(async () => { try { setMembers(await t.query<MemberRow>('table_members', { table_id: tableId })); } catch { /* ignore */ } }, [t, tableId]);
-  const loadChat = useCallback(async () => { try { setChat(await t.query<ChatRow>('chat_messages', { table_id: tableId }, { order: 'id', limit: 200 })); } catch { /* ignore */ } }, [t, tableId]);
-  const loadReactions = useCallback(async () => { try { setReactions(await t.query<ReactionRow>('chat_reactions', { table_id: tableId }, { order: 'id', limit: 1000 })); } catch { /* ignore */ } }, [t, tableId]);
+  const loadChat = useCallback(async () => { try { setChat((await t.query<ChatRow>('chat_messages', { table_id: tableId }, { order: 'id', asc: false, limit: 200 })).reverse()); } catch { /* keep the last successful chat */ } }, [t, tableId]);
+  const loadReactions = useCallback(async () => { try { setReactions(await t.query<ReactionRow>('chat_reactions', { table_id: tableId }, { order: 'id', asc: false, limit: 1000 })); } catch { /* ignore */ } }, [t, tableId]);
   const loadReloads = useCallback(async () => { try { setReloads(await t.query<ReloadRow>('reload_requests', { table_id: tableId }, { order: 'requested_at' })); } catch { /* ignore */ } }, [t, tableId]);
   const loadLedger = useCallback(async () => {
     try { setLedger(await t.query<LedgerRow>('ledger', { table_id: tableId }, { order: 'id' })); setParticipants(await t.query<ParticipantRow>('session_participants', { table_id: tableId })); } catch { /* ignore */ }
