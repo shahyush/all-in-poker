@@ -12,6 +12,7 @@ export function WaitingPage({ view, go }: { view: TableView; go: (to: string) =>
   const row = view.row!; const st = row.state;
   const me = s.player!;
   const isHost = st.hostPlayerId === me.id;
+  const watching = !st.seats.some(seat => seat?.playerId === me.id);
   const seated = st.seats.map((x, i) => ({ x, i })).filter((q) => q.x);
   const funded = seated.filter((q) => q.x!.stack > 0).length;
   const canStart = funded >= 2;
@@ -41,7 +42,7 @@ export function WaitingPage({ view, go }: { view: TableView; go: (to: string) =>
       <div className="stack" style={{ gap: 8 }}>
         <div className="eyebrow">{row.mode === 'cash' ? 'Cash table · play chips' : 'Last player standing'}</div>
         <h1>{row.name}</h1>
-        <p className="lead">{canStart ? (isHost ? 'Everyone here is ready when you are.' : `${hostName} starts the game. Your seat and chips are saved.`) : 'Waiting for one more player.'}</p>
+        <p className="lead">{watching ? 'Watching. Take an open seat when you’re ready.' : canStart ? (isHost ? 'Everyone here is ready when you are.' : `${hostName} starts the game. Your seat and chips are saved.`) : 'Waiting for one more player.'}</p>
       </div>
       <div>
         {seated.map(({ x, i }) => (
@@ -76,7 +77,7 @@ export function WaitingPage({ view, go }: { view: TableView; go: (to: string) =>
       {confirmLeave && (
         <Sheet title="Leave table?" onClose={() => setConfirmLeave(false)}>
           {err && <div className="error" role="alert">{err}</div>}
-          <p className="lead">Your buy-in comes back to you as chips taken off. {isHost && seated.length > 1 ? 'Hosting passes to the next player.' : ''}</p>
+          <p className="lead">{watching ? 'Stop watching this table?' : 'Your buy-in comes back to you as chips taken off.'} {isHost && seated.length > 1 ? 'Hosting passes to the next player.' : ''}</p>
           <button type="button" className="btn btn-danger" disabled={busy} onClick={async () => { if (await run('leave')) { setConfirmLeave(false); go('/'); } }}>Leave</button>
           <button type="button" className="btn btn-secondary" onClick={() => setConfirmLeave(false)}>Stay</button>
         </Sheet>
