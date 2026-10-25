@@ -34,7 +34,7 @@ async function pickAndExpect(pages: Page[], label: string): Promise<void> {
   // the click round-trip). We do NOT wait on "Locked in" as a stable state: on a fast accept the server deals at once and
   // the choice overlay is replaced by the dealt hand, so that label is transient. The real confirmation is below — every
   // client ends up on the chosen variant; a dropped or defaulted choice would read "Hold'em" and fail there.
-  await expect(chooser!.getByText(/Submitting|Locked in/).first()).toBeVisible({ timeout: 4_000 });
+  await expect(chooser!.getByText(/Submitting|Locked in/).first().or(chooser!.locator('.g-stakes').filter({hasText:label})).first()).toBeVisible({ timeout: 4_000 });
   for (const p of pages) await expect(p.locator('.g-stakes')).toContainText(label, { timeout: 20_000 });
 }
 

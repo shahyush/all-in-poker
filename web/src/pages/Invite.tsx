@@ -39,11 +39,11 @@ export function InvitePage({ code, go }: { code: string; go: (to: string, replac
       <div className="stack" style={{ gap: 8 }}>
         <div className="eyebrow">You're invited</div>
         <h1>{p.name}</h1>
-        <p className="lead">{p.host} is hosting. {p.mode === 'cash' ? 'Pull up a seat.' : 'A freezeout tournament.'}</p>
+        <p className="lead">{p.host} is hosting. {p.mode === 'cash' ? 'Pull up a seat.' : 'One bank each. Last player with chips wins.'}</p>
       </div>
-      <KV rows={[['Format', p.mode === 'cash' ? 'Cash · play chips' : 'Tournament · freezeout'], ...rulesRows(p.rules), ['Seats open', `${p.open} of ${p.seats}`]]} />
+      <KV rows={[['Format', p.mode === 'cash' ? 'Cash · play chips' : 'Last player standing'], ...rulesRows(p.rules), ['Seats open', `${p.open} of ${p.seats}`]]} />
       {closed ? <div className="notice">This table has ended. Nothing was charged.</div>
-        : started ? <div className="notice">This tournament has already started, so registration is closed.</div>
+        : started ? <div className="notice">This game has started. New entries are closed.</div>
         : p.open <= 0 ? <div className="notice">The table is full. Ask {p.host} to tell you when a seat opens; nothing has been charged.</div>
         : (
           <div className="stack">
@@ -55,7 +55,7 @@ export function InvitePage({ code, go }: { code: string; go: (to: string, replac
               </>
             )}
             {err && <div className="error" role="alert">{err}{busy ? '' : <> · <button type="button" className="btn-quiet" style={{ minHeight: 'auto', padding: 0 }} onClick={join}>Try again</button></>}</div>}
-            <button type="button" className="btn btn-primary" disabled={busy || (p.mode === 'cash' && !total)} onClick={join} aria-busy={busy}>{busy ? 'Joining…' : p.mode === 'cash' ? `Join table · buy-in ${fmt(total ?? 0)}` : `Join tournament · ${fmt(unit)} chips`}</button>
+            <button type="button" className="btn btn-primary" disabled={busy || (p.mode === 'cash' && !total)} onClick={join} aria-busy={busy}>{busy ? 'Joining…' : p.mode === 'cash' ? `Join table · buy-in ${fmt(total ?? 0)}` : `Join game · ${fmt(unit)} chips`}</button>
             {busy && <p className="fine" role="status" aria-live="polite">Taking your seat… the table may be waking up, this can take a few seconds.</p>}
             <p className="fine">Play chips only. Joining takes a seat and records your buy-in once against your player.</p>
           </div>

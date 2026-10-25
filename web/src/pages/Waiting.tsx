@@ -38,7 +38,7 @@ export function WaitingPage({ view, go }: { view: TableView; go: (to: string) =>
   return (
     <Page back="Lobby" onBack={() => go('/')}>
       <div className="stack" style={{ gap: 8 }}>
-        <div className="eyebrow">{row.mode === 'cash' ? 'Cash table · play chips' : 'Tournament · freezeout'}</div>
+        <div className="eyebrow">{row.mode === 'cash' ? 'Cash table · play chips' : 'Last player standing'}</div>
         <h1>{row.name}</h1>
         <p className="lead">{canStart ? (isHost ? 'Everyone here is ready when you are.' : `${hostName} starts the game. Your seat and chips are saved.`) : 'Waiting for one more player.'}</p>
       </div>

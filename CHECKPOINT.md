@@ -1,15 +1,23 @@
-# CHECKPOINT — 2026-10-23
+# CHECKPOINT — 2026-10-25
 
-Branch `main` on github.com/shahyush/all-in-poker (private). Read `CLAUDE.md` for the rules and `docs/handoff/` for the contract.
+Branch `main` on github.com/shahyush/all-in-poker . Read `CLAUDE.md` for the rules and `docs/handoff/` for the contract.
 This file separates **implemented** (code merged, local tests green), **deployed** (live on the hosted app) and **verified**
 (passed against the deployed app, or seen in its recordings). Nothing is called done on the strength of a push alone.
+
+## October 25 update
+
+Frontend main `5ec0de5` deployed successfully (Cloudflare version `0963a91f-68ac-47bb-b1fc-57c717a9cf2a`); Chromium and WebKit live sign-in smoke passed. Full hosted gameplay verification remains pending. Backend api v20 is active, deploying `static.ts` with the committed bundle directly (SHA `54929c91a8450083563c5c5b1cde0c32336b999e02d40e367fb05d0d2db9befa`), avoiding the asset-store cold-boot dependency.
+
+This change replaces the new-game Tournament UI with **Last player standing**: equal starting bank, one entry, no rebuys, fixed blinds, final player with chips wins. Existing tournament records keep their original rules. The internal mode remains compatible with the existing elimination engine. Creation is checked at 320px, 390px and landscape widths, including the submitted rules. End-to-end winner coverage is updated; deployment verification follows the push. No historical ledger records are modified.
+
+The previous Chromium functional run passed 10/11 (including both nine-player journeys); its choice test demanded a transient confirmation label after the dealt state had already replaced it. That assertion now accepts either confirmation or the chosen dealt variant, and still requires every client to show the selected variant.
 
 ## What is live right now
 
 | Layer | Version | How to check |
 | --- | --- | --- |
 | Frontend (Cloudflare Worker, free plan) | build = commit sha, shown as **Build …** at the foot of the table menu | https://all-in-poker.aayush9shah.workers.dev → table → ☰ |
-| Edge `api` | **v19**, bundle `f5bf54ee…` (v18 + slower deal: 420 ms travel / 320 ms gap per card, server deal window matches). v18 = `773965be…` | Supabase MCP `list_edge_functions`; the pin is `BUNDLE_SHA` in `supabase/functions/api/index.ts` |
+| Edge `api` | **v20**, static bundle `54929c91…`, shared deal/burn timing and final-street-aggressor showdown order | Supabase MCP `list_edge_functions`; the pin is `BUNDLE_SHA` in `supabase/functions/api/index.ts` |
 | Database | migrations 1–6 applied (6 = `allin_begin`, `allin_load` with approved reloads, `allin_chat` with membership/rate limit/receipt) | `supabase/migrations/` |
 
 Installed PWAs that predate build `62d3420` do not yet have the update prompt, so each phone needs **one** manual refresh /

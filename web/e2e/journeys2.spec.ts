@@ -188,24 +188,24 @@ test('server timers run with every browser closed; a timed-out player folds and 
   await back.close();
 });
 
-test('tournament: create with levels, play out to a winner, standings', async ({ browser }) => {
+test('last player standing: equal banks, fixed blinds, play to a winner and standings', async ({ browser }) => {
   test.setTimeout(180_000);
   const h = await player(browser, 'Tan');
   const g = await player(browser, 'Aay');
   await h.page.getByRole('button', { name: 'Host a table' }).click();
-  await h.page.getByRole('button', { name: 'Tournament' }).click();
+  await h.page.getByRole('button', { name: 'Last player standing' }).click();
   await h.page.getByLabel('Table name').fill('Cup');
-  await h.page.getByLabel('Starting stack').fill('300');
+  await h.page.getByLabel('Starting bank').fill('300');
   await h.page.getByRole('button', { name: 'Review the table' }).click();
   await h.page.getByRole('button', { name: 'Create and open the room' }).click();
   const url = (await h.page.locator('.fine', { hasText: '/join/' }).first().textContent())!.trim();
   await g.page.goto(url);
-  await g.page.getByRole('button', { name: /Join tournament/ }).click();
+  await g.page.getByRole('button', { name: /Join game/ }).click();
   await expect(g.page.getByText(/starts the game/)).toBeVisible();
   await h.page.getByRole('button', { name: 'Start the game' }).click();
   const pages = [h.page, g.page];
   for (const p of pages) await expect(p.locator('.game')).toBeVisible();
-  await expect(h.page.locator('.g-stakes')).toContainText('Level 1');
+  await expect(h.page.locator('.g-stakes')).toContainText('Blinds 5/10');
   // shove every turn until someone has everything (two players: the first called shove decides it unless they tie)
   for (let i = 0; i < 80; i++) {
     if (await h.page.getByText('Final standings').isVisible().catch(() => false)) break;

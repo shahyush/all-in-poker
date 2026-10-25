@@ -205,12 +205,12 @@ export function MenuSheet(p: { t: PublicTable; rules: TableRules; myId: string; 
           {p.t.seats.map((s, i) => s && s.playerId !== p.myId ? <div className="list-row" key={i}><span>{s.name}</span><span className="row"><button type="button" className="btn btn-quiet" onClick={() => void p.run('transfer_host', { playerId: s.playerId })}>Make host</button><button type="button" className="btn btn-quiet" style={{ color: 'var(--danger)' }} onClick={() => setConfirm(s.playerId)}>Remove</button></span></div> : null)}
         </div>
       )}
-      {me && (me.leaving && me.leaveReason === 'leave' ? <button type="button" className="btn btn-secondary" onClick={() => void p.run('cancel_leave')}>Stay after all</button> : <button type="button" className="btn btn-danger" onClick={() => setConfirm('leave')}>{cash ? 'Leave after this hand' : 'Leave the tournament'}</button>)}
+      {me && (me.leaving && me.leaveReason === 'leave' ? <button type="button" className="btn btn-secondary" onClick={() => void p.run('cancel_leave')}>Stay after all</button> : <button type="button" className="btn btn-danger" onClick={() => setConfirm('leave')}>{cash ? 'Leave after this hand' : 'Leave the game'}</button>)}
       {!me && <button type="button" className="btn btn-secondary" onClick={() => p.go('/')}>Back to the lobby</button>}
       <div className="fine build-id">Build {BUILD_ID}</div>
       {confirm && (
         <div className="card-box">
-          <b>{confirm === 'leave' ? (cash ? 'Leave after this hand? Your chips are taken off and recorded.' : 'Leave the tournament? Your stack stays in play and keeps posting blinds until it is gone.') : `Remove ${p.names.get(confirm) ?? 'this player'} after the hand?`}</b>
+          <b>{confirm === 'leave' ? (cash ? 'Leave after this hand? Your chips are taken off and recorded.' : 'Leave the game? Your stack stays in play and keeps posting blinds until it is gone.') : `Remove ${p.names.get(confirm) ?? 'this player'} after the hand?`}</b>
           <div className="grid2"><button type="button" className="btn btn-secondary" onClick={() => setConfirm(null)}>Keep playing</button><button type="button" className="btn btn-danger" onClick={async () => { await p.run(confirm === 'leave' ? 'leave' : 'remove', confirm === 'leave' ? {} : { playerId: confirm }); setConfirm(null); if (confirm === 'leave' && !cash) p.go('/'); }}>Confirm</button></div>
         </div>
       )}

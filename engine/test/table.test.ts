@@ -644,6 +644,17 @@ describe('tournament levels and eliminations', () => {
     tick(t, n, ctxAll(t, n, ctx.rng));
     expect(t.hand!.level).toBe(2); expect(t.hand!.bb).toBe(40); expect(t.hand!.ante).toBe(5);
   });
+  it('last player standing keeps its single fixed blind level after hours of play', () => {
+    const { t, now, ctx } = makeTable([3000, 3000, 3000], { mode: 'tournament', unit: 3000, levels: [{ sb: 10, bb: 20, ante: 0, minutes: 15 }] });
+    const n = start(t, now, ctx);
+    act(t, t.hand!.actor!, { type: 'fold' }, n, ctx);
+    act(t, t.hand!.actor!, { type: 'fold' }, n, ctx);
+    const later = now + 12 * 60 * 60 * 1000;
+    tick(t, later, ctxAll(t, later, ctx.rng));
+    expect(t.hand!.level).toBe(0);
+    expect(t.hand!.sb).toBe(10); expect(t.hand!.bb).toBe(20);
+    expect(t.hand!.ante).toBe(0);
+  });
   it('level changes never alter the active hand', () => {
     const { t, now, ctx } = makeTable([1000, 1000, 1000], { mode: 'tournament', levels });
     const n = start(t, now, ctx);

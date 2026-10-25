@@ -31,7 +31,7 @@ export function HistoryPage({ go }: { go: (to: string) => void }) {
             const place = r.me?.place ?? null;
             return (
               <button type="button" key={r.id} className="list-row" style={{ width: '100%', textAlign: 'left' }} onClick={() => go((live ? '/table/' : '/session/') + r.id)}>
-                <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}><span style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{r.name}</span><span className="fine">{new Date(r.created_at).toLocaleDateString([], { day: 'numeric', month: 'short' })} · {r.mode === 'cash' ? 'Cash' : 'Tournament'}{live ? ' · in progress' : r.status === 'abandoned' ? ' · abandoned' : ''}</span></span>
+                <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}><span style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{r.name}</span><span className="fine">{new Date(r.created_at).toLocaleDateString([], { day: 'numeric', month: 'short' })} · {r.mode === 'cash' ? 'Cash' : 'Last player standing'}{live ? ' · in progress' : r.status === 'abandoned' ? ' · abandoned' : ''}</span></span>
                 <span style={{ fontWeight: 700, color: r.mode === 'cash' && !live && net < 0 ? 'var(--danger)' : 'inherit' }}>{live ? 'Open' : r.mode === 'cash' ? `${net > 0 ? '+' : ''}${fmt(net)}` : place ? ordinal(place) : '—'}</span>
               </button>
             );
@@ -128,7 +128,7 @@ export function SessionPage({ tableId, go }: { tableId: string; go: (to: string)
 
   return (
     <Page back="History" onBack={() => go('/history')}>
-      <div className="stack" style={{ gap: 8 }}><div className="eyebrow">{new Date(row.created_at).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })} · {cash ? 'Cash' : 'Tournament'}{row.status === 'abandoned' ? ' · abandoned' : ''}</div><h1>{row.name}</h1></div>
+      <div className="stack" style={{ gap: 8 }}><div className="eyebrow">{new Date(row.created_at).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })} · {cash ? 'Cash' : 'Last player standing'}{row.status === 'abandoned' ? ' · abandoned' : ''}</div><h1>{row.name}</h1></div>
 
       {/* My own result — complete and fixed once I have left, provisional while I am still playing. */}
       {mine && cash && (
@@ -190,7 +190,7 @@ export function SessionPage({ tableId, go }: { tableId: string; go: (to: string)
 
       <button type="button" className="btn btn-secondary" onClick={() => setShowHands(!showHands)}>{showHands ? 'Hide hands' : `Hands (${hands.length})`}</button>
       {showHands && hands.map((h) => <div key={h.hand_no} className="card-box" style={{ gap: 4 }}><b>Hand {h.hand_no} · {h.results.variant}</b><span className="fine">{h.results.players.filter((p) => p.won > 0).map((p) => `${p.name} +${fmt(p.won)}`).join(', ') || '—'}{h.results.result?.uncontested ? ' · everyone else folded' : ''}</span></div>)}
-      <p className="fine">{cash ? 'Net = chips taken off + chips still at the table − chips added. Each amount comes from the recorded buy-ins, rebuys and withdrawals. All nets sum to zero once everyone has cashed out.' : 'Tournament chips are not play-chip profit or loss.'}</p>
+      <p className="fine">{cash ? 'Net = chips taken off + chips still at the table − chips added. Each amount comes from the recorded buy-ins, rebuys and withdrawals. All nets sum to zero once everyone has cashed out.' : 'Your place records where you finished. This mode has no cash-out profit or loss.'}</p>
     </Page>
   );
 }

@@ -162,7 +162,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
 
   const stakes: string[] = [];
   if (hand?.variant) stakes.push(`${variantLabel(hand.variant)} · ${limitLabel(hand.variant)}`); else stakes.push("Dealer's Choice");
-  if (row.mode === 'tournament' && t.tournament) { const L = row.config.levels[hand?.level ?? t.tournament.level]; stakes.push(`Level ${(hand?.level ?? t.tournament.level) + 1} · ${L.sb}/${L.bb}${L.ante ? ` a${L.ante}` : ''}`); }
+  if (row.mode === 'tournament' && t.tournament) { const L = row.config.levels[hand?.level ?? t.tournament.level]; stakes.push(`${row.config.levels.length === 1 ? "Blinds" : `Level ${(hand?.level ?? t.tournament.level) + 1} ·`} ${L.sb}/${L.bb}${L.ante ? ` a${L.ante}` : ''}`); }
   else stakes.push(`Blinds ${hand?.sb ?? row.config.sb}/${hand?.bb ?? row.config.bb}${(hand?.ante ?? row.config.ante) ? ` · ante ${hand?.ante ?? row.config.ante}` : ''}`);
   const notice = !view.connected ? 'Reconnecting…' : t.error ? 'This table stopped after a problem. Tell the host.' : err ?? (hand?.phase === 'result' ? 'Next hand' : t.waitingReason ?? '');
 
