@@ -206,7 +206,7 @@ export function MenuSheet(p: { t: PublicTable; rules: TableRules; myId: string; 
         </div>
       )}
       {me && (me.leaving && me.leaveReason === 'leave' ? <button type="button" className="btn btn-secondary" onClick={() => void p.run('cancel_leave')}>Stay after all</button> : <button type="button" className="btn btn-danger" onClick={() => setConfirm('leave')}>{cash ? 'Leave after this hand' : 'Leave the game'}</button>)}
-      {!me && <button type="button" className="btn btn-secondary" onClick={() => p.go('/')}>Back to the lobby</button>}
+      <button type="button" className="btn btn-secondary" onClick={() => p.go('/')}>{me ? 'Switch table' : 'Back to the lobby'}</button>
       <div className="fine build-id">Build {BUILD_ID}</div>
       {confirm && (
         <div className="card-box">
