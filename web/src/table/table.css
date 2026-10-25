@@ -217,3 +217,20 @@
 
 .own-cards { flex: 1; container-type: inline-size; }
 .own-cards .pc { width: min(40px, calc((100cqw - (var(--hole-count, 6) - 1) * 4px) / var(--hole-count, 6))); }
+
+.deal-slot { display: inline-flex; flex: none; }
+.seat-cards .deal-slot + .deal-slot { margin-left: -11px; }
+@media (max-height: 740px) { .seat-cards .deal-slot + .deal-slot { margin-left: -9px; } }
+.deck-anchor { opacity: .85; }
+.burn-pile { position: absolute; left: calc(50% - 48px); top: 15%; width: 24px; height: 32px; opacity: 0; pointer-events: none; }
+.burn-pile.has-burn { opacity: .65; transform: rotate(-12deg); }
+
+/* Shallow landscape screens: stack and committed bet share a row so nine seats do not collide. */
+@media (orientation: landscape) and (max-height: 390px) {
+  .seat-core { display: grid; grid-template-columns: 1fr 1fr; padding: 1px 2px; }
+  .seat-name { grid-column: 1 / -1; line-height: 14px; }
+  .seat-stack { grid-column: 1; grid-row: 2; font-size: 11px; line-height: 14px; }
+  .seat-wager { grid-column: 2; grid-row: 2; font-size: 9px; line-height: 14px; }
+  .seat-stack:last-of-type { grid-column: 1 / -1; }
+  .seat-status { grid-column: 1 / -1; grid-row: 3; line-height: 10px; min-height: 10px; }
+}

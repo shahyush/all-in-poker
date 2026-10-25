@@ -1,4 +1,4 @@
-import { RULES, variantAllowed, type Card, type PublicHand, type PublicTable, type VariantId, VARIANT_IDS } from '@allin/engine/public';
+import { BOARD_GAP_MS, RULES, variantAllowed, type Card, type PublicHand, type PublicTable, type VariantId, VARIANT_IDS } from '@allin/engine/public';
 import { PlayingCard, SlotCard } from './Card.tsx';
 import { fmt } from '../components/ui.tsx';
 import { timeLeft } from '../lib/format.ts';
@@ -48,18 +48,18 @@ export function Centre({ t, hand, now, mySeat, busy, chosen, submitting, onChoos
   }
   const boards: { label: string | null; cards: Card[] }[] = hand.boards ? [{ label: 'Board A', cards: hand.boards[0] }, { label: 'Board B', cards: hand.boards[1] }] : [{ label: null, cards: hand.board }];
   const res = hand.result;
-  const winCards = new Set<Card>();
-  if (res) for (const a of res.awards) for (const w of a.winners) for (const c of w.cards) winCards.add(c);
   return (
     <div className="centre">
       {!res && <div className="pot">Pot<b>{fmt(pot)}</b></div>}
       {boards.map((b, bi) => {
+        const winCards = new Set<Card>();
+        if (res) for (const a of res.awards) if (a.board === bi) for (const w of a.winners) for (const c of w.cards) winCards.add(c);
         const freshOrder = b.cards.map((c, i) => (newBoardKeys.has(`${bi}:${c}`) ? i : -1)).filter((i) => i >= 0);
         return (
         <div key={bi} className="stack" style={{ gap: 2, alignItems: 'center' }}>
           {b.label && <div className="board-label">{b.label}</div>}
           <div className="board" aria-label={b.label ?? 'Community cards'}>
-            {Array.from({ length: 5 }).map((_, i) => { if (b.cards[i] === undefined) return <SlotCard key={'s' + i} />; const fresh = newBoardKeys.has(`${bi}:${b.cards[i]}`); return <PlayingCard key={b.cards[i]} card={b.cards[i]} win={res ? winCards.has(b.cards[i]) : false} dim={res ? winCards.size > 0 && !winCards.has(b.cards[i]) : false} hi={!res && !!madeBoard?.has(b.cards[i])} flip={fresh} delayMs={fresh ? (boardLeadMs ?? 0) + freshOrder.indexOf(i) * 300 : undefined} />; })}
+            {Array.from({ length: 5 }).map((_, i) => { if (b.cards[i] === undefined) return <SlotCard key={'s' + i} />; const fresh = newBoardKeys.has(`${bi}:${b.cards[i]}`); return <PlayingCard key={b.cards[i]} card={b.cards[i]} win={res ? winCards.has(b.cards[i]) : false} dim={res ? winCards.size > 0 && !winCards.has(b.cards[i]) : false} hi={!res && !!madeBoard?.has(b.cards[i])} flip={fresh} delayMs={fresh ? (boardLeadMs ?? 0) + freshOrder.indexOf(i) * BOARD_GAP_MS : undefined} />; })}
           </div>
         </div>
         );

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-for (const [width, height] of [[320,568], [375,667], [390,700], [430,932], [844,390]]) {
+for (const [width, height] of [[320,568], [375,667], [390,700], [430,932], [844,390], [667,375], [740,360], [932,430]]) {
   test(`board remains clear at ${width}x${height}`, async ({page}, info) => {
     await page.setViewportSize({width, height});
     // Replace the HTML entry, preserving Vite module serving; no auth/backend calls are needed.

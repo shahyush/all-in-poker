@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Card, PublicEvent, VariantId } from '@allin/engine/public';
-import { currentBest } from '@allin/engine/public';
+import { currentBest, boardPresentationMs, showdownOrder } from '@allin/engine/public';
 import { useSession } from '../state/session.tsx';
 import { useNow, type TableView } from '../state/table.ts';
 import { TransportError } from '../transport/index.ts';
@@ -47,22 +47,24 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const lastSeq = useRef<number>(-1);
   const [dealt, setDealt] = useState(true);           // false while the deal animation is in flight
   const [newBoardKeys, setNewBoardKeys] = useState<Set<string>>(new Set());
+  const [presentationUntil, setPresentationUntil] = useState(0);
   const [boardLead, setBoardLead] = useState(0);        // ms the current board reveal waits for a preceding burn to show
   const [sweeps, setSweeps] = useState<{ id: number; left: number; top: number }[]>([]);
   const sweepId = useRef(0);
   const cancelAnim = useRef<(() => void) | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const events = t.events ?? [];
     if (lastSeq.current === -1) { lastSeq.current = t.seq; return; }         // snapshot resume: no replay
     const fresh = events.filter((e) => e.seq > lastSeq.current);
     if (!fresh.length) return;
     const gap = fresh[0].seq > lastSeq.current + 1 && events.length >= 60;
     lastSeq.current = t.seq;
-    if (gap) { setDealt(true); return; }                                      // missed too much: jump to settled view
+    if (gap) { cancelAnim.current?.(); cancelAnim.current = null; setDealt(true); return; }                                      // missed too much: jump to settled view
     const reduced = reducedMotionPreferred();
     let lead = 0; // a burn announced just before a street: the street's reveal waits this long so the burn is seen first
     for (const ev of fresh) {
-      if (ev.type === 'deal' && hand && ev.handId === hand.id && rootRef.current) {
+      if (ev.handId !== hand?.id) continue;
+      if (ev.type === 'deal' && hand?.phase === 'betting' && now < (hand.actionReadyAt ?? 0) && ev.handId === hand.id && rootRef.current) {
         cancelAnim.current?.();
         setDealt(false);
         cancelAnim.current = runDealAnimation(rootRef.current, ev as Extract<PublicEvent, { type: 'deal' }>, hand.id, reduced, () => { setDealt(true); cancelAnim.current = null; });
@@ -74,6 +76,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
       }
       if (ev.type === 'board') {
         const keys = (ev as Extract<PublicEvent, { type: 'board' }>).cards.map((c) => `${(ev as { board: number }).board}:${c}`);
+        setPresentationUntil(reduced ? 0 : now + boardPresentationMs(ev.cards.length));
         setBoardLead(lead);
         setNewBoardKeys(new Set(keys));
         setTimeout(() => setNewBoardKeys(new Set()), 1400 + lead); // burn lead + the staggered one-by-one flop (3 × ~300ms + flip)
@@ -174,15 +177,12 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const winTotals = hand?.result?.totals ?? {};
   const winCardsBySeat = new Map<number, Card[]>();
   if (hand?.result) for (const a of hand.result.awards) for (const w of a.winners) winCardsBySeat.set(w.seat, [...(winCardsBySeat.get(w.seat) ?? []), ...w.cards]);
-  // Showdown reveal order follows table position, not who won: hands turn over clockwise from the first seat left of the
-  // button (the standard order at a checked-down showdown), each a beat apart within the hold — the drama comes from the
-  // measured reveal, the winning-card highlight and the pot award, not from re-ordering by result. Reduced motion → 0.
+  // Final-street aggressor first, otherwise clockwise from left of the button; never winner-dependent.
   const revealDelay = new Map<number, number>();
   if (hand?.result && !hand.result.uncontested && hand.result.shows && hand.button !== null) {
     const shown = new Set(Object.keys(hand.result.shows).map(Number));
     const n = t.seats.length;
-    let order = 0;
-    for (let k = 1; k <= n; k++) { const seat = (hand.button + k) % n; if (shown.has(seat)) revealDelay.set(seat, order++ * 450); }
+    showdownOrder(hand.log, hand.button, n, [...shown]).forEach((seat, index) => revealDelay.set(seat, index * 450));
   }
 
   // Compact last-hand recap: captured when a hand settles, shown through the next hand. Winner, amount and the made-hand
@@ -223,7 +223,8 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
       </div>
       <div className="g-surface">
         <div className="felt" aria-hidden="true" />
-        <span className="deck-anchor" data-deck aria-hidden="true" />
+        <span className="deck-anchor pc back" data-deck aria-hidden="true" />
+        <span className={`burn-pile pc back ${hand?.log.some(e => e.t === 'burn') ? 'has-burn' : ''}`} data-burn-pile aria-hidden="true" />
         {sweeps.map((sp) => <ChipSweep key={sp.id} from={{ left: sp.left, top: sp.top }} />)}
         {t.seats.map((seat, i) => {
           if (i === mySeatIdx) return null;
@@ -236,7 +237,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
         {hand && hand.button !== null && positions[hand.button] && <DealerButton seat={hand.button} />}
         <Centre t={t} hand={hand} now={now} mySeat={mySeat} busy={pending !== null} chosen={chosen} submitting={submitting} onChoose={(v: VariantId) => void choose(v)} onStraddle={(a) => void quiet('straddle', { accept: a })} onVote={(c) => void quiet('vote', { choice: c })} onPots={() => setSheet('pots')} newBoardKeys={newBoardKeys} boardLeadMs={boardLead} madeBoard={madeSet} />
       </div>
-      <Hero seatNames={t.seats.map((x) => x?.name ?? null)} hand={hand} mySeat={mySeat} me={meSeat} own={view.own?.cards ?? null} ownHandId={view.own?.handId ?? null} now={now} busy={pending !== null} pending={pending} legal={legal} dealt={dealt} connected={view.connected} isCash={row.mode === 'cash'}
+      <Hero seatNames={t.seats.map((x) => x?.name ?? null)} hand={hand} mySeat={mySeat} me={meSeat} own={view.own?.cards ?? null} ownHandId={view.own?.handId ?? null} now={now} busy={pending !== null} pending={pending} legal={legal} presentationUntil={presentationUntil} dealt={dealt} connected={view.connected} isCash={row.mode === 'cash'}
         onAct={(a, to) => void quiet('act', a === 'raise' ? { action: 'raise', raiseTo: String(to) } : { action: a })}
         onPropose={(runs) => void quiet('propose', { runs })} onReveal={(what) => void quiet('reveal', what === 'all' || what === 'muck' ? { what } : { indices: what })} onReturn={(post) => void quiet('return', { post })}
         made={made} madeShown={madeShown} madeSet={madeSet} onToggleMade={() => setMadeShown((v) => !v)} />

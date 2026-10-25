@@ -27,7 +27,13 @@ jobs:
 
   nine-player-browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    env:
+      REVIEW_BROWSER: ${{ matrix.browser }}
     services:
       postgres:
         image: postgres:16
@@ -40,7 +46,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci --no-audit --no-fund
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Initialize isolated development database
         run: ./scripts/local-db-reset.sh allin_dev
       - name: Start local app and server
@@ -54,14 +60,32 @@ jobs:
           exit 1
       - name: Layout regression matrix
         run: npx playwright test --config web/playwright.layout.config.ts
-      - name: Nine independent player sessions
-        run: npm run test:e2e -w web -- nine-players.spec.ts
+      - name: Full functional suite including nine independent players
+        run: npm run test:e2e -w web
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: nine-player-review
+          name: nine-player-review-${{ matrix.browser }}
           path: |
             web/test-results/
             /tmp/allin-server.log
             /tmp/allin-web.log
+          retention-days: 7
+
+  firefox-layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps firefox
+      - run: npx playwright test --config web/playwright.layout.config.ts
+        env: { REVIEW_BROWSER: firefox }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: firefox-layout-review
+          path: web/test-results/
           retention-days: 7

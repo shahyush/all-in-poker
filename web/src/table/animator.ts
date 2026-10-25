@@ -1,4 +1,4 @@
-import { planDeal, type Card, type PublicEvent } from '@allin/engine/public';
+import { BURN_MS, planDeal, type Card, type PublicEvent } from '@allin/engine/public';
 
 /** DOM-level deal animation driven by a planner; card backs fly from the deck anchor to seat slots. */
 export function runDealAnimation(root: HTMLElement, ev: Extract<PublicEvent, { type: 'deal' }>, handId: string, reducedMotion: boolean, onDone: () => void): () => void {
@@ -9,13 +9,16 @@ export function runDealAnimation(root: HTMLElement, ev: Extract<PublicEvent, { t
   catch { onDone(); return () => undefined; }
   const from = deck.getBoundingClientRect();
   const flyers: HTMLElement[] = [];
+  const slots: HTMLElement[] = [];
   const anims: Animation[] = [];
   let cancelled = false;
   for (const step of plan.steps) {
     const slot = root.querySelector<HTMLElement>(`[data-seat="${step.to}"] [data-slot="${step.slot}"]`) ?? root.querySelector<HTMLElement>(`[data-seat="${step.to}"]`);
     if (!slot) continue;
     const to = slot.getBoundingClientRect();
-    if (reducedMotion) { slot.classList.add('dealt'); continue; }
+    slots.push(slot);
+    slot.style.visibility = reducedMotion ? '' : 'hidden';
+    if (reducedMotion) { slot.style.visibility = ''; continue; }
     const el = document.createElement('span');
     el.className = 'pc back fly';
     el.setAttribute('aria-hidden', 'true');
@@ -27,13 +30,13 @@ export function runDealAnimation(root: HTMLElement, ev: Extract<PublicEvent, { t
       { opacity: 1, offset: 0.1 },
       { transform: `translate(${to.left - from.left}px, ${to.top - from.top}px) rotate(0deg)`, opacity: 1 },
     ], { duration: step.durationMs, delay: step.delayMs, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'forwards' });
-    a.onfinish = () => { if (cancelled) return; slot.classList.add('dealt'); el.remove(); };
+    a.onfinish = () => { if (cancelled) return; slot.style.visibility = ''; el.remove(); };
     anims.push(a);
   }
   const total = reducedMotion ? 0 : plan.durationMs + 20;
   const t = setTimeout(() => { if (!cancelled) finish(); }, total);
-  function finish() { for (const el of flyers) el.remove(); onDone(); }
-  return () => { cancelled = true; clearTimeout(t); for (const a of anims) a.cancel(); for (const el of flyers) el.remove(); };
+  function finish() { for (const slot of slots) slot.style.visibility = ''; for (const el of flyers) el.remove(); onDone(); }
+  return () => { for (const slot of slots) slot.style.visibility = ''; cancelled = true; clearTimeout(t); for (const a of anims) a.cancel(); for (const el of flyers) el.remove(); };
 }
 
 /** A discreet burn: one card back slides a short way off the deck and fades, face-down throughout. The burned card is
@@ -43,6 +46,9 @@ export function runBurnAnimation(root: HTMLElement, reducedMotion: boolean): num
   const deck = root.querySelector<HTMLElement>('[data-deck]');
   if (!deck || reducedMotion) return 0;
   const from = deck.getBoundingClientRect();
+  const pile = root.querySelector<HTMLElement>('[data-burn-pile]')?.getBoundingClientRect();
+  const dx = pile ? pile.left - from.left : -48;
+  const dy = pile ? pile.top - from.top : 12;
   const el = document.createElement('span');
   el.className = 'pc back fly';
   el.setAttribute('aria-hidden', 'true');
@@ -50,11 +56,11 @@ export function runBurnAnimation(root: HTMLElement, reducedMotion: boolean): num
   document.body.appendChild(el);
   const a = el.animate([
     { transform: 'translate(0,0) rotate(0deg)', opacity: 1 },
-    { transform: `translate(${-from.width * 1.4}px, ${from.height * 0.35}px) rotate(-14deg)`, opacity: 0.9, offset: 0.7 },
-    { transform: `translate(${-from.width * 1.6}px, ${from.height * 0.5}px) rotate(-18deg)`, opacity: 0 },
-  ], { duration: 380, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'forwards' });
+    { transform: `translate(${dx}px, ${dy}px) rotate(-14deg)`, opacity: 0.9, offset: 0.7 },
+    { transform: `translate(${dx}px, ${dy}px) rotate(-18deg)`, opacity: 0 },
+  ], { duration: BURN_MS, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)', fill: 'forwards' });
   a.onfinish = () => el.remove();
-  return 380;
+  return BURN_MS;
 }
 
 export function reducedMotionPreferred(): boolean {
