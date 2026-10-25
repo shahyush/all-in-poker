@@ -1,4 +1,4 @@
-.game { height: var(--vh); background: var(--game); color: var(--game-text); display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; padding-top: var(--safe-t); }
+.game { height: var(--vh); background: var(--game); color: var(--game-text); display: grid; grid-template-rows: auto minmax(400px, 1fr) auto; overflow: auto; padding-top: var(--safe-t); }
 .g-head { padding: 6px max(12px, var(--safe-r)) 4px max(12px, var(--safe-l)); display: flex; flex-direction: column; gap: 2px; }
 .g-head-row { display: flex; align-items: center; gap: 6px; min-height: 40px; }
 .g-title { flex: 1; min-width: 0; font-family: var(--display); font-size: 20px; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -12,7 +12,7 @@
 .g-recap-tag { flex: none; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--on-table); background: var(--accent-table); border-radius: 4px; padding: 1px 6px; }
 .g-recap-body { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
-.g-surface { position: relative; margin: 2px max(10px, var(--safe-r)) 0 max(10px, var(--safe-l)); min-height: 0; }
+.g-surface { position: relative; margin: 2px max(10px, var(--safe-r)) 0 max(10px, var(--safe-l)); min-height: 0; container-type: inline-size; }
 /* The table: a tall sapphire oval with a padded rail. Seats sit on the rail; the felt is lit from the centre so the board
    and pot read first. The rail is the dark surround, the rim a thin gold line. */
 .felt { position: absolute; inset: 3% 5%; border-radius: 50% / 46%;
@@ -20,19 +20,19 @@
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-table) 55%, transparent), inset 0 0 0 10px color-mix(in srgb, var(--game) 70%, var(--seat) 30%), inset 0 0 0 12px color-mix(in srgb, var(--table-line) 45%, transparent), inset 0 0 70px rgba(0,0,0,0.35), 0 10px 30px rgba(0,0,0,0.45); }
 /* Seat pod: avatar disc on the rail with a name/stack plaque beneath — the classic layout, in sapphire. The pod is
    centred on its rail point; cards fan above it toward the felt. */
-.seat { position: absolute; width: 104px; margin-left: -52px; margin-top: -34px; display: flex; flex-direction: column; align-items: center; gap: 0; text-align: center; z-index: 2; }
-.seat-core { position: relative; background: color-mix(in srgb, var(--game) 82%, #000 18%); border-radius: 12px; padding: 22px 8px 5px; min-width: 84px; max-width: 104px; border: 2px solid color-mix(in srgb, var(--table-line) 35%, transparent); display: flex; flex-direction: column; align-items: center; margin-top: 18px; box-shadow: 0 3px 10px rgba(0,0,0,0.45); }
-.seat-avatar { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); width: 40px; height: 40px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--table-line) 70%, #fff 30%), var(--accent)); color: var(--on-accent); font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; border: 2px solid color-mix(in srgb, var(--game) 60%, var(--table-line) 40%); box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+.seat { position: absolute; width: 76px; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; text-align: center; z-index: 2; }
+.seat-core { position: relative; background: color-mix(in srgb, var(--game) 88%, #000 12%); border-radius: 9px; padding: 5px 3px 4px; width: 76px; border: 1px solid var(--table-line); display: flex; flex-direction: column; align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+.seat-avatar { position: absolute; top: -12px; left: -5px; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: 11px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--table-line); }
 .seat.is-actor .seat-core { border-color: var(--accent-table); box-shadow: 0 0 0 1px var(--accent-table), 0 0 18px color-mix(in srgb, var(--accent-table) 45%, transparent), 0 3px 10px rgba(0,0,0,0.45); }
 .seat.is-actor .seat-avatar { border-color: var(--accent-table); }
 .seat.is-folded .seat-core, .seat.is-folded .seat-avatar { opacity: 0.5; filter: saturate(0.6); }
-.seat-name { font-size: 13px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--game-text); }
-.seat-stack { font-size: 15px; font-weight: 700; color: var(--accent-table); font-variant-numeric: tabular-nums; }
+.seat-name { font-size: 12px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--game-text); }
+.seat-stack { font-size: 14px; font-weight: 700; color: var(--accent-table); font-variant-numeric: tabular-nums; }
 .seat-status { font-size: 10px; color: var(--game-muted); white-space: nowrap; letter-spacing: 0.02em; min-height: 12px; }
 .seat-empty { position: absolute; width: 10px; height: 10px; margin: -5px; border-radius: 50%; border: 1px dashed var(--table-line); }
-.seat-cards { display: flex; gap: 2px; justify-content: center; height: 30px; align-items: flex-end; margin-bottom: 4px; z-index: 3; position: relative; }
-.seat-bet { position: absolute; transform: translate(-50%, -50%); z-index: 3; white-space: nowrap; font-size: 12px; font-weight: 700; background: rgba(0,0,0,0.45); color: var(--game-text); border: 1px solid color-mix(in srgb, var(--accent-table) 50%, transparent); border-radius: 10px; padding: 1px 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.seat-bet::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; background: radial-gradient(circle at 35% 30%, var(--accent-table), #9a6f1c); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35); }
+.seat-cards { display: flex; justify-content: center; height: 28px; align-items: flex-end; margin-bottom: 3px; position: relative; width: 76px; }
+.seat-cards .pc + .pc { margin-left: -11px; }
+.seat-cards .pc .s { align-self: flex-start; }
 .dealer-btn { position: absolute; width: 20px; height: 20px; border-radius: 50%; background: var(--paper); color: var(--ink); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 /* table-level dealer button: one token that slides between seats at each hand */
 .dealer-token { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: var(--card); color: var(--on-table); font-size: 12px; font-weight: 800; border: 2px solid color-mix(in srgb, var(--on-table) 30%, var(--card)); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 7px rgba(0,0,0,0.5); transform: translate(-50%, -50%); z-index: 3; transition: left 420ms cubic-bezier(.2,.7,.2,1), top 420ms cubic-bezier(.2,.7,.2,1); }
@@ -44,20 +44,20 @@
 .timer-ring { position: absolute; left: 50%; bottom: -6px; width: 44px; height: 3px; margin-left: -22px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; }
 .timer-ring > i { display: block; height: 100%; background: var(--accent-table); }
 
-.centre { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92%, 420px); display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.centre { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(calc(100% - 176px), 420px); display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
 /* pot pill above the board: a chip glyph and the amount */
 .pot { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--game-muted); background: rgba(0,0,0,0.38); border: 1px solid color-mix(in srgb, var(--table-line) 40%, transparent); border-radius: 999px; padding: 3px 12px 3px 8px; letter-spacing: 0.04em; text-transform: uppercase; }
 .pot::before { content: ''; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--accent-table), #9a6f1c); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.35), 0 1px 3px rgba(0,0,0,0.5); flex: none; }
 .pot b { font-size: 18px; color: var(--game-text); font-weight: 700; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
 /* community cards: larger than seat cards so the board reads first */
-.board { display: flex; gap: 6px; justify-content: center; align-items: center; min-height: 66px; }
-.board .pc { width: 46px; height: 64px; padding: 4px 5px; }
-.board .pc .r { font-size: 19px; } .board .pc .s { font-size: 16px; }
+.board { display: flex; width: 100%; gap: 4px; justify-content: center; align-items: center; min-height: 48px; }
+.board .pc { width: clamp(24px, calc((100cqw - 192px) / 5), 46px); height: auto; aspect-ratio: 5 / 7; padding: 3px; }
+.board .pc .r { font-size: clamp(14px, 4cqw, 19px); } .board .pc .s { font-size: 14px; }
 .board-label { font-size: 11px; color: var(--game-muted); letter-spacing: 0.1em; text-transform: uppercase; }
 .deck-anchor { position: absolute; left: 50%; top: 15%; width: 32px; height: 44px; margin-left: -16px; opacity: 0; pointer-events: none; }
-.centre-card { background: var(--seat); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; width: 100%; }
-.centre-title { font-family: var(--display); font-size: 20px; letter-spacing: -0.01em; }
-.centre-copy { font-size: 13px; color: var(--game-muted); }
+.centre-card { max-height: 260px; overflow-y: auto; background: var(--seat); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.centre-title { font-family: var(--display); font-size: 17px; letter-spacing: -0.01em; }
+.centre-copy { font-size: 12px; color: var(--game-muted); }
 .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; }
 .choice-grid button { min-height: 48px; border-radius: 10px; background: var(--table); color: var(--game-text); font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
 .choice-grid button span:last-child { font-size: 11px; color: var(--game-muted); font-weight: 500; }
@@ -132,18 +132,55 @@
 
 /* landscape phones */
 @media (orientation: landscape) and (max-height: 500px) {
-  .game { grid-template-rows: auto 1fr; grid-template-columns: 1fr minmax(260px, 34%); grid-template-areas: 'head head' 'surface hero'; }
+  .game { grid-template-rows: auto minmax(280px, 1fr); grid-template-columns: 1fr minmax(260px, 34%); grid-template-areas: 'head head' 'surface hero'; }
   .g-head { grid-area: head; }
   .g-surface { grid-area: surface; margin-bottom: max(8px, var(--safe-b)); }
   .g-hero { grid-area: hero; justify-content: flex-end; padding-bottom: max(8px, var(--safe-b)); background: none; }
   .felt { inset: 5% 5%; border-radius: 50% / 50%; }
   .board .pc { width: 40px; height: 56px; padding: 3px 4px; }
   .board .pc .r { font-size: 16px; } .board .pc .s { font-size: 14px; }
-  .own-cards { flex-wrap: wrap; }
+  .own-cards { flex-wrap: nowrap; }
   .dock { grid-template-columns: 1fr 1fr; }
   .dock .raise { grid-column: 1 / -1; }
 }
-@media (max-width: 360px) { .pc { width: 34px; height: 48px; } .pc .r { font-size: 14px; } .board .pc { width: 40px; height: 56px; } .board .pc .r { font-size: 16px; } .seat { width: 92px; margin-left: -46px; } .seat-core { min-width: 76px; max-width: 92px; } .seat-avatar { width: 34px; height: 34px; top: -17px; font-size: 14px; } }
+/* Own Omaha cards and the stack share the footer without squeezing the stack off-screen. */
+.own-cards { min-width: 0; }
+.own-cards .pc { width: clamp(28px, 9vw, 40px); height: auto; aspect-ratio: 5 / 7; }
+.hero-meta { flex-shrink: 0; }
+.hand-label { max-width: 100%; flex-wrap: wrap; gap: 4px 8px; }
+.hand-label .hint { display: none; }
+.g-notice:empty, .dock-note:empty { display: none; }
+
 
 .result-strip { display: flex; flex-direction: column; align-items: center; gap: 2px; background: rgba(33,23,32,0.75); border-radius: 12px; padding: 6px 12px; max-width: 100%; }
 .btn-link { color: var(--game-muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; min-height: 32px; }
+
+.result-strip { width: 100%; max-height: 120px; overflow-y: auto; overflow-wrap: anywhere; padding: 6px; }
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .g-head-row { min-height: 32px; }
+  .g-head .g-icon { height: 32px; }
+  .g-head { padding-top: 0; }
+  .seat-core { padding: 3px; }
+  .seat-name { font-size: 11px; }
+  .seat-stack { font-size: 12px; }
+  .seat-status { font-size: 9px; min-height: 10px; }
+  .seat-cards { height: 20px; margin-bottom: 2px; }
+  .seat-cards .pc.sm { height: 20px; width: 18px; }
+  .seat-cards .pc + .pc { margin-left: -9px; }
+  .seat-avatar { width: 18px; height: 18px; font-size: 10px; }
+  .board .pc { width: 32px; height: 44px; }
+  .board { min-height: 44px; }
+  .centre { gap: 3px; }
+  .pot { padding: 2px 8px; }
+  .pot b { font-size: 15px; }
+  .board-label { font-size: 9px; }
+  .g-hero { gap: 4px; }
+  .dock button { min-height: 44px; }
+}
+
+.seat-wager { font-size: 10px; color: var(--game-text); line-height: 13px; }
+
+.seat-status:empty { display: none; }
+.centre:has(.choice-grid) { width: min(92%, 420px); z-index: 4; }
+.centre-card .row { flex-wrap: wrap; }
