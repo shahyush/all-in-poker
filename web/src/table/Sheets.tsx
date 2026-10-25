@@ -188,11 +188,11 @@ export function MenuSheet(p: { t: PublicTable; rules: TableRules; myId: string; 
         <button type="button" className="btn btn-secondary" onClick={() => p.open('accounts')}>{cash ? 'Accounts' : 'Standings'}</button>
         <button type="button" className="btn btn-secondary" onClick={() => p.open('rules')}>Rules</button>
       </div>
-      {me && cash && <button type="button" className="btn btn-secondary" onClick={() => p.open('reload')}>Reload chips</button>}
+      {me && cash && <button type="button" className="btn btn-secondary" onClick={() => p.open('reload')}>Add chips</button>}
       {pendingMine.map((r) => <div className="notice" key={r.id}>Reload {fmt(Number(r.amount))}: {r.status === 'approved' ? 'approved, added before the next hand' : 'waiting for the host'} {r.status === 'requested' && <button type="button" className="btn btn-quiet" onClick={() => p.run('reload_cancel', { requestId: r.id })}>Cancel</button>}</div>)}
       {pendingOthers.map((r) => <div className="notice row" key={r.id} style={{ justifyContent: 'space-between' }}><span>{p.names.get(r.user_id) ?? 'Player'} asks for {fmt(Number(r.amount))}</span><span className="row"><button type="button" className="btn btn-quiet" onClick={() => p.run('reload_decide', { requestId: r.id, approve: false })}>Reject</button><button type="button" className="btn btn-primary" style={{ minHeight: 40, padding: '0 12px' }} onClick={() => p.run('reload_decide', { requestId: r.id, approve: true })}>Approve</button></span></div>)}
       {me && cash && (me.status === 'in' ? (
-        <button type="button" className="btn btn-secondary" onClick={() => { void p.run('sitout'); p.onClose(); }}>Sit out after this hand</button>
+        <button type="button" className="btn btn-secondary" onClick={() => { void p.run('sitout'); p.onClose(); }}>Sit out</button>
       ) : (
         <div className="grid2"><button type="button" className="btn btn-secondary" onClick={() => { void p.run('return', { post: false }); p.onClose(); }}>I'm back · wait for BB</button><button type="button" className="btn btn-secondary" onClick={() => { void p.run('return', { post: true }); p.onClose(); }}>Post and play</button></div>
       ))}
@@ -205,13 +205,14 @@ export function MenuSheet(p: { t: PublicTable; rules: TableRules; myId: string; 
           {p.t.seats.map((s, i) => s && s.playerId !== p.myId ? <div className="list-row" key={i}><span>{s.name}</span><span className="row"><button type="button" className="btn btn-quiet" onClick={() => void p.run('transfer_host', { playerId: s.playerId })}>Make host</button><button type="button" className="btn btn-quiet" style={{ color: 'var(--danger)' }} onClick={() => setConfirm(s.playerId)}>Remove</button></span></div> : null)}
         </div>
       )}
-      {me && (me.leaving && me.leaveReason === 'leave' ? <button type="button" className="btn btn-secondary" onClick={() => void p.run('cancel_leave')}>Stay after all</button> : <button type="button" className="btn btn-danger" onClick={() => setConfirm('leave')}>{cash ? 'Leave after this hand' : 'Leave the game'}</button>)}
+      {me && (me.leaving && me.leaveReason === 'leave' ? <button type="button" className="btn btn-secondary" onClick={() => void p.run('cancel_leave')}>Stay</button> : <button type="button" className="btn btn-danger" onClick={() => setConfirm('leave')}>Leave table</button>)}
+      {p.isHost && <button type="button" className="btn btn-danger" disabled={p.t.closeRequested} onClick={() => setConfirm('close_table')}>{p.t.closeRequested ? 'Closing after this hand' : 'Delete table'}</button>}
       <button type="button" className="btn btn-secondary" onClick={() => p.go('/')}>{me ? 'Switch table' : 'Back to the lobby'}</button>
       <div className="fine build-id">Build {BUILD_ID}</div>
       {confirm && (
         <div className="card-box">
-          <b>{confirm === 'leave' ? (cash ? 'Leave after this hand? Your chips are taken off and recorded.' : 'Leave the game? Your stack stays in play and keeps posting blinds until it is gone.') : `Remove ${p.names.get(confirm) ?? 'this player'} after the hand?`}</b>
-          <div className="grid2"><button type="button" className="btn btn-secondary" onClick={() => setConfirm(null)}>Keep playing</button><button type="button" className="btn btn-danger" onClick={async () => { await p.run(confirm === 'leave' ? 'leave' : 'remove', confirm === 'leave' ? {} : { playerId: confirm }); setConfirm(null); if (confirm === 'leave' && !cash) p.go('/'); }}>Confirm</button></div>
+          <b>{confirm === 'close_table' ? 'Delete this table for everyone? The current hand finishes first. Chips and history are saved.' : confirm === 'leave' ? (cash ? 'Leave after this hand? Your chips are taken off and recorded.' : 'Leave the game? Your stack stays in play and keeps posting blinds until it is gone.') : `Remove ${p.names.get(confirm) ?? 'this player'} after the hand?`}</b>
+          <div className="grid2"><button type="button" className="btn btn-secondary" onClick={() => setConfirm(null)}>Keep playing</button><button type="button" className="btn btn-danger" onClick={async () => { await p.run(confirm === 'close_table' ? 'close_table' : confirm === 'leave' ? 'leave' : 'remove', confirm === 'leave' || confirm === 'close_table' ? {} : { playerId: confirm }); setConfirm(null); if (confirm === 'leave' && !cash) p.go('/'); }}>Confirm</button></div>
         </div>
       )}
     </Sheet>

@@ -138,7 +138,7 @@ export function createTable(id: string, rules: TableRules, hostPlayerId: string,
     id, rules: r, status: 'waiting', version: 0, seq: 0,
     seats: Array(r.seats).fill(null), button: null, prevBB: null, prevSB: null, handNo: 0, hand: null, orbit: null,
     hostPlayerId, hostEpoch: 1, createdAt: now, startedAt: null, nextSeq: 0,
-    tournament: null, waitingReason: 'Waiting for players', dueAt: null, idleCheckAt: null, events: [], error: null, lastActivityAt: now,
+    tournament: null, waitingReason: 'Waiting for players', dueAt: null, idleCheckAt: null, events: [], error: null, lastActivityAt: now, lastPresenceAt: now,
   };
 }
 
@@ -161,7 +161,7 @@ function balancedFreeSeat(seats: (SeatState | null)[]): number {
   return best;
 }
 export function seatPlayer(t: TableState, player: { playerId: string; name: string }, stack: number, now: number, preferred?: number | null): number {
-  if (t.status !== 'waiting' && t.status !== 'running') fail('closed', 'This table has closed');
+  if (t.closeRequested || (t.status !== 'waiting' && t.status !== 'running')) fail('closed', 'This table has closed');
   if (t.rules.mode === 'tournament' && t.status !== 'waiting') fail('locked', 'Registration closed when the tournament started');
   if (seatOf(t, player.playerId) !== -1) fail('already_seated', 'Already seated here');
   if (!isChipInt(stack) || stack <= 0) fail('invalid_amount', 'Invalid buy-in');
@@ -179,7 +179,9 @@ export function seatPlayer(t: TableState, player: { playerId: string; name: stri
     sitOutRequested: false, returnRequested: false, leaving: false, leaveReason: null, consecutiveTimeouts: 0,
     joinedAt: now, joinSeq: t.nextSeq++, straddlePref: false, handStartStack: null, eliminatedPlace: null,
   };
+  t.lastPresenceAt = now;
   event(t, null, now, { type: 'seat', seat, change: 'join' });
+  computeDue(t);
   return seat;
 }
 
@@ -690,6 +692,8 @@ function queueStages(t: TableState, h: HandState, now: number, runs: 1 | 2): voi
     if (!canRunTwice(h)) fail('capacity', 'Not enough cards to run it twice');
     h.boards ??= [prefix.slice(), prefix.slice()];
   }
+  // Betting is closed and every run decision has resolved before exposing cards.
+  for (const player of h.players.filter(live)) player.revealed = h.hole[player.seat].map((_, index) => index);
   let at = now;
   const stageFor = (board: 0 | 1, start: number) => {
     let len = start;
@@ -711,9 +715,6 @@ function queueStages(t: TableState, h: HandState, now: number, runs: 1 | 2): voi
 }
 
 function beginRunout(t: TableState, h: HandState, now: number): void {
-  // Betting is complete with at most one player able to act: table all live hands before the runout.
-  // Folded/mucked hands remain private; the deck, burns and future board cards are never exposed.
-  for (const player of h.players.filter(live)) player.revealed = h.hole[player.seat].map((_, index) => index);
   if (h.boards) { queueStages(t, h, now, 2); return; }
   if (h.bettingLocked) { queueStages(t, h, now, h.runs); return; }
   if (h.board.length < 3) {
@@ -787,8 +788,7 @@ export function respondVote(t: TableState, seat: number, choice: 'agree' | 'decl
   } else {
     if (choice !== 'once' && choice !== 'twice') fail('bad_vote', 'Once or twice');
     v.votes[seat] = choice;
-    if (choice === 'once') resolveOffer(t, h, now, 1);
-    else if (v.electorate.every((s) => v.votes[s] === 'twice')) resolveOffer(t, h, now, 2);
+    if (v.electorate.every((s) => v.votes[s])) resolveOffer(t, h, now, v.electorate.every((s) => v.votes[s] === 'twice') ? 2 : 1);
   }
   computeDue(t);
   return effects;
@@ -909,6 +909,12 @@ export function setStraddlePref(t: TableState, playerId: string, pref: boolean):
 }
 
 /** Leave (or host removal). Cash: queued to the next boundary; the player keeps any all-in claim. Tournament: no cash-out. */
+/** Finish the current hand and preserve its accounting before closing for everyone. */
+export function requestClose(t: TableState, now: number, ctx: TickContext): Effect[] {
+  t.closeRequested = true;
+  return tick(t, now, ctx);
+}
+
 export function requestLeave(t: TableState, playerId: string, reason: 'leave' | 'removed', now: number, ctx: TickContext): Effect[] {
   const i0 = seatOf(t, playerId); if (i0 === -1) fail('not_seated', 'Not seated');
   const tourneyRunning = t.rules.mode === 'tournament' && t.status === 'running';
@@ -963,7 +969,8 @@ export function computeDue(t: TableState): void {
     if ((h.phase === 'vote' || h.phase === 'offer') && h.vote) c.push(h.vote.deadline);
     if (h.phase === 'runout' && h.runoutQueue.length) c.push(h.runoutQueue[0].at);
     if (h.phase === 'result' && h.nextAt !== null) c.push(h.nextAt);
-  } else if (t.status === 'running' && t.idleCheckAt !== null) c.push(t.idleCheckAt);
+  } else if (t.status === 'waiting') c.push((t.lastPresenceAt ?? t.lastActivityAt) + T.abandonmentMs);
+  else if (t.status === 'running' && t.idleCheckAt !== null) c.push(Math.min(t.idleCheckAt, (t.lastPresenceAt ?? t.lastActivityAt) + T.abandonmentMs));
   t.dueAt = c.length ? Math.min(...c) : null;
 }
 
@@ -971,13 +978,17 @@ export function computeDue(t: TableState): void {
 export function tick(t: TableState, now: number, ctx: TickContext): Effect[] {
   const effects: Effect[] = [];
   if (t.error) return effects;
+  t.lastPresenceAt ??= t.startedAt ?? t.lastActivityAt;
+  for (const seat of t.seats) if (seat) t.lastPresenceAt = Math.max(t.lastPresenceAt, ctx.presence[seat.playerId] ?? 0);
+  const inactive = now >= t.lastPresenceAt + T.abandonmentMs;
+  if (t.status === 'waiting' && (inactive || t.closeRequested)) abandon(t, now, effects);
   for (let guard = 0; guard < 200; guard++) {
     if (t.status !== 'running') break;
     hostSuccession(t, now, ctx);
     const h = t.hand;
     if (!h) {
       if (t.seats.every((s) => !s)) { t.status = 'closed'; event(t, null, now, { type: 'status', status: 'closed' }); effects.push({ type: 'archive', reason: 'all_left' }); break; }
-      if (!anyonePresent(t, ctx, now, T.abandonmentMs) && t.lastActivityAt < now - T.abandonmentMs) { abandon(t, now, effects); break; }
+      if (inactive || t.closeRequested) { abandon(t, now, effects); break; }
       const before = t.handNo;
       startNextHand(t, now, ctx, effects);
       if (t.handNo === before) break;
@@ -1004,6 +1015,7 @@ export function tick(t: TableState, now: number, ctx: TickContext): Effect[] {
       applyBoundary(t, h.nextAt, ctx, effects);
       ctx = { ...ctx, credits: [] };
       if (t.status !== 'running') break;
+      if (inactive || t.closeRequested) { abandon(t, now, effects); break; }
       startNextHand(t, now, ctx, effects);
       if (!t.hand) break;
       continue;

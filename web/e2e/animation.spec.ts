@@ -72,7 +72,7 @@ test('folded own cards stay readable and last-player-standing exposes both run c
   await expect(page.locator('.seat-cards .pc:not(.back)')).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Fold',exact:true})).toBeDisabled();
   await page.evaluate(async()=>{(await import(/* @vite-ignore */ '/e2e/layout-fixture.tsx')).renderLayout(5,4,false,false,false,true,false,false);});
-  await expect(page.getByRole('button',{name:'Run once',exact:true})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Run out now, end betting if everyone agrees',exact:true})).toBeEnabled();
   await expect(page.getByRole('button',{name:'Two boards · keep betting',exact:true})).toBeEnabled();
 });
 

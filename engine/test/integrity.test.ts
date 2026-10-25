@@ -80,7 +80,7 @@ function verifyConsumedDeck(h: HandState) {
   expect([...consumed].sort((a,b)=>a-b)).toEqual(h.deck.slice(0,h.cursor).sort((a,b)=>a-b));
 }
 
-it('all-in runouts table live hands immediately while folded hands stay private',()=>{
+it('all-in hands remain private until every runout vote resolves',()=>{
   const {t,now,ctx}=makeTable([1000,1000,1000]);
   const clock=start(t,now,ctx), h=t.hand!;
   const folded=h.actor!;
@@ -88,6 +88,13 @@ it('all-in runouts table live hands immediately while folded hands stay private'
   const raiser=h.actor!;
   act(t,raiser,{type:'raise',raiseTo:legalActions(t,raiser,clock).raise!.maxTo},clock,ctx);
   act(t,h.actor!,{type:'call'},clock,ctx);
+  expect(publicView(t).hand!.revealedCards).toEqual({});
+  tick(t,t.dueAt!,ctx);
+  const voters=[...h.vote!.electorate];
+  respondVote(t,voters[0],'once',clock,ctx);
+  expect(h.phase).toBe('offer');
+  expect(publicView(t).hand!.revealedCards).toEqual({});
+  respondVote(t,voters[1],'twice',clock,ctx);
   const publicHand=publicView(t).hand!;
   expect(publicHand.phase).toBe('runout');
   expect(publicHand.revealedCards[folded]).toBeUndefined();

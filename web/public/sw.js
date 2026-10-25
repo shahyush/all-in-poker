@@ -20,7 +20,11 @@ self.addEventListener('fetch', (e) => {
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
     if (isNav) {
-      try { const fresh = await fetch(req); return fresh; } catch { return (await cache.match('./')) || Response.error(); }
+      // Launch the installed build immediately instead of waiting on a weak connection.
+      // A new version still waits for the user's update action; game data is never cached.
+      const shell = await cache.match('./');
+      if (shell) return shell;
+      try { return await fetch(req); } catch { return Response.error(); }
     }
     const hit = await cache.match(req);
     if (hit) return hit;

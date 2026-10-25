@@ -139,3 +139,14 @@ Own hole cards remain readable after folding and can be inspected using My folde
 
 ## Multiple active tables — 2026-10-25
 User explicitly allows simultaneous table memberships. Removed global server admission guards and the single-active-seat index; per-table membership primary key remains. Lobby lists every active table and permits host/join alongside existing games. Last Player Standing departures still preserve chips in play; an existing membership no longer blocks another game. Server regression covers cross-table joins, same-table idempotency, hosting while seated, and independent leaving.
+
+## October 25 local smoothness review — NOT DEPLOYED
+
+Deployment pause remains active. Recovered prior unpushed privacy/three-minute cleanup/six-second showdown/host departure work after workspace pruning. Added serialized resource refresh, separate game/chat paths, private-hand caching, keyed table routes, recoverable table/invite failures, identity-safe auth restore, hidden-tab polling pause and bounded parallel timer dispatch. Clarified runout choices. See docs/reviews/2026-10-25-smoothness.md for exact findings, live latency evidence and verification limits. No hosted verification or real-device claim; Postgres integration remains unrun. Production is unchanged.
+
+
+## October 25 deployment authorised — host delete and faster pacing
+
+User explicitly authorised deploying the complete refinement. Host-only close_table archives a waiting table immediately or finishes and records the current hand before closing. Cash chips exit through the ledger; history is preserved; non-host closure is rejected. UI says Delete table, Leave table, Add chips, Sit out. Deal travel/gap are 320/220 ms (down from 420/320); runout stages 1700 ms (down from 2200); contested showdown remains six seconds. Decision windows are unchanged.
+
+Removed redundant table/hole-card safety polls because the game loop already polls those; account fallback is 15 seconds and membership fallback 10 seconds, while realtime changes still refresh immediately. All prior local recovery/privacy/cleanup fixes are included. Deployment and hosted verification results will be recorded after completion.

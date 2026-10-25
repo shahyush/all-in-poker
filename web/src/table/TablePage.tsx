@@ -116,20 +116,20 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   const choose = useCallback(async (v: VariantId) => {
     if (submitting || chosen) return;
     setSubmitting(v); setErr(null);
-    try { await s.transport.cmd('choose', { variant: v }, row.id); await view.reload(); setChosen(v); }
+    try { await s.transport.cmd('choose', { variant: v }, row.id); await view.reload('game'); setChosen(v); }
     catch (e) { const msg = e instanceof TransportError ? e.message : 'Could not reach the server'; setErr(msg); s.toast(msg); }
     finally { setSubmitting(null); }
   }, [submitting, chosen, s, row.id, view]);
 
   const run = useCallback(async (type: string, payload: Record<string, unknown> = {}) => {
     setPending(type); setErr(null);
-    try { await s.transport.cmd(type, payload, row.id); await view.reload(); }
+    try { await s.transport.cmd(type, payload, row.id); await view.reload(type === 'chat' ? 'chat' : 'game'); }
     catch (e) { const msg = e instanceof TransportError ? e.message : 'Could not reach the server'; setErr(msg); s.toast(msg); throw e; }
     finally { setPending(null); }
   }, [s, row.id, view]);
   const quiet = useCallback(async (type: string, payload: Record<string, unknown> = {}) => { try { await run(type, payload); } catch { /* toast shown */ } }, [run]);
   // fire-and-forget command that does NOT flip `pending` (so it never disables the action/choice controls)
-  const silent = useCallback(async (type: string, payload: Record<string, unknown> = {}) => { try { await s.transport.cmd(type, payload, row.id); await view.reload(); } catch { /* ignore */ } }, [s, row.id, view]);
+  const silent = useCallback(async (type: string, payload: Record<string, unknown> = {}) => { try { await s.transport.cmd(type, payload, row.id); await view.reload(type === 'chat' ? 'chat' : 'game'); } catch { /* ignore */ } }, [s, row.id, view]);
   // Readiness: the moment the chooser's client actually displays the choice, confirm it to the server so the usable
   // dealer's-choice window is re-anchored from here. This stops cold-start/idle discovery latency from eating the window.
   const readyRef = useRef<string | null>(null);
@@ -176,7 +176,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
   if (hand?.variant) stakes.push(`${variantLabel(hand.variant)} · ${limitLabel(hand.variant)}`); else stakes.push("Dealer's Choice");
   if (row.mode === 'tournament' && t.tournament) { const L = row.config.levels[hand?.level ?? t.tournament.level]; stakes.push(`${row.config.levels.length === 1 ? "Blinds" : `Level ${(hand?.level ?? t.tournament.level) + 1} ·`} ${hand?.sb ?? L.sb}/${hand?.bb ?? L.bb}${L.ante ? ` a${L.ante}` : ''}`); }
   else stakes.push(`Blinds ${hand?.sb ?? row.config.sb}/${hand?.bb ?? row.config.bb}${(hand?.ante ?? row.config.ante) ? ` · ante ${hand?.ante ?? row.config.ante}` : ''}`);
-  const notice = !view.connected ? 'Reconnecting…' : t.error ? 'This table stopped after a problem. Tell the host.' : err ?? (t.waitingReason ?? '');
+  const notice = !view.connected ? 'Reconnecting…' : t.closeRequested ? 'Table closes after this hand' : t.error ? 'This table stopped after a problem. Tell the host.' : err ?? (t.waitingReason ?? '');
 
   // the viewer's own best made hand so far (flop onward), with the contributing cards for an on-tap highlight
   const made = useMemo(() => {
@@ -265,7 +265,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
         onAct={(a, to) => void quiet('act', a === 'raise' ? { action: 'raise', raiseTo: String(to) } : { action: a })}
         onPropose={(runs) => void quiet('propose', { runs })} onReveal={(what) => void quiet('reveal', what === 'all' || what === 'muck' ? { what } : { indices: what })} onReturn={(post) => void quiet('return', { post })}
         made={made} madeShown={madeShown} madeSet={madeSet} onToggleMade={() => setMadeShown((v) => !v)} />
-      {sheet === 'chat' && <ChatSheet chat={view.chat} reactions={view.reactions} names={names} myId={me.id} onSend={(body) => run('chat', { body })} onReact={async (messageId, emoji, op) => { await s.transport.cmd('react', { messageId, emoji, op }, row.id); await view.reload(); }} onClose={() => setSheet(null)} turnCue={turnCue} onReturn={() => setSheet(null)} draft={draft} setDraft={setDraft} />}
+      {sheet === 'chat' && <ChatSheet chat={view.chat} reactions={view.reactions} names={names} myId={me.id} onSend={(body) => run('chat', { body })} onReact={async (messageId, emoji, op) => { await s.transport.cmd('react', { messageId, emoji, op }, row.id); await view.reload('chat'); }} onClose={() => setSheet(null)} turnCue={turnCue} onReturn={() => setSheet(null)} draft={draft} setDraft={setDraft} />}
       {sheet === 'menu' && <MenuSheet t={t} rules={row.config} myId={me.id} isHost={isHost} members={view.members} reloads={view.reloads} names={names} onClose={() => setSheet(null)} run={quiet} open={(x) => setSheet(x)} go={go} turnCue={turnCue} onReturn={() => setSheet(null)} />}
       {sheet === 'accounts' && <AccountsSheet t={t} ledger={view.ledger} participants={view.participants} mode={row.mode} onClose={() => setSheet(null)} turnCue={turnCue} onReturn={() => setSheet(null)} />}
       {sheet === 'pots' && hand?.result && <PotSheet hand={hand} t={t} onClose={() => setSheet(null)} />}

@@ -26,7 +26,8 @@ export class SupabaseTransport implements Transport {
     this.client.auth.onAuthStateChange((event, session) => {
       try {
         if (session?.access_token && session.refresh_token) { localStorage.setItem(MIRROR_KEY, JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token })); this.setRealtimeAuth(session.access_token); }
-        else if (event === 'SIGNED_OUT') localStorage.removeItem(MIRROR_KEY);
+        // Explicit signOut clears the mirror; transient SDK events must not erase recovery tokens.
+        void event;
       } catch { /* storage unavailable: nothing to mirror */ }
     });
   }
@@ -36,13 +37,17 @@ export class SupabaseTransport implements Transport {
     const { data, error } = await this.client.auth.setSession({ access_token: m.access_token, refresh_token: m.refresh_token }).catch((e: Error) => ({ data: { session: null }, error: e }));
     if (data.session) { this.lastAuthError = null; this.setRealtimeAuth(data.session.access_token); return data.session; }
     this.lastAuthError = error?.message ?? 'restore failed';
-    try { localStorage.removeItem(MIRROR_KEY); } catch { /* ignore */ }
-    return null;
+    throw new TransportError('session_restore', 'Could not reconnect your player. Try again when your connection returns, or use your player code if the session has expired.', 401);
   }
   private setRealtimeAuth(token: string | undefined): void {
-    try { if (token) this.client.realtime.setAuth(token); } catch { /* realtime optional */ }
+    try { if (token) void this.client.realtime.setAuth(token).catch(() => undefined); } catch { /* realtime optional */ }
   }
-  async ensureSession(): Promise<string> {
+  private signingIn: Promise<string> | null = null;
+  ensureSession(): Promise<string> {
+    if (!this.signingIn) this.signingIn = this.startSession().finally(() => { this.signingIn = null; });
+    return this.signingIn;
+  }
+  private async startSession(): Promise<string> {
     this.watch();
     const { data, error } = await this.client.auth.getSession();
     if (data.session?.user) { this.setRealtimeAuth(data.session.access_token); return data.session.user.id; }
@@ -92,14 +97,14 @@ export class SupabaseTransport implements Transport {
     if (error) throw new TransportError(error.code ?? 'query', error.message, 400);
     return (data ?? []) as T[];
   }
-  subscribe(table: string, tableId: string, cb: () => void): Unsubscribe {
+  subscribe(table: string, tableId: string, cb: () => void, opts: { pollMs?: number } = {}): Unsubscribe {
     const filter = table === 'tables' ? `id=eq.${tableId}` : `table_id=eq.${tableId}`;
     const ch = this.client.channel(`t:${table}:${tableId}:${Math.random().toString(36).slice(2, 8)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table, filter }, () => cb())
       .subscribe((status) => { if (status === 'SUBSCRIBED') cb(); });
     // safety poll: realtime can drop events; a slow poll keeps the view honest without being the primary driver
-    const poll = setInterval(cb, 5000);
-    return () => { clearInterval(poll); this.client.removeChannel(ch); };
+    const poll = opts.pollMs === 0 ? null : setInterval(() => { if (document.visibilityState === 'visible' && navigator.onLine) cb(); }, opts.pollMs ?? 5000);
+    return () => { if (poll) clearInterval(poll); void this.client.removeChannel(ch); };
   }
   async heartbeat(tableId: string): Promise<void> {
     await this.client.rpc('heartbeat', { t: tableId }).then(() => undefined, () => undefined);

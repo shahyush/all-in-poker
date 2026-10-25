@@ -11,7 +11,7 @@ export interface Transport {
   cmd<T = unknown>(type: string, payload?: Record<string, unknown>, tableId?: string, actionId?: string): Promise<T>;
   query<T extends Row = Row>(table: string, where: Where, opts?: QueryOpts): Promise<T[]>;
   /** Subscribes to row changes for a table-scoped resource; the callback receives fresh rows (full refetch or payload). */
-  subscribe(table: string, tableId: string, cb: () => void): Unsubscribe;
+  subscribe(table: string, tableId: string, cb: () => void, opts?: { pollMs?: number }): Unsubscribe;
   heartbeat(tableId: string): Promise<void>;
   serverNow(): Promise<number>;
 }

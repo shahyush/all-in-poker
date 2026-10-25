@@ -251,7 +251,7 @@ export class Handlers {
   async game(player: Player, receipt: Receipt, tableId: string, type: string, p: Record<string, unknown>): Promise<HandlerResult> {
     // For leave/remove, record the leaving intent BEFORE the pre-tick resolves any due boundary, so a hand that starts in
     // that pre-tick excludes the departing player instead of dealing them in (which would strand the table on timeouts).
-    const prepare = (type === 'leave' || type === 'remove') ? (L: Loaded): void => {
+    const prepare = type === 'close_table' ? (L: Loaded): void => { this.requireHost(L, player); L.t.closeRequested = true; } : (type === 'leave' || type === 'remove') ? (L: Loaded): void => {
       const targetId = type === 'remove' ? String(p.playerId ?? '') : player.id;
       const i = seatOf(L.t, targetId);
       if (i === -1) return;
@@ -263,9 +263,13 @@ export class Handlers {
       if (t.error) bad(409, 'table_error', 'This table stopped after a problem. Please tell the host.');
       // leave/remove: the pre-tick (with the leaving flag already set) may have cashed the player out at a boundary. If so
       // the seat is gone and the exit is already in the pre-tick effects — nothing more to do.
+      if (type === 'close_table') return { effects: [], result: { ok: true }, extras: { touch: player.id } };
       if (type === 'leave') {
         const eff = seatOf(t, player.id) !== -1 ? requestLeave(t, player.id, 'leave', now, ctx) : [];
-        return { effects: eff, result: { ok: true, version: t.version + 1 }, extras: { touch: player.id } };
+        const extras: CommitExtras = { touch: player.id };
+        // Hide a departed player from the active dashboard, retaining their LPS stack in play.
+        if (t.rules.mode === 'tournament' && t.status === 'running') extras.members = [{ user_id: player.id, status: 'left', seat: null }];
+        return { effects: eff, result: { ok: true, version: t.version + 1 }, extras };
       }
       if (type === 'remove') {
         this.requireHost(L, player);

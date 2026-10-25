@@ -18,12 +18,13 @@ export function WaitingPage({ view, go }: { view: TableView; go: (to: string) =>
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
   const inviteUrl = absoluteUrl('/join/' + row.invite_code);
   async function run(type: string, payload: Record<string, unknown> = {}) {
     setBusy(true); setErr(null);
-    try { await s.transport.cmd(type, payload, row.id); await view.reload(); return true; }
+    try { await s.transport.cmd(type, payload, row.id); await view.reload('game'); return true; }
     catch (e) { setErr(e instanceof TransportError ? e.message : 'Something went wrong'); return false; }
     finally { setBusy(false); }
   }
@@ -68,9 +69,11 @@ export function WaitingPage({ view, go }: { view: TableView; go: (to: string) =>
           <button type="button" className="btn btn-secondary" onClick={async () => { try { await navigator.clipboard.writeText(inviteUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* unsupported */ } }}>Copy link</button>
         </div>
       </div>
-      <button type="button" className="btn btn-danger" onClick={() => setConfirmLeave(true)}>Leave the room</button>
+      <button type="button" className="btn btn-danger" onClick={() => setConfirmLeave(true)}>Leave table</button>
+      {isHost && <button type="button" className="btn btn-danger" onClick={() => setConfirmClose(true)}>Delete table</button>}
+      {confirmClose && <Sheet title="Delete table?" onClose={() => setConfirmClose(false)}><p>Closes the table for everyone. Chips and history are saved.</p>{err && <p role="alert">{err}</p>}<button className="btn btn-danger" disabled={busy} onClick={async () => { if (await run('close_table')) go('/'); }}>Delete table</button><button className="btn btn-secondary" onClick={() => setConfirmClose(false)}>Cancel</button></Sheet>}
       {confirmLeave && (
-        <Sheet title="Leave the room?" onClose={() => setConfirmLeave(false)}>
+        <Sheet title="Leave table?" onClose={() => setConfirmLeave(false)}>
           {err && <div className="error" role="alert">{err}</div>}
           <p className="lead">Your buy-in comes back to you as chips taken off. {isHost && seated.length > 1 ? 'Hosting passes to the next player.' : ''}</p>
           <button type="button" className="btn btn-danger" disabled={busy} onClick={async () => { if (await run('leave')) { setConfirmLeave(false); go('/'); } }}>Leave</button>

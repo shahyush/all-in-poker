@@ -9,7 +9,7 @@ export interface ApiRequest { method: string; path: string; headers: Record<stri
 export interface ApiResponse { status: number; body: unknown; headers?: Record<string, string> }
 
 const PRE_ADMISSION = new Set(['admit', 'recover', 'me']);
-const TABLE_CMDS = new Set(['start', 'choose', 'choice_ready', 'straddle', 'act', 'propose', 'vote', 'reveal', 'sitout', 'return', 'post_pref', 'straddle_pref', 'leave', 'cancel_leave', 'remove', 'reload_request', 'reload_cancel', 'reload_decide', 'chat', 'react', 'transfer_host']);
+const TABLE_CMDS = new Set(['start', 'choose', 'choice_ready', 'straddle', 'act', 'propose', 'vote', 'reveal', 'sitout', 'return', 'post_pref', 'straddle_pref', 'leave', 'close_table', 'cancel_leave', 'remove', 'reload_request', 'reload_cancel', 'reload_decide', 'chat', 'react', 'transfer_host']);
 
 export class App {
   handlers: Handlers;
@@ -66,11 +66,19 @@ export class App {
     const body = (req.body ?? {}) as { tableIds?: string[]; limit?: number };
     const ids: string[] = Array.isArray(body.tableIds) && body.tableIds.every(isUuid) ? body.tableIds : await this.db.rpc<string[]>('allin_claim_due', { limit: body.limit ?? 10 });
     const results: Record<string, string> = {};
-    for (const id of ids) {
-      try { await this.handlers.runTable(id); results[id] = 'ok'; }
-      catch (e) { results[id] = (e as Error).message; console.error('[allin job]', id, (e as Error).message); }
-    }
-    return { ok: true, ran: ids.length, results };
+    const uniqueIds = [...new Set(ids)];
+    let next = 0;
+    // Independent tables must not queue behind one slow database round-trip.
+    // Bound concurrency to avoid flooding the database; each table still uses CAS.
+    const worker = async () => {
+      while (next < uniqueIds.length) {
+        const id = uniqueIds[next++];
+        try { await this.handlers.runTable(id); results[id] = 'ok'; }
+        catch (e) { results[id] = (e as Error).message; console.error('[allin job]', id, (e as Error).message); }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, uniqueIds.length) }, worker));
+    return { ok: true, ran: uniqueIds.length, results };
   }
 
   private async cmd(req: ApiRequest): Promise<unknown> {
