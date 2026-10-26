@@ -111,3 +111,26 @@ for(const [width,height] of [[390,700],[320,568],[844,390]]) test(`nine-player s
   expect(clashes).toBe(0);
   await expect(page.locator('.choice-grid')).toHaveCount(0);
 });
+
+test('chip collection reaches the displayed pot and cancels cleanly', async ({page}) => {
+  await page.route('http://127.0.0.1:5173/', r=>r.fulfill({contentType:'text/html',body:'<html><body><div id="root"></div></body></html>'}));
+  await page.goto('/');
+  const result=await page.evaluate(async()=>{
+    const refresh=await import(/* @vite-ignore */ '/@react-refresh');
+    refresh.default.injectIntoGlobalHook(window);
+    (window as any).$RefreshReg$=()=>{}; (window as any).$RefreshSig$=()=>(type:unknown)=>type;
+    (window as any).__vite_plugin_react_preamble_installed__=true;
+    const {renderChipCollection}=await import(/* @vite-ignore */ '/e2e/layout-fixture.tsx');
+    const unmount=await renderChipCollection();
+    await new Promise(r=>setTimeout(r,50));
+    const chip=document.querySelector('.chip-sweep') as HTMLElement;
+    const a=chip.getAnimations()[0]; a.pause(); a.currentTime=520;
+    const c=chip.getBoundingClientRect(), p=document.querySelector('.pot')!.getBoundingClientRect();
+    const delta=Math.hypot(c.left+c.width/2-p.left-p.width/2,c.top+c.height/2-p.top-p.height/2);
+    const left=chip.style.left, top=chip.style.top;
+    unmount();
+    return {delta,left,top,remaining:document.getAnimations().length};
+  });
+  expect(result.delta).toBeLessThan(1);
+  expect(result.left).toBe('10%'); expect(result.top).toBe('80%'); expect(result.remaining).toBe(0);
+});

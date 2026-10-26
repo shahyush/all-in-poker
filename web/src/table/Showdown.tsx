@@ -24,6 +24,6 @@ export function Showdown({hand, names, stack, mySeat, foldedCards}: {hand: Publi
     <div className="showdown-heading">{selected !== -1 && win.seat === mySeat && <WinnerCelebration />}<strong>{selected === -1 ? 'Your folded hand' : `${names[win.seat] ?? 'Player'} wins ${fmt(hand.result!.totals[win.seat] ?? 0)}`}</strong>{stack !== undefined && <span>Your stack {fmt(stack)}</span>}</div>
     <div className="showdown-hand-name">{selected === -1 ? 'Only visible to you' : win.name}</div>
     <div className="showdown-caption">{selected === -1 ? 'Your private cards' : `Best five · ${usedHole} hole + ${5 - usedHole} board`}</div>
-    <div className="showdown-cards">{(selected === -1 && foldedCards ? foldedCards : win.cards).map(c => <div className="showdown-card-source" key={c}><PlayingCard card={c} win={selected !== -1} /><span>{selected === -1 || !board.includes(c) ? 'Hole' : 'Board'}</span></div>)}</div>
+    <div className="showdown-cards">{(selected === -1 && foldedCards ? foldedCards : win.cards).map(c => <div className="showdown-card-source" data-source={selected === -1 || !board.includes(c) ? "hole" : "board"} key={c}><PlayingCard card={c} win={selected !== -1} /><span>{selected === -1 || !board.includes(c) ? 'Hole' : 'Board'}</span></div>)}</div>
   </section>;
 }
