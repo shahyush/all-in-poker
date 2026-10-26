@@ -340,3 +340,15 @@
 .pc.dim { opacity: .55; }
 .showdown-card-source[data-source=hole] > span { color: var(--accent-table); font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .turn-bar > i, .timer-ring > i { transition: none; } }
+
+/* Extra-short browser viewports still need room for the runout controls. */
+@container poker-viewport (orientation: portrait) and (max-height: 500px) {
+  .game { grid-template-rows: auto minmax(220px, 1fr) auto; }
+  .propose-row { flex-wrap: nowrap; }
+  .propose-row button { min-width: 0; flex: 1; padding: 0 6px; min-height: 44px; font-size: 12px; }
+  .g-hero { gap: 2px; }
+  .hand-label { min-height: 20px; padding-block: 0; }
+  .seat-cards { height: 14px; margin-bottom: 1px; }
+  .seat-cards .pc.sm { height: 14px; width: 14px; }
+  .seat-core { padding-block: 0; }
+}
