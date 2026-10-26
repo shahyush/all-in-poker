@@ -1,6 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { parseChipAmount, type BestHand, type Card, type LegalActions, type PublicHand, type SeatState } from '@allin/engine/public';
-import {Showdown} from './Showdown';
 import {WinnerCelebration} from './WinnerCelebration';
 import { PlayingCard } from './Card.tsx';
 import { Sheet, fmt } from '../components/ui.tsx';
@@ -34,9 +33,6 @@ export function Hero(p: HeroProps) {
   const winCards = new Set<Card>();
   if (p.awardReady && hand?.result) for (const a of hand.result.awards) for (const w of a.winners) if (w.seat === mySeat) for (const c of w.cards) winCards.add(c);
   const turnLabel = !p.connected ? 'Reconnecting…' : !ready ? 'Dealing…' : pending ? 'Sending…' : myTurn && ready ? (legal!.owed > 0 ? `Your turn · ${fmt(legal!.call)} to call` : 'Your turn') : hand?.phase === 'betting' && hand.actor !== null ? `Waiting for ${hand.actor === mySeat ? 'you' : p.seatNames[hand.actor] ?? 'seat ' + (hand.actor + 1)}` : hand?.phase === 'result' ? (revealOpen ? `Show your cards? ${timeLeft(hand.revealDeadline, now)}s` : 'Next hand shortly') : '';
-  if (hand?.result && !hand.result.uncontested && p.awardReady && hand.result.awards.some(a => a.winners.some(w => w.cards.length === 5))) {
-    return <Showdown key={hand.id} hand={hand} names={p.seatNames} stack={me?.stack} mySeat={mySeat} foldedCards={showCards && myHp?.folded ? own! : undefined} />;
-  }
   return (
     <div className="g-hero">
       <div className="hero-top">
