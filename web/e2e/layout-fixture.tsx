@@ -28,3 +28,14 @@ export function renderLayout(count: number, holes: number, twice: boolean, shown
     {spectator && !result ? <div className="g-hero spectator-dock"><strong>Watching</strong><span className="dock-note">Private cards stay hidden</span><button className="btn-game btn-game-primary">Take a seat</button></div> : <Hero awardReady={result} winnerBurst={result} seatNames={seats.map(s => s.name)} hand={hand} mySeat={0} me={seats[0] as any} own={Array.from({length: holes}, (_, i) => i + 15)} ownHandId="layout" now={now} busy={false} pending={null} legal={acting ? {canAct:true, owed:0, call:0, raise:null, raiseClosed:null} as any : null} dealt connected isCash={isCash} made={{name:'Pair of Aces'} as any} madeShown={false} madeSet={null} onToggleMade={noop} onAct={noop} onPropose={noop} onReveal={noop} onReturn={noop} />}
   </div>);
 }
+
+
+export async function renderChipCollection() {
+  const {ChipSweep}=await import('../src/table/ChipSweep');
+  const root=createRoot(document.getElementById('root')!);
+  root.render(<div style={{position:'relative',width:400,height:500}}>
+    <div className="pot" style={{position:'absolute',left:160,top:100,width:80,height:30}} />
+    <ChipSweep from={{left:10,top:80}} />
+  </div>);
+  return ()=>root.unmount();
+}

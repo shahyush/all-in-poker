@@ -12,10 +12,13 @@ export function runDealAnimation(root: HTMLElement, ev: Extract<PublicEvent, { t
   const slots: HTMLElement[] = [];
   const anims: Animation[] = [];
   let cancelled = false;
-  for (const step of plan.steps) {
+  // Measure all destinations before hiding slots or inserting animated cards.
+  // Interleaving these operations forced repeated layout at crowded tables.
+  const destinations = plan.steps.flatMap(step => {
     const slot = root.querySelector<HTMLElement>(`[data-seat="${step.to}"] [data-slot="${step.slot}"]`) ?? root.querySelector<HTMLElement>(`[data-seat="${step.to}"]`);
-    if (!slot) continue;
-    const to = slot.getBoundingClientRect();
+    return slot ? [{ step, slot, to: slot.getBoundingClientRect() }] : [];
+  });
+  for (const { step, slot, to } of destinations) {
     slots.push(slot);
     slot.style.visibility = reducedMotion ? '' : 'hidden';
     if (reducedMotion) { slot.style.visibility = ''; continue; }

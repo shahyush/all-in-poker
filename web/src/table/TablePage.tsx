@@ -16,12 +16,7 @@ import { playCue } from '../lib/sound.ts';
 import { fmt } from '../components/ui.tsx';
 import './table.css';
 
-// a single gold chip that glides from a seat's bet spot into the pot; purely decorative (aria-hidden), self-removing
-function ChipSweep({ from }: { from: { left: number; top: number } }) {
-  const [go, setGo] = useState(false);
-  useEffect(() => { const r = requestAnimationFrame(() => requestAnimationFrame(() => setGo(true))); return () => cancelAnimationFrame(r); }, []);
-  return <span className="chip-sweep" aria-hidden="true" style={{ left: (go ? 50 : from.left) + '%', top: (go ? 50 : from.top) + '%', opacity: go ? 0.1 : 1 }} />;
-}
+import { ChipSweep } from './ChipSweep';
 
 export function TablePage({ view, go }: { view: TableView; go: (to: string) => void }) {
   const s = useSession();

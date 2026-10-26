@@ -140,3 +140,32 @@ test('installed shell opens without a network wait and never intercepts game dat
   });
   expect(result).toEqual({body:'cached shell',network:0,intercepted:false});
 });
+
+
+test('a command whose body stalls times out without retrying the action, then recovers', async ({page}) => {
+  await page.route('http://127.0.0.1:5173/', r => r.fulfill({contentType:'text/html',body:'<html></html>'}));
+  await page.goto('/');
+  await page.clock.install();
+  await page.evaluate(async () => {
+    const {SupabaseTransport}=await import(/* @vite-ignore */ '/src/transport/supabase.ts');
+    const transport=Object.create(SupabaseTransport.prototype);
+    transport.token=async()=> 'test-token'; transport.fnUrl='/test-api'; transport.key='test';
+    const original=window.fetch;
+    let calls=0;
+    window.fetch=async(input, init)=> {
+      if(String(input)!=='/test-api/cmd') return original(input,init);
+      calls++;
+      if(calls>1) return new Response(JSON.stringify({ok:true,result:'accepted'}));
+      return new Response(new ReadableStream({start(controller) {
+        controller.enqueue(new TextEncoder().encode('{'));
+        init!.signal!.addEventListener('abort',()=>controller.error(init!.signal!.reason),{once:true});
+      }}));
+    };
+    (window as any).commandTest={transport,calls:()=>calls};
+    (window as any).commandResult=transport.cmd('start',{},'table','same-action').catch((e:any)=>e.code);
+  });
+  await page.clock.fastForward(20001);
+  expect(await page.evaluate(()=>(window as any).commandResult)).toBe('timeout');
+  expect(await page.evaluate(()=>(window as any).commandTest.calls())).toBe(1);
+  expect(await page.evaluate(()=>(window as any).commandTest.transport.cmd('start',{},'table','same-action'))).toBe('accepted');
+});

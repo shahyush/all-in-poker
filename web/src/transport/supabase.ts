@@ -78,7 +78,7 @@ export class SupabaseTransport implements Transport {
     const token = await this.token();
     let r: Response;
     try {
-      r = await fetch(this.fnUrl + '/cmd', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token, apikey: this.key }, body: JSON.stringify({ actionId, type, tableId, payload }), signal: AbortSignal.timeout(type === 'preview' ? 12_000 : 20_000) });
+      r = await boundedFetch(this.fnUrl + '/cmd', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token, apikey: this.key }, body: JSON.stringify({ actionId, type, tableId, payload }), }, type === 'preview' ? 12_000 : 20_000);
     } catch (e) {
       if ((e as Error)?.name === 'TimeoutError') throw new TransportError('timeout', 'The server did not answer. Check your connection and try again.', 0);
       throw new TransportError('network', 'No connection. Check your network and try again.', 0);

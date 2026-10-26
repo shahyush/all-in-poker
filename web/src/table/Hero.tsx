@@ -61,8 +61,8 @@ export function Hero(p: HeroProps) {
           <span>{hand?.boards ? 'Board A' : 'Your hand'}</span><b>{p.made.name}</b>
         </button>
       )}
-      <div className={`turn-line ${myTurn && secs <= 10 ? 'urgent' : ''}`} aria-live="polite"><span>{turnLabel}</span><span>{myTurn && ready && deadline ? `${secs}s` : ''}</span></div>
-      <div className="turn-bar" aria-hidden="true"><i className="motion" style={{ width: (myTurn ? frac * 100 : 0) + '%' }} /></div>
+      <div className={`turn-line ${myTurn && ready && p.connected && !pending ? 'is-your-turn' : ''} ${myTurn && secs <= 10 ? 'urgent' : ''}`} ><span aria-live="polite">{turnLabel}</span><span aria-hidden="true">{myTurn && ready && deadline ? `${secs}s` : ''}</span></div>
+      <div className="turn-bar" aria-hidden="true"><i className="motion" style={{ transform: `scaleX(${myTurn ? frac : 0})` }} /></div>
       {me && me.status === 'sitout' && !hand?.players.some((x) => x.seat === mySeat) && (
         <div className="propose-row"><button type="button" onClick={() => p.onReturn(false)}>I'm back · wait for big blind</button>{me.owesBB && <button type="button" onClick={() => p.onReturn(true)}>Post and play</button>}</div>
       )}
