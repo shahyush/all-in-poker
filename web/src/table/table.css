@@ -94,7 +94,7 @@
 .btn-game:active:not(:disabled), .dock button:active:not(:disabled), .choice-grid button:active:not(:disabled), .hand-label:active, .g-icon:active, .reveal-row button:active:not(:disabled), .propose-row button:active:not(:disabled) { transform: scale(.985); filter: brightness(.96); }
 /* win + all-in emphasis */
 .seat.is-winner .seat-core { box-shadow: 0 0 0 2px var(--accent-table), 0 0 22px color-mix(in srgb, var(--accent-table) 55%, transparent); animation: winpulse 900ms ease-out 2; }
-@keyframes winpulse { 0%,100% { box-shadow: 0 0 0 2px var(--accent-table), 0 0 14px color-mix(in srgb,var(--accent-table) 35%, transparent); } 50% { box-shadow: 0 0 0 3px var(--accent-table), 0 0 30px color-mix(in srgb,var(--accent-table) 70%, transparent); } }
+@keyframes winpulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.025); } }
 .pot.pot-won b { animation: potpop 700ms ease-out; display: inline-block; }
 @keyframes potpop { 0% { transform: scale(1); } 40% { transform: scale(1.22); color: var(--accent-table); } 100% { transform: scale(1); } }
 .seat.is-allin .seat-core { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-table) 70%, #fff 10%); }
