@@ -243,6 +243,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
       </div>
       <div className="g-surface">
         <div className="felt" aria-hidden="true" />
+        {meSeat && <div className="g-own-seat" data-seat={mySeat} />}
 
         {sweeps.map((sp) => <ChipSweep key={sp.id} from={{ left: sp.left, top: sp.top }} />)}
         {t.seats.map((seat, i) => {
