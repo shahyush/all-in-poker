@@ -55,7 +55,13 @@ test('three friends: invite → entry → buy-in → start → dealer choice →
   // every player sees their own cards and nobody else's faces
   for (const p of pages) {
     await expect(p.locator('.own-cards .pc:not(.back)')).toHaveCount(dealt, { timeout: 15_000 });
-    const html = await p.locator('.g-surface').innerHTML();
+    await expect(p.locator('.g-surface .own-cards')).toHaveCount(1);
+    // Our private cards now sit on the felt. Every other part of the surface must still hide hole-card faces.
+    const html = await p.locator('.g-surface').evaluate(surface => {
+      const otherCards = surface.cloneNode(true) as HTMLElement;
+      otherCards.querySelector('.own-cards')?.remove();
+      return otherCards.innerHTML;
+    });
     expect(html).not.toMatch(/aria-label="(Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Jack|Queen|King|Ace) of/);
     await expect(p.locator('.seat .pc.back')).toHaveCount(backs);
   }

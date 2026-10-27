@@ -4,6 +4,7 @@ import { currentBest, boardPresentationMs, showdownOrder, RULES } from '@allin/e
 import { useSession } from '../state/session.tsx';
 import { useNow, type TableView } from '../state/table.ts';
 import { TransportError } from '../transport/index.ts';
+import { submitVote } from '../transport/vote.ts';
 import { SeatView } from './Seat.tsx';
 import { Centre } from './Centre.tsx';
 import { Hero } from './Hero.tsx';
@@ -118,7 +119,11 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
 
   const run = useCallback(async (type: string, payload: Record<string, unknown> = {}) => {
     setPending(type); setErr(null);
-    try { await s.transport.cmd(type, payload, row.id); await view.reload(type === 'chat' ? 'chat' : 'game'); }
+    try {
+      if (type === 'vote') await submitVote(s.transport, payload, row.id);
+      else await s.transport.cmd(type, payload, row.id);
+      await view.reload(type === 'chat' ? 'chat' : 'game');
+    }
     catch (e) { const msg = e instanceof TransportError ? e.message : 'Could not reach the server'; setErr(msg); s.toast(msg); throw e; }
     finally { setPending(null); }
   }, [s, row.id, view]);
@@ -243,6 +248,7 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
       </div>
       <div className="g-surface">
         <div className="felt" aria-hidden="true" />
+        {meSeat && <div className="g-own-seat" data-seat={mySeat} />}
 
         {sweeps.map((sp) => <ChipSweep key={sp.id} from={{ left: sp.left, top: sp.top }} />)}
         {t.seats.map((seat, i) => {

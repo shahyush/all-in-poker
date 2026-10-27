@@ -340,3 +340,57 @@
 .pc.dim { opacity: .55; }
 .showdown-card-source[data-source=hole] > span { color: var(--accent-table); font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .turn-bar > i, .timer-ring > i { transition: none; } }
+
+/* Extra-short browser viewports still need room for the runout controls. */
+@container poker-viewport (orientation: portrait) and (max-height: 500px) {
+  .game { grid-template-rows: auto minmax(220px, 1fr) auto; }
+  .propose-row { flex-wrap: nowrap; }
+  .propose-row button { min-width: 0; flex: 1; padding: 0 6px; min-height: 44px; font-size: 12px; }
+  .g-hero { gap: 2px; }
+  .hand-label { min-height: 20px; padding-block: 0; }
+  .seat-cards { height: 14px; margin-bottom: 1px; }
+  .seat-cards .pc.sm { height: 14px; width: 14px; }
+  .seat-core { padding-block: 0; }
+}
+
+/* Classic oval: personal cards belong to the bottom seat, actions stay below. */
+.game { max-width: 1100px; margin-inline: auto; }
+.g-surface { min-height: 0; }
+.g-own-seat { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: min(290px, 88%); z-index: 3; }
+.own-seat { padding: 6px 10px; border: 1px solid var(--table-line); border-radius: 10px; background: var(--game); }
+.own-seat .seat-name { font-size: 11px; max-width: 110px; }
+.own-seat .own-cards { min-height: 38px; }
+.own-seat .hero-meta { font-size: 10px; gap: 0; }
+.own-seat .hero-meta b { font-size: 16px; }
+.own-seat .hero-meta .has-dealer { padding-left: 18px; }
+.centre { top: 47%; }
+.felt { inset: 4% 4% 5%; }
+@container poker-viewport (orientation: portrait) {
+  .game { grid-template-rows: auto minmax(300px, 1fr) auto; }
+}
+@container poker-viewport (orientation: portrait) and (max-height: 600px) {
+  .game { grid-template-rows: auto minmax(280px, 1fr) auto; }
+  .centre { gap: 3px; }
+  .result-strip { max-height: 80px; }
+}
+@container poker-viewport (orientation: landscape) and (max-height: 500px) {
+  .g-own-seat { width: min(240px, 80%); }
+  .own-seat { padding: 2px 6px; }
+  .own-seat .own-cards { min-height: 24px; }
+  .own-seat .own-cards .pc { max-width: 22px; }
+  .own-seat .hero-meta b { font-size: 12px; }
+}
+
+@container poker-viewport (orientation: portrait) and (max-height: 500px) {
+  .game { grid-template-rows: auto minmax(260px, 1fr) auto; }
+}
+@container poker-viewport (orientation: landscape) and (max-height: 500px) {
+  .centre { top: 42%; }
+}
+
+@container poker-viewport (orientation: landscape) and (max-height: 500px) {
+  .g-own-seat { width: min(240px, calc(100% - 176px)); }
+  .own-seat .seat-name { max-width: 80px; }
+  .centre { top: 4px; bottom: 64px; transform: translateX(-50%); justify-content: center; }
+  .result-strip { max-height: 60px; flex-shrink: 1; }
+}

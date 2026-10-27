@@ -169,3 +169,46 @@ test('a command whose body stalls times out without retrying the action, then re
   expect(await page.evaluate(()=>(window as any).commandTest.calls())).toBe(1);
   expect(await page.evaluate(()=>(window as any).commandTest.transport.cmd('start',{},'table','same-action'))).toBe('accepted');
 });
+
+test('simultaneous vote conflicts retry the same receipt and preserve the choice', async ({page}) => {
+  await page.route('http://127.0.0.1:5173/', r=>r.fulfill({contentType:'text/html',body:'<html></html>'}));
+  await page.goto('/');
+  const result = await page.evaluate(async () => {
+    const {submitVote} = await import(/* @vite-ignore */ '/src/transport/vote.ts');
+    const {TransportError} = await import(/* @vite-ignore */ '/src/transport/types.ts');
+    const calls: unknown[][] = [];
+    const result = await submitVote({cmd: async (...args: unknown[]) => {
+      calls.push(args);
+      if (calls.length < 3) throw new TransportError('busy', 'Concurrent vote', 409);
+      return {accepted:true};
+    }}, {choice:'agree'}, 'table-one');
+    return {result, attempts:calls.length, sameReceipt:new Set(calls.map(c=>c[3])).size,
+      commands:calls.map(c=>c.slice(0,3)), receipt:calls[0][3]};
+  });
+  expect(result.result).toEqual({accepted:true});
+  expect(result.attempts).toBe(3);
+  expect(result.sameReceipt).toBe(1);
+  expect(result.receipt).toMatch(/^[0-9a-f-]{36}$/);
+  expect(result.commands).toEqual(Array(3).fill(['vote',{choice:'agree'},'table-one']));
+});
+
+test('vote retry is bounded and does not retry an expired vote or network error', async ({page}) => {
+  await page.route('http://127.0.0.1:5173/', r=>r.fulfill({contentType:'text/html',body:'<html></html>'}));
+  await page.goto('/');
+  const results = await page.evaluate(async () => {
+    const {submitVote} = await import(/* @vite-ignore */ '/src/transport/vote.ts');
+    const {TransportError} = await import(/* @vite-ignore */ '/src/transport/types.ts');
+    const results=[];
+    for (const [code,status] of [['busy',409],['no_vote',409],['network',0],['rate_limit',429]] as const) {
+      let attempts=0;
+      const error=new TransportError(code,'failed',status);
+      const caught=await submitVote({cmd:async()=>{attempts++;throw error;}},{choice:'agree'},'table-one').catch(e=>e);
+      results.push({code,attempts,sameError:caught===error});
+    }
+    return results;
+  });
+  expect(results).toEqual([
+    {code:'busy',attempts:4,sameError:true}, {code:'no_vote',attempts:1,sameError:true},
+    {code:'network',attempts:1,sameError:true}, {code:'rate_limit',attempts:1,sameError:true},
+  ]);
+});

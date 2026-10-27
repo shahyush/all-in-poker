@@ -1,6 +1,6 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { parseChipAmount, type BestHand, type Card, type LegalActions, type PublicHand, type SeatState } from '@allin/engine/public';
-import {Showdown} from './Showdown';
 import {WinnerCelebration} from './WinnerCelebration';
 import { PlayingCard } from './Card.tsx';
 import { Sheet, fmt } from '../components/ui.tsx';
@@ -18,6 +18,9 @@ export interface HeroProps {
 
 export function Hero(p: HeroProps) {
   const { hand, mySeat, me, own, now, busy, pending, legal } = p;
+  const heroRef = useRef<HTMLDivElement>(null);
+  const [seatTarget, setSeatTarget] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => { setSeatTarget(heroRef.current?.closest('.game')?.querySelector<HTMLElement>('.g-own-seat') ?? null); }, [mySeat]);
   const [composer, setComposer] = useState(false);
   const inHand = !!hand?.players.find((x) => x.seat === mySeat);
   const myHp = hand?.players.find((x) => x.seat === mySeat) ?? null;
@@ -34,12 +37,8 @@ export function Hero(p: HeroProps) {
   const winCards = new Set<Card>();
   if (p.awardReady && hand?.result) for (const a of hand.result.awards) for (const w of a.winners) if (w.seat === mySeat) for (const c of w.cards) winCards.add(c);
   const turnLabel = !p.connected ? 'Reconnecting…' : !ready ? 'Dealing…' : pending ? 'Sending…' : myTurn && ready ? (legal!.owed > 0 ? `Your turn · ${fmt(legal!.call)} to call` : 'Your turn') : hand?.phase === 'betting' && hand.actor !== null ? `Waiting for ${hand.actor === mySeat ? 'you' : p.seatNames[hand.actor] ?? 'seat ' + (hand.actor + 1)}` : hand?.phase === 'result' ? (revealOpen ? `Show your cards? ${timeLeft(hand.revealDeadline, now)}s` : 'Next hand shortly') : '';
-  if (hand?.result && !hand.result.uncontested && p.awardReady && hand.result.awards.some(a => a.winners.some(w => w.cards.length === 5))) {
-    return <Showdown key={hand.id} hand={hand} names={p.seatNames} stack={me?.stack} mySeat={mySeat} foldedCards={showCards && myHp?.folded ? own! : undefined} />;
-  }
-  return (
-    <div className="g-hero">
-      <div className="hero-top">
+  const ownSeat = (
+<div className="hero-top own-seat" role="group" aria-label="Your seat">
         <div className={`own-cards ${myHp?.folded ? 'own-folded' : ''}`} style={{'--hole-count': myHp?.holeCount ?? 2} as CSSProperties} aria-label={showCards ? 'Your cards' : 'Your cards appear here'} data-seat={mySeat} data-own>
           {showCards ? own!.map((c, i) => (<span className="deal-slot" data-slot={i} key={i}>
             {revealOpen || revealed.has(i)
@@ -49,13 +48,17 @@ export function Hero(p: HeroProps) {
         </div>
         <div className={`hero-meta ${p.awardReady && (hand?.result?.totals[mySeat] ?? 0) > 0 ? 'hero-winner' : ''}`}>
           {p.winnerBurst && (hand?.result?.totals[mySeat] ?? 0) > 0 && <WinnerCelebration key={hand?.id} />}
-          <span>{me ? 'Your stack' : ''}</span>
+          <span className={`seat-name${hand?.button === mySeat ? ' has-dealer' : ''}`}>{me ? me.name === 'You' ? 'You' : `${me.name} · You` : ''}</span>
           <b>{me ? fmt(me.stack) : ''}</b>
           {myHp && myHp.bet > 0 && <span>In front {fmt(myHp.bet)}</span>}
           {myHp?.folded && <span>Folded</span>}
           {myHp?.allIn && !myHp.folded && <span>All-in</span>}
         </div>
       </div>
+  );
+  return (
+    <div className="g-hero" ref={heroRef}>
+      {seatTarget ? createPortal(ownSeat, seatTarget) : ownSeat}
       {showCards && p.made && (
         <button type="button" className="hand-label" aria-pressed={p.madeShown} onClick={p.onToggleMade}>
           <span>{hand?.boards ? 'Board A' : 'Your hand'}</span><b>{p.made.name}</b>
