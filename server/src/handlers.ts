@@ -149,7 +149,7 @@ export class Handlers {
       const pre = tick(L.t, L.now, ctx);
       const out = fn(L, ctx);
       const effects = [...pre, ...out.effects];
-      const r = await commitTable(this.db, { ...L, t: before }, L.t, effects, { ...(out.extras ?? {}), receipt: receipt ?? undefined }, approved);
+      const r = await commitTable(this.db, { ...L, t: before }, L.t, effects, { ...(out.extras ?? {}), receipt: receipt ? { ...receipt, result: out.result } : undefined }, approved);
       if (r.ok) return { result: out.result as T };
       if (r.duplicate && r.receipt) return { result: r.receipt.result as T, duplicate: { ...receipt!, status: r.receipt.status, result: r.receipt.result } };
       if (!r.conflict) bad(500, 'commit_failed', 'Could not save that, please try again');
