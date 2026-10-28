@@ -101,8 +101,12 @@ describe('full cash session through the API', () => {
     const actor = await actorClient(tableId);
     const first = await actor.raw('act', { action: 'call' }, tableId);
     expect(first.body.ok).toBe(true);
+    const committed = (await W.db.select<{ version: number }>('tables', { id: tableId }))[0];
+    expect(first.body.result.version).toBe(committed.version);
+    expect(first.body.result.version).toBeGreaterThan(1);
     const replay = await actor.raw('act', { action: 'call' }, tableId, first.actionId);
     expect(replay.body.ok).toBe(true); expect(replay.body.replayed).toBe(true);
+    expect(replay.body.result.version).toBe(first.body.result.version);
     const conflict = await actor.raw('act', { action: 'fold' }, tableId, first.actionId);
     expect(conflict.body.error?.code).toBe('action_conflict');
     // finish preflop then flop/turn/river by checking/calling

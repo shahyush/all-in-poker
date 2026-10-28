@@ -91,6 +91,10 @@ test('a failed identity restore preserves tokens and never creates a different p
 });
 
 test('game refreshes do not wait for chat or refetch the same private hand', async ({page})=>{
+  // Measure explicit refreshes in isolation: the development transport also polls
+  // every 600ms, which otherwise races these exact request-count assertions.
+  await page.clock.install();
+  await page.clock.pauseAt(new Date());
   const counts:Record<string,number>={};
   await page.route('http://127.0.0.1:8787/**',async route=>{
     const headers={'access-control-allow-origin':'*','access-control-allow-headers':'content-type,authorization'};
@@ -115,6 +119,11 @@ test('game refreshes do not wait for chat or refetch the same private hand', asy
   });
   await expect(page.locator('#own')).toHaveText('hand-1');
   await page.evaluate(()=>(window as any).probeRefresh());
+  const acknowledged = counts.tables;
+  await page.evaluate(()=>(window as any).probeRefresh('game', 1));
+  expect(counts.tables).toBe(acknowledged);
+  await page.evaluate(()=>(window as any).probeRefresh('game', 2));
+  expect(counts.tables).toBe(acknowledged + 1);
   const before={...counts};
   await page.evaluate(()=>Promise.all(Array.from({length:30},()=>(window as any).probeRefresh('game'))));
   expect(counts.hole_cards).toBe(before.hole_cards);
@@ -211,4 +220,39 @@ test('vote retry is bounded and does not retry an expired vote or network error'
     {code:'busy',attempts:4,sameError:true}, {code:'no_vote',attempts:1,sameError:true},
     {code:'network',attempts:1,sameError:true}, {code:'rate_limit',attempts:1,sameError:true},
   ]);
+});
+
+test('bet taps acknowledge immediately, block duplicates and wait for the accepted table version', async ({page}) => {
+  let sends = 0;
+  let release: (()=>void) | undefined;
+  await page.route('http://127.0.0.1:8787/**', async route => {
+    const headers = {'access-control-allow-origin':'*','access-control-allow-headers':'content-type,authorization'};
+    if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+    const url = route.request().url(); let body: unknown = {};
+    if(url.endsWith('/dev/signin'))body={token:'dev:p0',authUid:'p0'};
+    else if(url.endsWith('/dev/now'))body={now:Date.now()};
+    else if(url.endsWith('/cmd')) {
+      const command=route.request().postDataJSON();
+      if(command.type==='act') {sends++; await new Promise<void>(resolve=>{release=resolve;}); body={ok:true,result:{version:2}};}
+      else body={ok:true,result:{player:{id:'p0',name:'P0'}}};
+    }
+    await route.fulfill({json:body,headers});
+  });
+  await page.route('http://127.0.0.1:5173/',r=>r.fulfill({contentType:'text/html',body:'<html><div id="root"></div></html>'}));
+  await page.goto('/');
+  await page.evaluate(async()=>{
+    const refresh=await import(/* @vite-ignore */ '/@react-refresh');refresh.default.injectIntoGlobalHook(window);
+    (window as any).$RefreshReg$=()=>{};(window as any).$RefreshSig$=()=>(t:unknown)=>t;(window as any).__vite_plugin_react_preamble_installed__=true;
+    (await import(/* @vite-ignore */ '/e2e/action-feedback-fixture.tsx')).renderActionProbe();
+  });
+  const call=page.locator('.dock .call'); await expect(call).toBeEnabled();
+  await call.evaluate((button:HTMLButtonElement)=>{button.click();button.click();});
+  await expect(call).toHaveText(/Calling…|Checking…/);
+  await expect(call).toBeDisabled(); expect(sends).toBe(1);
+  release!();
+  await expect(page.locator('.turn-line')).toContainText('Accepted');
+  await expect(call).toBeDisabled();
+  await page.evaluate(()=>(window as any).publishActionVersion(2));
+  await expect(call).toBeEnabled();
+  expect(sends).toBe(1);
 });

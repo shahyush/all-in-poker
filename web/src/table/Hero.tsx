@@ -1,3 +1,4 @@
+import { RULES } from '@allin/engine/public';
 import { createPortal } from 'react-dom';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { parseChipAmount, type BestHand, type Card, type LegalActions, type PublicHand, type SeatState } from '@allin/engine/public';
@@ -28,7 +29,7 @@ export function Hero(p: HeroProps) {
   const deadline = myTurn ? hand?.deadline ?? null : null;
   const secs = timeLeft(deadline, now);
   const ready = now >= Math.max(hand?.actionReadyAt ?? 0, p.presentationUntil ?? 0);
-  const frac = deadline ? Math.max(0, Math.min(1, (deadline - now) / 30000)) : 0;
+  const frac = deadline ? Math.max(0, Math.min(1, (deadline - now) / RULES.timers.bettingMs)) : 0;
   useEffect(() => { if (!myTurn) setComposer(false); }, [myTurn]);
   const showCards = own && hand && p.ownHandId === hand.id && myHp;
   const canPropose = myTurn && hand && !hand.boards && (hand.street === 'flop' || hand.street === 'turn') && hand.currentBet === 0 && !hand.players.some((x) => x.bet > 0) && !hand.proposedStreets.includes(hand.street) && hand.players.filter((x) => !x.folded).length > 1;
@@ -36,7 +37,8 @@ export function Hero(p: HeroProps) {
   const revealed = new Set(myHp?.revealed ?? []);
   const winCards = new Set<Card>();
   if (p.awardReady && hand?.result) for (const a of hand.result.awards) for (const w of a.winners) if (w.seat === mySeat) for (const c of w.cards) winCards.add(c);
-  const turnLabel = !p.connected ? 'Reconnecting…' : !ready ? 'Dealing…' : pending ? 'Sending…' : myTurn && ready ? (legal!.owed > 0 ? `Your turn · ${fmt(legal!.call)} to call` : 'Your turn') : hand?.phase === 'betting' && hand.actor !== null ? `Waiting for ${hand.actor === mySeat ? 'you' : p.seatNames[hand.actor] ?? 'seat ' + (hand.actor + 1)}` : hand?.phase === 'result' ? (revealOpen ? `Show your cards? ${timeLeft(hand.revealDeadline, now)}s` : 'Next hand shortly') : '';
+  const sendingLabel = pending === 'call' ? 'Calling…' : pending === 'check' ? 'Checking…' : pending === 'fold' ? 'Folding…' : pending === 'raise' ? 'Raising…' : pending === 'confirmed' ? 'Accepted · updating table…' : 'Sending…';
+  const turnLabel = !p.connected ? 'Reconnecting…' : !ready ? 'Dealing…' : pending ? sendingLabel : myTurn && ready ? (legal!.owed > 0 ? `Your turn · ${fmt(legal!.call)} to call` : 'Your turn') : hand?.phase === 'betting' && hand.actor !== null ? `Waiting for ${hand.actor === mySeat ? 'you' : p.seatNames[hand.actor] ?? 'seat ' + (hand.actor + 1)}` : hand?.phase === 'result' ? (revealOpen ? `Show your cards? ${timeLeft(hand.revealDeadline, now)}s` : 'Next hand shortly') : '';
   const ownSeat = (
 <div className="hero-top own-seat" role="group" aria-label="Your seat">
         <div className={`own-cards ${myHp?.folded ? 'own-folded' : ''}`} style={{'--hole-count': myHp?.holeCount ?? 2} as CSSProperties} aria-label={showCards ? 'Your cards' : 'Your cards appear here'} data-seat={mySeat} data-own>
@@ -64,7 +66,7 @@ export function Hero(p: HeroProps) {
           <span>{hand?.boards ? 'Board A' : 'Your hand'}</span><b>{p.made.name}</b>
         </button>
       )}
-      <div className={`turn-line ${myTurn && ready && p.connected && !pending ? 'is-your-turn' : ''} ${myTurn && secs <= 10 ? 'urgent' : ''}`} ><span aria-live="polite">{turnLabel}</span><span aria-hidden="true">{myTurn && ready && deadline ? `${secs}s` : ''}</span></div>
+      <div className={`turn-line ${myTurn && ready && p.connected && !pending ? 'is-your-turn' : ''} ${myTurn && secs <= 5 ? 'urgent' : ''}`} ><span aria-live="polite">{turnLabel}</span><span aria-hidden="true">{myTurn && ready && deadline ? `${secs}s` : ''}</span></div>
       <div className="turn-bar" aria-hidden="true"><i className="motion" style={{ transform: `scaleX(${myTurn ? frac : 0})` }} /></div>
       {me && me.status === 'sitout' && !hand?.players.some((x) => x.seat === mySeat) && (
         <div className="propose-row"><button type="button" onClick={() => p.onReturn(false)}>I'm back · wait for big blind</button>{me.owesBB && <button type="button" onClick={() => p.onReturn(true)}>Post and play</button>}</div>
@@ -76,10 +78,10 @@ export function Hero(p: HeroProps) {
         </div>
       ) : hand?.phase === 'betting' ? (
         <>
-          <div className="dock" role="group" aria-label="Actions">
-            <button type="button" className="fold" disabled={!myTurn || busy || !ready} onClick={() => p.onAct('fold')}>Fold</button>
-            <button type="button" className="call" disabled={!myTurn || busy || !ready} onClick={() => p.onAct(legal && legal.owed > 0 ? 'call' : 'check')}>{legal && legal.owed > 0 ? `Call ${fmt(legal.call)}` : 'Check'}</button>
-            <button type="button" className="raise" disabled={!myTurn || busy || !ready || !legal?.raise} onClick={() => setComposer(true)}>{legal?.raise?.isBet ? 'Bet' : 'Raise'}</button>
+          <div className="dock" aria-busy={busy} role="group" aria-label="Actions">
+            <button type="button" className="fold" disabled={!myTurn || busy || !ready} onClick={() => p.onAct('fold')}>{pending === 'fold' ? 'Folding…' : 'Fold'}</button>
+            <button type="button" className="call" disabled={!myTurn || busy || !ready} onClick={() => p.onAct(legal && legal.owed > 0 ? 'call' : 'check')}>{pending === 'call' ? 'Calling…' : pending === 'check' ? 'Checking…' : legal && legal.owed > 0 ? `Call ${fmt(legal.call)}` : 'Check'}</button>
+            <button type="button" className="raise" disabled={!myTurn || busy || !ready || !legal?.raise} onClick={() => setComposer(true)}>{pending === 'raise' ? 'Raising…' : legal?.raise?.isBet ? 'Bet' : 'Raise'}</button>
           </div>
           <div className="dock-note">{!ready && inHand ? '' : legal?.raiseClosed && myTurn ? legal.raiseClosed : legal?.raise && legal.allInTo === null && legal.raise.maxTo < legal.stack + legal.bet ? `Max ${fmt(legal.raise.maxTo)}` : ''}</div>
           {canPropose && <div className="propose-row"><button type="button" disabled={busy || !ready} aria-label="Run out now, end betting if everyone agrees" onClick={() => p.onPropose(1)}>Run out now</button><button type="button" disabled={busy || !ready || !hand!.canRunTwice} onClick={() => p.onPropose(2)}>Two boards · keep betting</button></div>}

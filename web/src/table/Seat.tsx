@@ -1,3 +1,4 @@
+import { RULES } from '@allin/engine/public';
 import type { Card, PublicHand, SeatState } from '@allin/engine/public';
 import {WinnerCelebration} from './WinnerCelebration';
 import { PlayingCard } from './Card.tsx';
@@ -29,7 +30,7 @@ export function SeatView({ index, seat, hand, pos, isHost, present, now, isMe, s
         : hand.straddleSeat === index ? { cls: 'str', text: 'STR', label: `Straddle ${fmt(hand.bb * 2)}` } : null
     : null;
   const label = `Seat ${index + 1}, ${seat.name}${isMe ? ' (you)' : ''}, ${fmt(seat.stack)} chips${status.length ? ', ' + status.join(', ') : ''}${actor ? ', to act' : ''}${hand?.button === index ? ', dealer' : ''}`;
-  const remaining = actor && hand?.deadline ? Math.min(1, Math.max(0, hand.deadline - now) / 30000) : 0;
+  const remaining = actor && hand?.deadline ? Math.min(1, Math.max(0, hand.deadline - now) / RULES.timers.bettingMs) : 0;
   const backs = hp && !hp.folded && !shownCards ? hp.holeCount : 0;
   return (
     <div className={`seat ${actor ? 'is-actor' : ''} ${hp?.folded ? 'is-folded' : ''} ${won != null && won > 0 ? 'is-winner' : ''} ${hp?.allIn && !hp.folded ? 'is-allin' : ''}`} style={{ left: pos.left < 20 ? '40px' : pos.left > 80 ? 'calc(100% - 40px)' : pos.left + '%', top: pos.top + '%' }} data-seat={index} aria-label={label} role="group">

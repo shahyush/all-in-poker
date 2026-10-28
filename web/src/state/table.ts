@@ -23,7 +23,7 @@ export interface TableView {
   own: OwnCards | null;
   error: string | null;
   loaded: boolean;
-  reload(scope?: 'game' | 'chat' | 'all'): Promise<void>;
+  reload(scope?: 'game' | 'chat' | 'all', minimumVersion?: number): Promise<void>;
   connected: boolean;
 }
 
@@ -81,9 +81,11 @@ export function useTable(tableId: string): TableView {
   const loadLedger = useMemo(() => coalescedRefresh(async () => {
     try { setLedger(await t.query<LedgerRow>('ledger', { table_id: tableId }, { order: 'id' })); setParticipants(await t.query<ParticipantRow>('session_participants', { table_id: tableId })); } catch { /* ignore */ }
   }), [t, tableId]);
-  const reload = useCallback(async (scope: 'game' | 'chat' | 'all' = 'all') => {
+  const reload = useCallback(async (scope: 'game' | 'chat' | 'all' = 'all', minimumVersion?: number) => {
     if (scope === 'chat') { await Promise.all([loadChat(), loadReactions()]); return; }
-    await loadTable();
+    // Realtime may already have delivered the committed command while its reply was in flight.
+    // Avoid an extra serialized HTTP read in that case; never skip an unknown/newer version.
+    if (minimumVersion === undefined || versionRef.current < minimumVersion) await loadTable();
     await loadOwn();
     if (scope === 'all') await Promise.all([loadMembers(), loadChat(), loadReactions(), loadReloads(), loadLedger()]);
   }, [loadTable, loadOwn, loadMembers, loadChat, loadReactions, loadReloads, loadLedger]);

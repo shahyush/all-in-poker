@@ -149,7 +149,7 @@ export class Handlers {
       const pre = tick(L.t, L.now, ctx);
       const out = fn(L, ctx);
       const effects = [...pre, ...out.effects];
-      const r = await commitTable(this.db, { ...L, t: before }, L.t, effects, { ...(out.extras ?? {}), receipt: receipt ?? undefined }, approved);
+      const r = await commitTable(this.db, { ...L, t: before }, L.t, effects, { ...(out.extras ?? {}), receipt: receipt ? { ...receipt, result: out.result } : undefined }, approved);
       if (r.ok) return { result: out.result as T };
       if (r.duplicate && r.receipt) return { result: r.receipt.result as T, duplicate: { ...receipt!, status: r.receipt.status, result: r.receipt.result } };
       if (!r.conflict) bad(500, 'commit_failed', 'Could not save that, please try again');
@@ -272,7 +272,7 @@ export class Handlers {
         const extras: CommitExtras = { touch: player.id };
         // Hide a departed player from the active dashboard, retaining their LPS stack in play.
         if (seatOf(t, player.id) === -1 || (t.rules.mode === 'tournament' && t.status === 'running')) extras.members = [{ user_id: player.id, status: 'left', seat: null }];
-        return { effects: eff, result: { ok: true, version: t.version + 1 }, extras };
+        return { effects: eff, result: { ok: true, version: L.row.version + 1 }, extras };
       }
       if (type === 'remove') {
         this.requireHost(L, player);
@@ -309,7 +309,7 @@ export class Handlers {
         case 'cancel_leave': cancelLeave(t, player.id); break;
         default: bad(400, 'bad_type', 'Unknown command');
       }
-      return { effects, result: { ok: true, version: t.version + 1 }, extras: { touch: player.id } };
+      return { effects, result: { ok: true, version: L.row.version + 1 }, extras: { touch: player.id } };
     }, prepare);
     return { result: r.result };
   }
