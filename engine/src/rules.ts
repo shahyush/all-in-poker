@@ -15,7 +15,7 @@ export const RULES = {
   timers: {
     choiceMs: 15000,
     choiceWarmupCapMs: 30000,
-    bettingMs: 30000,
+    bettingMs: 15000,
     voluntaryVoteMs: 8000,
     forcedOfferMs: 5000,
     revealMs: 10000,

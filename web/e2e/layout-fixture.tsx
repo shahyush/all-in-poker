@@ -13,7 +13,7 @@ export function renderLayout(count: number, holes: number, twice: boolean, shown
   const now = Date.now();
   const seats = Array.from({ length: count }, (_, i) => ({ playerId: String(i), name: ['You', 'Stu', 'TR45', 'Sne'][i] ?? `Player ${i}`, stack: 900, status: 'in' }));
   const hand: any = { id: 'layout', handNo: 1, phase: 'betting', street: 'flop', actor: acting ? 0 : 1, button: count - 1, pot: 300, board: [2, 11, 24], boards: twice ? [[2, 11, 24, 31, 43], [2, 11, 24, 33, 45]] : null,
-    players: seats.map((s, i) => ({ seat: i, playerId: s.playerId, holeCount: holes, bet: acting ? 0 : 20, paid: 100, revealed: [], folded: folded && i === 0 })), canRunTwice: true, proposedStreets: [], currentBet: 0, deadline: now + 30000 };
+    players: seats.map((s, i) => ({ seat: i, playerId: s.playerId, holeCount: holes, bet: acting ? 0 : 20, paid: 100, revealed: [], folded: folded && i === 0 })), canRunTwice: true, proposedStreets: [], currentBet: 0, deadline: now + 15000 };
   if (result) {
     hand.phase = 'result';
     hand.result = { uncontested: false, totals: twice ? {1:150,0:150} : {1:300}, awards: [{board:0, winners:[{seat:1, name:'Two pair, Kings and Eights', cards:[26,27,2,11,24]}]}, ...(twice ? [{board:1, winners:[{seat:0, name:'Flush, Ace high', cards:[15,16,24,33,45]}]}] : [])], shows: {}, boards: hand.boards ?? [hand.board] };

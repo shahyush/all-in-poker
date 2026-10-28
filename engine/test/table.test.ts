@@ -338,6 +338,14 @@ describe('betting rules', () => {
     act(t, h.actor!, { type: 'call' }, ready, ctx);
     expect(h.phase === 'offer' || h.phase === 'runout').toBe(true);
   });
+  it('gives each player 15 seconds after presentation and after the previous action', () => {
+    const { t, now, ctx } = makeTable([1000, 1000, 1000]);
+    const ready = start(t, now, ctx);
+    expect(t.hand!.deadline).toBe(t.hand!.actionReadyAt! + 15000);
+    const actionAt = ready + 2000;
+    act(t, t.hand!.actor!, { type: 'call' }, actionAt, ctx);
+    expect(t.hand!.deadline).toBe(actionAt + 15000);
+  });
   it('a betting command before the deal presentation is ready is rejected', () => {
     const { t, now, ctx } = makeTable([1000, 1000, 1000]);
     startTable(t, now, ctx);

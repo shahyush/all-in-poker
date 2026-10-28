@@ -117,16 +117,30 @@ export function TablePage({ view, go }: { view: TableView; go: (to: string) => v
     finally { setSubmitting(null); }
   }, [submitting, chosen, s, row.id, view]);
 
+  const commandInFlight = useRef(false);
+  const [acceptedVersion, setAcceptedVersion] = useState<number | null>(null);
+  useEffect(() => {
+    if (acceptedVersion !== null && row.version >= acceptedVersion) {
+      setAcceptedVersion(null); setPending(null);
+    }
+  }, [acceptedVersion, row.version]);
   const run = useCallback(async (type: string, payload: Record<string, unknown> = {}) => {
-    setPending(type); setErr(null);
+    if (commandInFlight.current || acceptedVersion !== null) return;
+    commandInFlight.current = true;
+    setPending(type === 'act' ? String(payload.action) : type); setErr(null);
+    let accepted = false;
     try {
-      if (type === 'vote') await submitVote(s.transport, payload, row.id);
-      else await s.transport.cmd(type, payload, row.id);
-      await view.reload(type === 'chat' ? 'chat' : 'game');
+      const result = type === 'vote' ? await submitVote(s.transport, payload, row.id)
+        : await s.transport.cmd<{version?: number}>(type, payload, row.id);
+      const version = (result as {version?: number} | undefined)?.version;
+      if (type === 'act' && typeof version === 'number') {
+        accepted = true; setAcceptedVersion(version); setPending('confirmed');
+      }
+      await view.reload(type === 'chat' ? 'chat' : 'game', version);
     }
     catch (e) { const msg = e instanceof TransportError ? e.message : 'Could not reach the server'; setErr(msg); s.toast(msg); throw e; }
-    finally { setPending(null); }
-  }, [s, row.id, view]);
+    finally { commandInFlight.current = false; if (!accepted) setPending(null); }
+  }, [s, row.id, view, acceptedVersion]);
   const quiet = useCallback(async (type: string, payload: Record<string, unknown> = {}) => { try { await run(type, payload); return true; } catch { return false; /* toast shown */ } }, [run]);
   // fire-and-forget command that does NOT flip `pending` (so it never disables the action/choice controls)
   const silent = useCallback(async (type: string, payload: Record<string, unknown> = {}) => { try { await s.transport.cmd(type, payload, row.id); await view.reload(type === 'chat' ? 'chat' : 'game'); } catch { /* ignore */ } }, [s, row.id, view]);
