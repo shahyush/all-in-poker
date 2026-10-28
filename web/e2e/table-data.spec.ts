@@ -91,6 +91,10 @@ test('a failed identity restore preserves tokens and never creates a different p
 });
 
 test('game refreshes do not wait for chat or refetch the same private hand', async ({page})=>{
+  // Measure explicit refreshes in isolation: the development transport also polls
+  // every 600ms, which otherwise races these exact request-count assertions.
+  await page.clock.install();
+  await page.clock.pauseAt(new Date());
   const counts:Record<string,number>={};
   await page.route('http://127.0.0.1:8787/**',async route=>{
     const headers={'access-control-allow-origin':'*','access-control-allow-headers':'content-type,authorization'};
